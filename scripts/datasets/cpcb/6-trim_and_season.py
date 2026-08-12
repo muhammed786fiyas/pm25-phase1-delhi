@@ -16,6 +16,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", required=True, help = "Combined CSV")
     parser.add_argument("--outdir", required=True)
+    parser.add_argument("--config", default="configs/seasons.yaml")
     args = parser.parse_args()
 
     os.makedirs(args.outdir,exist_ok=True)
