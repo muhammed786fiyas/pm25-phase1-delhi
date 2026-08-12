@@ -1,0 +1,34 @@
+# ---- secrets ----
+.env
+.env.local
+*.key
+
+# ---- bulk downloaded data (regenerable from the API; keep out of git) ----
+data/
+pm25_*/
+CPCB_Measurements/
+test_run/
+*.csv.gz
+*.parquet
+
+# NOTE: station metadata CSVs are deliberately NOT ignored.
+# They are small and contain manual QC decisions that cannot be regenerated
+# automatically, so they belong in version control. See stations/ .
+
+# ---- python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.ipynb_checkpoints/
+.pytest_cache/
+
+# ---- environments ----
+.venv/
+venv/
+env/
+
+# ---- editors / OS ----
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
