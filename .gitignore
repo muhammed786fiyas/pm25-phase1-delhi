@@ -3,17 +3,17 @@
 .env.local
 *.key
 
-# ---- bulk downloaded data (regenerable from the API; keep out of git) ----
-data/
-pm25_*/
-CPCB_Measurements/
-test_run/
+# ---- bulk downloaded data (DVC-tracked; DVC manages ignoring the real files) ----
+# NOTE: data/raw, data/interim, data/processed are tracked via DVC.
+# Their .dvc pointer files ARE version controlled — only the real data is ignored,
+# and DVC adds those specific ignore rules automatically on `dvc add`.
+
 *.csv.gz
 *.parquet
 
-# NOTE: station metadata CSVs are deliberately NOT ignored.
-# They are small and contain manual QC decisions that cannot be regenerated
-# automatically, so they belong in version control. See stations/ .
+# ---- station metadata: deliberately NOT ignored ----
+# Small, manually-QC'd CSVs that can't be regenerated automatically.
+# Tracked directly in git, not through DVC. See data/stations/.
 
 # ---- python ----
 __pycache__/
