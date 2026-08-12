@@ -1,0 +1,6 @@
+outs:
+- md5: 7b8c805eabe8a87421fc33a74206abf2.dir
+  size: 104080997
+  nfiles: 49
+  hash: md5
+  path: cpcb
