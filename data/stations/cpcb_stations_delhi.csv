@@ -1,0 +1,57 @@
+location_id,name,locality,latitude,longitude,country_iso,timezone,is_mobile,parameters,sensor_count,datetime_first,datetime_last
+13,"Delhi Technological University, Delhi - CPCB",,28.744,77.12,IN,Asia/Kolkata,False,"no2,o3,pm25",3,2016-11-03T00:30:00+05:30,2018-02-22T09:30:00+05:30
+15,IGI Airport,,28.56,77.094,IN,Asia/Kolkata,False,"co,no2,o3,pm10,pm25",5,,
+16,Civil Lines,,28.6787,77.2262,IN,Asia/Kolkata,False,"co,no2,pm10,pm25",4,,
+17,"R K Puram, Delhi - DPCC",,28.563262,77.186937,IN,Asia/Kolkata,False,"co,no,no2,nox,o3,pm10,pm25,relativehumidity,so2,temperature,wind_direction,wind_speed",18,2016-02-05T20:25:00+05:30,2026-07-30T11:15:00+05:30
+50,"Punjabi Bagh, Delhi - DPCC",,28.674045,77.131023,IN,Asia/Kolkata,False,"co,no,no2,nox,o3,pm10,pm25,relativehumidity,so2,temperature,wind_direction,wind_speed",18,2016-02-05T20:25:00+05:30,2026-07-30T11:15:00+05:30
+103,"Income Tax Office, Delhi - CPCB",,28.623499999999996,77.2494,IN,Asia/Kolkata,False,"co,no2,o3,pm10,pm25",5,2016-11-03T00:00:00+05:30,2018-02-22T09:15:00+05:30
+235,"Anand Vihar, New Delhi - DPCC",,28.646835,77.316032,IN,Asia/Kolkata,False,"co,no,no2,nox,o3,pm10,pm25,relativehumidity,so2,temperature,wind_direction,wind_speed",18,2016-02-05T19:45:00+05:30,2026-07-30T11:15:00+05:30
+236,"Mandir Marg, Delhi - DPCC",,28.6341,77.2005,IN,Asia/Kolkata,False,"co,no2,o3,pm10,pm25,so2",6,2016-02-05T20:30:00+05:30,2018-02-22T02:45:00+05:30
+301,"Vikas Sadan, Gurugram - HSPCB",,28.4501238,77.0263051,IN,Asia/Kolkata,False,"co,no,no2,nox,o3,pm10,pm25,relativehumidity,so2,temperature,wind_direction,wind_speed",18,2016-03-25T13:30:00+05:30,2026-07-30T11:15:00+05:30
+431,"IHBAS, Delhi - CPCB",,28.6821,77.305,IN,Asia/Kolkata,False,"co,no2,pm25,so2",4,2016-04-11T00:00:00+05:30,2018-02-22T08:15:00+05:30
+2503,"Shadipur, Delhi - CPCB",,28.651699999999998,77.1581,IN,Asia/Kolkata,False,"co,no2,o3,pm25,so2",5,2016-03-22T05:00:00+05:30,2018-02-22T08:15:00+05:30
+5404,"Pusa, Delhi - IMD",,28.639645,77.146263,IN,Asia/Kolkata,False,"co,no,no2,nox,o3,pm10,pm25",11,2017-09-15T11:30:00+05:30,2026-07-30T10:30:00+05:30
+5541,"Burari Crossing, New Delhi - IMD",,28.7256504,77.2011573,IN,Asia/Kolkata,False,"co,no,no2,nox,o3,pm10,pm25",12,2018-03-09T11:30:00+05:30,2026-07-30T11:15:00+05:30
+5570,"Aya Nagar, New Delhi - IMD",,28.474261,77.131606,IN,Asia/Kolkata,False,"co,no,no2,nox,o3,pm10,pm25",12,2018-03-09T11:00:00+05:30,2026-07-30T11:00:00+05:30
+5586,"Sirifort, Delhi - CPCB",,28.5504249,77.2159377,IN,Asia/Kolkata,False,"co,no,no2,nox,o3,pm10,pm25,relativehumidity,so2,temperature,wind_direction,wind_speed",12,2025-02-19T01:45:00+05:30,2026-07-30T11:15:00+05:30
+5598,"Sector - 125, Noida, UP - UPPCB",,28.5447608,77.3231257,IN,Asia/Kolkata,False,"co,no,no2,nox,o3,pm10,pm25,relativehumidity,so2,temperature,wind_direction,wind_speed",12,2025-02-19T01:45:00+05:30,2026-07-30T11:15:00+05:30
+5610,"North Campus, DU, Delhi - IMD",,28.6573814,77.1585447,IN,Asia/Kolkata,False,"co,no,no2,nox,o3,pm10,pm25",13,2018-03-09T11:00:00+05:30,2026-07-30T11:00:00+05:30
+5613,"ITO, New Delhi - CPCB",,28.628624,77.24106,IN,Asia/Kolkata,False,"co,no,no2,nox,o3,pm10,pm25,so2",14,2018-03-09T11:00:00+05:30,2026-07-30T11:30:00+05:30
+5622,"NSIT Dwarka, Delhi - CPCB",,28.60909,77.0325413,IN,Asia/Kolkata,False,"co,no,no2,nox,o3,pm10,pm25,relativehumidity,so2,temperature,wind_direction,wind_speed",18,2018-03-09T11:30:00+05:30,2026-07-25T09:00:00+05:30
+5626,"DTU, New Delhi - CPCB",,28.7500499,77.1112615,IN,Asia/Kolkata,False,"co,no,no2,nox,o3,pm10,pm25,relativehumidity,so2,temperature,wind_direction,wind_speed",18,2018-03-09T11:00:00+05:30,2026-07-30T11:30:00+05:30
+5627,"CRRI Mathura Road, New Delhi - IMD",,28.5512005,77.2735737,IN,Asia/Kolkata,False,"co,no,no2,nox,o3,pm10,pm25",12,2018-03-09T11:00:00+05:30,2026-07-30T11:15:00+05:30
+5630,"Shadipur, Delhi - CPCB",,28.6514781,77.1473105,IN,Asia/Kolkata,False,"co,no,no2,nox,o3,pm10,pm25,relativehumidity,so2,temperature,wind_direction,wind_speed",18,2018-03-09T11:30:00+05:30,2026-07-30T11:15:00+05:30
+5634,"Lodhi Road, New Delhi - IMD",,28.5918245,77.2273074,IN,Asia/Kolkata,False,"co,no,no2,nox,o3,pm10,pm25",12,2018-03-09T11:00:00+05:30,2026-07-30T11:15:00+05:30
+5650,"IGI Airport (T3), Delhi - IMD",,28.5627763,77.1180053,IN,Asia/Kolkata,False,"co,no,no2,nox,o3,pm10,pm25",7,2025-02-19T01:46:00+05:30,2026-07-30T11:15:00+05:30
+6356,"Pusa, Delhi - DPCC",,28.639645,77.146262,IN,Asia/Kolkata,False,"co,no,no2,nox,o3,pm10,pm25,relativehumidity,so2,temperature,wind_direction,wind_speed",12,2025-02-19T01:45:00+05:30,2026-07-30T11:15:00+05:30
+6358,"Mandir Marg, New Delhi - DPCC",,28.636429,77.201067,IN,Asia/Kolkata,False,"co,no,no2,nox,o3,pm10,pm25,relativehumidity,so2,temperature,wind_direction,wind_speed",18,2018-08-10T11:30:00+05:30,2026-07-30T11:15:00+05:30
+6359,"IHBAS, Dilshad Garden,New Delhi - CPCB",,28.6811736,77.3025234,IN,Asia/Kolkata,False,"co,no,no2,nox,o3,pm10,pm25,relativehumidity,so2,temperature,wind_direction,wind_speed",18,2018-04-28T21:15:00+05:30,2026-07-30T08:30:00+05:30
+6929,"Major Dhyan Chand National Stadium, Delhi - DPCC",,28.611281,77.237738,IN,Asia/Kolkata,False,"co,no,no2,nox,o3,pm10,pm25,relativehumidity,so2,temperature,wind_direction,wind_speed",18,2018-08-10T12:30:00+05:30,2026-07-30T11:45:00+05:30
+6931,"Dwarka-Sector 8, Delhi - DPCC ",,28.5710274,77.0719006,IN,Asia/Kolkata,False,"co,no,no2,nox,o3,pm10,pm25,relativehumidity,so2,temperature,wind_direction,wind_speed",18,2018-08-10T11:45:00+05:30,2026-07-30T11:45:00+05:30
+6932,"Alipur, Delhi - DPCC",,28.815329,77.15301,IN,Asia/Kolkata,False,"co,no,no2,nox,o3,pm10,pm25,relativehumidity,so2,temperature,wind_direction,wind_speed",18,2018-12-15T20:30:00+05:30,2026-07-30T11:15:00+05:30
+6934,"Dr. Karni Singh Shooting Range, Delhi - DPCC",,28.498571,77.26484,IN,Asia/Kolkata,False,"co,no,no2,nox,o3,pm10,pm25,relativehumidity,so2,temperature,wind_direction,wind_speed",18,2018-08-10T12:00:00+05:30,2026-07-30T11:45:00+05:30
+6936,"Arya Nagar, Bahadurgarh - HSPCB",,28.6701,76.9254,IN,Asia/Kolkata,False,"co,no,no2,nox,o3,pm10,pm25,relativehumidity,so2,temperature,wind_direction,wind_speed",18,2019-02-13T05:45:00+05:30,2026-07-30T11:15:00+05:30
+6938,"Vivek Vihar, Delhi - DPCC",,28.672342,77.31526,IN,Asia/Kolkata,False,"co,no,no2,nox,o3,pm10,pm25,relativehumidity,so2,temperature,wind_direction,wind_speed",18,2018-12-15T20:45:00+05:30,2026-07-30T11:15:00+05:30
+6957,"Jawaharlal Nehru Stadium, Delhi - DPCC",,28.58028,77.233829,IN,Asia/Kolkata,False,"co,no,no2,nox,o3,pm10,pm25,relativehumidity,so2,temperature,wind_direction,wind_speed",18,2018-08-10T11:30:00+05:30,2026-07-30T11:45:00+05:30
+6960,"Patparganj, Delhi - DPCC",,28.623748,77.287205,IN,Asia/Kolkata,False,"co,no,no2,nox,o3,pm10,pm25,relativehumidity,so2,temperature,wind_direction,wind_speed",17,2018-08-10T11:30:00+05:30,2026-07-30T11:15:00+05:30
+6980,"Sector-1, Noida - UPPCB",,28.589247,77.321962,IN,Asia/Kolkata,False,"co,no,no2,nox,o3,pm10,pm25,relativehumidity,so2,temperature,wind_direction,wind_speed",18,2019-06-28T11:15:00+05:30,2026-07-30T09:45:00+05:30
+7005,"Loni, Ghaziabad - UPPCB",,28.757294,77.278792,IN,Asia/Kolkata,False,"co,no,no2,nox,o3,pm10,pm25,relativehumidity,so2,temperature,wind_direction,wind_speed",18,2019-04-27T17:15:00+05:30,2026-07-30T08:30:00+05:30
+8235,"Jahangirpuri, Delhi - DPCC",,28.73282,77.170633,IN,Asia/Kolkata,False,"co,no,no2,nox,o3,pm10,pm25,relativehumidity,so2,temperature,wind_direction,wind_speed",18,2018-08-10T12:30:00+05:30,2026-07-30T11:45:00+05:30
+8239,"Okhla Phase-2, Delhi - DPCC",,28.530785,77.271255,IN,Asia/Kolkata,False,"co,no,no2,nox,o3,pm10,pm25,relativehumidity,so2,temperature,wind_direction,wind_speed",18,2018-08-22T17:15:00+05:30,2026-07-30T11:15:00+05:30
+8365,"Nehru Nagar, Delhi - DPCC",,28.56789,77.250515,IN,Asia/Kolkata,False,"co,no,no2,nox,o3,pm10,pm25,relativehumidity,so2,temperature,wind_direction,wind_speed",18,2018-08-10T11:30:00+05:30,2026-07-30T11:15:00+05:30
+8472,"Bawana, Delhi - DPCC",,28.7762,77.051074,IN,Asia/Kolkata,False,"co,no,no2,nox,o3,pm10,pm25,relativehumidity,so2,temperature,wind_direction,wind_speed",17,2018-08-10T11:45:00+05:30,2026-07-30T11:30:00+05:30
+8475,"Sonia Vihar, Delhi - DPCC",,28.710508,77.249485,IN,Asia/Kolkata,False,"co,no,no2,nox,o3,pm10,pm25,relativehumidity,so2,temperature,wind_direction,wind_speed",18,2018-08-10T13:45:00+05:30,2026-07-30T10:30:00+05:30
+8915,"Wazirpur, Delhi - DPCC",,28.699793,77.165453,IN,Asia/Kolkata,False,"co,no,no2,nox,o3,pm10,pm25,relativehumidity,so2,temperature,wind_direction,wind_speed",18,2018-12-15T20:30:00+05:30,2026-07-30T11:15:00+05:30
+8917,"Ashok Vihar, Delhi - DPCC",,28.695381,77.181665,IN,Asia/Kolkata,False,"co,no,no2,nox,o3,pm10,pm25,relativehumidity,so2,temperature,wind_direction,wind_speed",18,2018-12-15T20:30:00+05:30,2026-07-30T11:30:00+05:30
+10484,"Sri Aurobindo Marg, Delhi - DPCC",,28.531346,77.190156,IN,Asia/Kolkata,False,"co,no,no2,nox,o3,pm10,pm25,relativehumidity,so2,temperature,wind_direction,wind_speed",18,2018-12-15T20:30:00+05:30,2026-07-30T11:15:00+05:30
+10485,"Narela, Delhi - DPCC",,28.822836,77.101981,IN,Asia/Kolkata,False,"co,no,no2,nox,o3,pm10,pm25,relativehumidity,so2,temperature,wind_direction,wind_speed",18,2018-08-10T11:15:00+05:30,2026-07-30T11:45:00+05:30
+10486,"Mundka, Delhi - DPCC",,28.684678,77.076574,IN,Asia/Kolkata,False,"co,no,no2,nox,o3,pm10,pm25,relativehumidity,so2,temperature,wind_direction,wind_speed",18,2018-12-15T20:30:00+05:30,2026-07-30T11:45:00+05:30
+10488,"Najafgarh, Delhi - DPCC",,28.570173,76.933762,IN,Asia/Kolkata,False,"co,no,no2,nox,o3,pm10,pm25,relativehumidity,so2,temperature,wind_direction,wind_speed",18,2018-12-15T20:30:00+05:30,2026-07-30T11:45:00+05:30
+10820,"Sector 30, Faridabad - HSPCB",,28.4417,77.3217,IN,Asia/Kolkata,False,"co,no,no2,nox,o3,pm10,pm25,relativehumidity,so2,temperature,wind_direction,wind_speed",12,2025-02-19T01:45:00+05:30,2026-07-30T07:45:00+05:30
+10825,"Sector-51, Gurugram - HSPCB",,28.4227,77.0667,IN,Asia/Kolkata,False,"co,no,no2,nox,o3,pm10,pm25,relativehumidity,so2,temperature,wind_direction,wind_speed",18,2020-03-11T14:30:00+05:30,2026-07-30T05:15:00+05:30
+10831,"Rohini, Delhi - DPCC",,28.732528,77.11992,IN,Asia/Kolkata,False,"co,no,no2,nox,o3,pm10,pm25,relativehumidity,so2,temperature,wind_direction,wind_speed",18,2018-08-10T11:30:00+05:30,2026-07-30T11:15:00+05:30
+10900,"Teri Gram, Gurugram - HSPCB",,28.4275,77.1465,IN,Asia/Kolkata,False,"co,no,no2,nox,o3,pm10,pm25,relativehumidity,so2,temperature,wind_direction,wind_speed",18,2020-03-30T21:30:00+05:30,2026-07-30T07:45:00+05:30
+10921,"NISE Gwal Pahari, Gurugram - IMD",,28.422681,77.148944,IN,Asia/Kolkata,False,"co,no,no2,nox,o3,pm10,pm25",11,2018-11-16T14:30:00+05:30,2026-07-30T11:00:00+05:30
+11603,"Chandni Chowk, Delhi - IITM",,28.656756,77.227234,IN,Asia/Kolkata,False,"co,no,no2,nox,o3,pm10,pm25,relativehumidity,so2,temperature,wind_direction,wind_speed",18,2020-11-13T17:45:00+05:30,2026-07-30T10:45:00+05:30
+11607,"Lodhi Road, Delhi - IITM",,28.588333,77.221667,IN,Asia/Kolkata,False,"co,no2,o3,pm10,pm25,relativehumidity,so2,temperature,wind_direction,wind_speed",14,2020-11-13T17:30:00+05:30,2025-12-27T11:30:00+05:30
+3409496,"New Moti Bagh, Delhi - MHUA",,28.57834,77.184,IN,Asia/Kolkata,False,"co,no,no2,nox,pm25,relativehumidity,temperature,wind_direction,wind_speed",9,2026-03-10T16:00:00+05:30,2026-06-13T14:45:00+05:30
