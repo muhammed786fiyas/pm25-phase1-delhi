@@ -1,0 +1,73 @@
+schema: '2.0'
+stages:
+  cpcb_list_stations:
+    cmd: python scripts/datasets/cpcb/2-list_stations.py
+    deps:
+    - path: scripts/datasets/cpcb/2-list_stations.py
+      hash: md5
+      md5: 415981b0385f75828212a464b32eb80d
+      size: 2136
+    outs:
+    - path: data/stations
+      hash: md5
+      md5: 5a246bda17a315e6d5369f6b58caac14.dir
+      size: 24777
+      nfiles: 2
+  cpcb_download_pm25:
+    cmd: python scripts/datasets/cpcb/3-download_pm25.py
+    deps:
+    - path: data/stations
+      hash: md5
+      md5: 5a246bda17a315e6d5369f6b58caac14.dir
+      size: 24777
+      nfiles: 2
+    - path: scripts/datasets/cpcb/1-cpcb_fetcher.py
+      hash: md5
+      md5: 59fce616c3f09f9bd1175f48a956b626
+      size: 8920
+    - path: scripts/datasets/cpcb/3-download_pm25.py
+      hash: md5
+      md5: 3051c35c11470f62fbd98d29942c358e
+      size: 11190
+    outs:
+    - path: data/raw/cpcb
+      hash: md5
+      md5: d8aef6b456d4d37ae83df376478e8296.dir
+      size: 104111282
+      nfiles: 95
+  cpcb_merge_downloads:
+    cmd: python scripts/datasets/cpcb/5-merge_downloads.py
+    deps:
+    - path: data/raw/cpcb
+      hash: md5
+      md5: d8aef6b456d4d37ae83df376478e8296.dir
+      size: 104111282
+      nfiles: 95
+    - path: scripts/datasets/cpcb/5-merge_downloads.py
+      hash: md5
+      md5: 5f4c0cc0017e44f3b6a83f5d67b91de3
+      size: 2830
+    outs:
+    - path: data/interim/cpcb
+      hash: md5
+      md5: 7b8c805eabe8a87421fc33a74206abf2.dir
+      size: 104080997
+      nfiles: 49
+  cpcb_trim_and_season:
+    cmd: python scripts/datasets/cpcb/6-trim_and_season.py
+    deps:
+    - path: data/interim/cpcb
+      hash: md5
+      md5: 7b8c805eabe8a87421fc33a74206abf2.dir
+      size: 104080997
+      nfiles: 49
+    - path: scripts/datasets/cpcb/6-trim_and_season.py
+      hash: md5
+      md5: 05414d0d567172dc24a3755202d13ede
+      size: 2190
+    outs:
+    - path: data/processed/cpcb
+      hash: md5
+      md5: d0c682d5cdc2ace8da627503c80fabfd.dir
+      size: 49258889
+      nfiles: 2

@@ -1,0 +1,61 @@
+stages:
+  # ============================================================
+  # CPCB ground-station pipeline (Phase 1: Delhi)
+  # ============================================================
+  cpcb_list_stations:
+    cmd: python scripts/datasets/cpcb/2-list_stations.py
+    deps:
+      - scripts/datasets/cpcb/2-list_stations.py
+    outs:
+      - data/stations:
+          cache: false
+
+  cpcb_download_pm25:
+    cmd: python scripts/datasets/cpcb/3-download_pm25.py
+    deps:
+      - scripts/datasets/cpcb/3-download_pm25.py
+      - scripts/datasets/cpcb/1-cpcb_fetcher.py
+      - data/stations
+    outs:
+      - data/raw/cpcb
+
+  cpcb_merge_downloads:
+    cmd: python scripts/datasets/cpcb/5-merge_downloads.py
+    deps:
+      - scripts/datasets/cpcb/5-merge_downloads.py
+      - data/raw/cpcb
+    outs:
+      - data/interim/cpcb
+
+  cpcb_trim_and_season:
+    cmd: python scripts/datasets/cpcb/6-trim_and_season.py
+    deps:
+      - scripts/datasets/cpcb/6-trim_and_season.py
+      - data/interim/cpcb
+    outs:
+      - data/processed/cpcb
+
+  # ============================================================
+  # MAIAC AOD pipeline — add stages here once scripts/datasets/maiac/ exists
+  # e.g. maiac_extract, maiac_gapfill (calibrated MERRA-2 fill)
+  # ============================================================
+
+  # ============================================================
+  # ERA5-Land meteorology — add stages here once scripts/datasets/era5/ exists
+  # ============================================================
+
+  # ============================================================
+  # OSM / static covariates (roads, land use, elevation) —
+  # add stages here once scripts/datasets/osm/ exists
+  # ============================================================
+
+  # ============================================================
+  # Modeling — add stages here once scripts/modeling/ has content
+  # e.g. lme_fit_delhi (depends on cpcb_trim_and_season + maiac stages,
+  # outputs to models/)
+  # ============================================================
+
+  # ============================================================
+  # Validation — add stages here once scripts/validation/ has content
+  # e.g. per-airshed out-of-site CV, depends on models/
+  # ============================================================
