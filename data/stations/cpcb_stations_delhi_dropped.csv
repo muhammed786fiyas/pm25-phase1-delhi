@@ -1,0 +1,10 @@
+location_id,name,region,latitude,longitude,parameters,sensor_count,datetime_first,datetime_last,pct_2025_possible,nn_km,nn_station,shares_maiac_pixel_risk,coord_verified,status,qc_note
+13,"Delhi Technological University, Delhi - CPCB",NCT,28.744,77.12,"no2,o3,pm25",3,2016-11-03T00:30:00+05:30,2018-02-22T09:30:00+05:30,0.0,,,,,DROP_dead_since_2018,Last record Feb 2018; no 2025 coverage.
+103,"Income Tax Office, Delhi - CPCB",NCT,28.6235,77.2494,"co,no2,o3,pm10,pm25",5,2016-11-03T00:00:00+05:30,2018-02-22T09:15:00+05:30,0.0,,,,,DROP_dead_since_2018,Last record Feb 2018; no 2025 coverage.
+236,"Mandir Marg, Delhi - DPCC",NCT,28.6341,77.2005,"co,no2,o3,pm10,pm25,so2",6,2016-02-05T20:30:00+05:30,2018-02-22T02:45:00+05:30,0.0,,,,,DROP_dead_since_2018,Last record Feb 2018; no 2025 coverage.
+431,"IHBAS, Delhi - CPCB",NCT,28.6821,77.305,"co,no2,pm25,so2",4,2016-04-11T00:00:00+05:30,2018-02-22T08:15:00+05:30,0.0,,,,,DROP_dead_since_2018,Last record Feb 2018; no 2025 coverage.
+2503,"Shadipur, Delhi - CPCB",NCT,28.6517,77.1581,"co,no2,o3,pm25,so2",5,2016-03-22T05:00:00+05:30,2018-02-22T08:15:00+05:30,0.0,,,,,DROP_dead_since_2018,Last record Feb 2018; no 2025 coverage.
+6356,"Pusa, Delhi - DPCC",NCT,28.639645,77.146262,"co,no,no2,nox,o3,pm10,pm25,relativehumidity,so2,temperature,wind_direction,wind_speed",12,2025-02-19T01:45:00+05:30,2026-07-30T11:15:00+05:30,86.0,,,,,DROP_duplicate_site_of_5404,"Identical coordinates to 5404 (Pusa-IMD) - same physical site, different reporting agency."
+3409496,"New Moti Bagh, Delhi - MHUA",NCT,28.57834,77.184,"co,no,no2,nox,pm25,relativehumidity,temperature,wind_direction,wind_speed",9,2026-03-10T16:00:00+05:30,2026-06-13T14:45:00+05:30,0.0,,,,,DROP_no_2025_data,First record Mar 2026; no 2025 coverage.
+15,IGI Airport,NCT,28.56,77.094,"co,no2,o3,pm10,pm25",5,,,,,,,,DROP_no_sensors_confirmed,"Test pull 2025-06-01/02 returned ""No sensors found"" - no data exists at any date."
+16,Civil Lines,NCT,28.6787,77.2262,"co,no2,pm10,pm25",4,,,,,,,,DROP_no_sensors_confirmed,"Test pull 2025-06-01/02 returned ""No sensors found"" - no data exists at any date."

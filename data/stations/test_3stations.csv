@@ -1,0 +1,4 @@
+location_id,name,region,latitude,longitude,parameters,sensor_count,datetime_first,datetime_last,pct_2025_possible,nn_km,nn_station,shares_maiac_pixel_risk,coord_verified,status,qc_note
+13,"Delhi Technological University, Delhi - CPCB",NCT,28.744,77.12,"no2,o3,pm25",3,2016-11-03T00:30:00+05:30,2018-02-22T09:30:00+05:30,0.0,,,,,DROP_dead_since_2018,Last record Feb 2018; no 2025 coverage.
+103,"Income Tax Office, Delhi - CPCB",NCT,28.6235,77.2494,"co,no2,o3,pm10,pm25",5,2016-11-03T00:00:00+05:30,2018-02-22T09:15:00+05:30,0.0,,,,,DROP_dead_since_2018,Last record Feb 2018; no 2025 coverage.
+236,"Mandir Marg, Delhi - DPCC",NCT,28.6341,77.2005,"co,no2,o3,pm10,pm25,so2",6,2016-02-05T20:30:00+05:30,2018-02-22T02:45:00+05:30,0.0,,,,,DROP_dead_since_2018,Last record Feb 2018; no 2025 coverage.
