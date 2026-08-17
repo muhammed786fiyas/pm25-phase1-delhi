@@ -71,3 +71,22 @@ stages:
       md5: d0c682d5cdc2ace8da627503c80fabfd.dir
       size: 49258889
       nfiles: 2
+  maiac_extract:
+    cmd: python scripts/datasets/maiac_aod/1-extract_gee_covariates.py 
+      --stations data/stations/cpcb_stations_delhi_status.csv --outdir 
+      data/raw/maiac
+    deps:
+    - path: data/stations/cpcb_stations_delhi_status.csv
+      hash: md5
+      md5: 05ba0bea2cc9f08e4298c157d40749b6
+      size: 13406
+    - path: scripts/datasets/maiac_aod/1-extract_gee_covariates.py
+      hash: md5
+      md5: e32cf60c1237d114fd9af75356d09b04
+      size: 3422
+    outs:
+    - path: data/raw/maiac
+      hash: md5
+      md5: 1d08a90111317af22fb89c9805fca380.dir
+      size: 1365740
+      nfiles: 1

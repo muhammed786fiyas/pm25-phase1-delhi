@@ -15,7 +15,7 @@ stages:
     deps:
       - scripts/datasets/cpcb/3-download_pm25.py
       - scripts/datasets/cpcb/1-cpcb_fetcher.py
-      - data/stations
+      - data/stations/cpcb_stations_delhi_status.csv
     outs:
       - data/raw/cpcb
 
@@ -36,8 +36,19 @@ stages:
       - data/processed/cpcb
 
   # ============================================================
-  # MAIAC AOD pipeline — add stages here once scripts/datasets/maiac/ exists
-  # e.g. maiac_extract, maiac_gapfill (calibrated MERRA-2 fill)
+  # MAIAC AOD pipeline
+  # ============================================================
+  maiac_extract:
+    cmd: python scripts/datasets/maiac_aod/1-extract_gee_covariates.py --stations data/stations/cpcb_stations_delhi_status.csv --outdir data/raw/maiac
+    deps:
+      - scripts/datasets/maiac_aod/1-extract_gee_covariates.py
+      - data/stations/cpcb_stations_delhi_status.csv
+    outs:
+      - data/raw/maiac
+
+  # add more stages here once ready: maiac_filter_stations (after CPCB QC
+  # finalizes the station list), maiac_preprocess (scale factor + QA decode),
+  # maiac_gapfill (calibrated MERRA-2 fill)
   # ============================================================
 
   # ============================================================
