@@ -20,20 +20,32 @@ stages:
       - data/raw/cpcb
 
   cpcb_merge_downloads:
-    cmd: python scripts/datasets/cpcb/5-merge_downloads.py
+    cmd: python scripts/datasets/cpcb/5-merge_downloads.py --dir1 data/raw/cpcb/pm25_delhi_2025 --dir2 data/raw/cpcb/pm25_delhi_2026_q1 --outdir data/interim/cpcb/pm25_delhi_merged
     deps:
       - scripts/datasets/cpcb/5-merge_downloads.py
-      - data/raw/cpcb
+      - data/raw/cpcb/pm25_delhi_2025
+      - data/raw/cpcb/pm25_delhi_2026_q1
     outs:
-      - data/interim/cpcb
+      - data/interim/cpcb/pm25_delhi_merged
 
   cpcb_trim_and_season:
     cmd: python scripts/datasets/cpcb/6-trim_and_season.py --input data/interim/cpcb/pm25_delhi_merged/ALL_COMBINED.csv --outdir data/processed/cpcb/pm25_delhi_final
     deps:
       - scripts/datasets/cpcb/6-trim_and_season.py
-      - data/interim/cpcb
+      - data/interim/cpcb/pm25_delhi_merged
     outs:
       - data/processed/cpcb
+
+  cpcb_qc_check:
+    cmd: python scripts/datasets/cpcb/7-cpcb_qc_check.py --input data/processed/cpcb/pm25_delhi_final/pm25_delhi_mar25_feb26_seasoned.csv --outdir data/interim/cpcb/pm25_qc
+    deps:
+      - scripts/datasets/cpcb/7-cpcb_qc_check.py
+      - data/processed/cpcb/pm25_delhi_final
+    params:
+      - cpcb_qc.high_value_limit
+      - cpcb_qc.stuck_run_limit
+    outs:
+      - data/interim/cpcb/pm25_qc
 
   # ============================================================
   # MAIAC AOD pipeline

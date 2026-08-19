@@ -1,0 +1,3 @@
+cpcb_qc:
+  high_value_limit: 1000
+  stuck_run_limit: 3

@@ -33,7 +33,7 @@ def main():
     df["month"] = df["dt_local"].dt.month
     df["season"] = df["month"].map(SEASON_MONTHS)
 
-    # WINDOW FILTERING
+    # DAILY WINDOW FILTERING
     df = df[(df["dt_local"].dt.hour >=10) & (df["dt_local"].dt.hour <=13)]
 
     out_path = os.path.join(args.outdir ,"pm25_delhi_mar25_feb26_seasoned.csv")

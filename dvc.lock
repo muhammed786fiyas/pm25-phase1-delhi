@@ -35,37 +35,44 @@ stages:
       size: 104111282
       nfiles: 95
   cpcb_merge_downloads:
-    cmd: python scripts/datasets/cpcb/5-merge_downloads.py
+    cmd: python scripts/datasets/cpcb/5-merge_downloads.py --dir1 
+      data/raw/cpcb/pm25_delhi_2025 --dir2 data/raw/cpcb/pm25_delhi_2026_q1 
+      --outdir data/interim/cpcb/pm25_delhi_merged
     deps:
-    - path: data/raw/cpcb
+    - path: data/raw/cpcb/pm25_delhi_2025
       hash: md5
-      md5: d8aef6b456d4d37ae83df376478e8296.dir
-      size: 104111282
-      nfiles: 95
+      md5: 6855fe437563210c82b87c00cd7e2691.dir
+      size: 82866872
+      nfiles: 48
+    - path: data/raw/cpcb/pm25_delhi_2026_q1
+      hash: md5
+      md5: c03e0d7cc8a87ff1b90675ed67df4eff.dir
+      size: 21244410
+      nfiles: 47
     - path: scripts/datasets/cpcb/5-merge_downloads.py
       hash: md5
       md5: 5f4c0cc0017e44f3b6a83f5d67b91de3
       size: 2830
     outs:
-    - path: data/interim/cpcb
+    - path: data/interim/cpcb/pm25_delhi_merged
       hash: md5
-      md5: 1daf608efda304d68028068073e20d15.dir
-      size: 104082417
-      nfiles: 51
+      md5: fed56d8bf8346b20f9e429578be039cc.dir
+      size: 104080997
+      nfiles: 49
   cpcb_trim_and_season:
     cmd: python scripts/datasets/cpcb/6-trim_and_season.py --input 
       data/interim/cpcb/pm25_delhi_merged/ALL_COMBINED.csv --outdir 
       data/processed/cpcb/pm25_delhi_final
     deps:
-    - path: data/interim/cpcb
+    - path: data/interim/cpcb/pm25_delhi_merged
       hash: md5
-      md5: 1daf608efda304d68028068073e20d15.dir
-      size: 104082417
-      nfiles: 51
+      md5: fed56d8bf8346b20f9e429578be039cc.dir
+      size: 104080997
+      nfiles: 49
     - path: scripts/datasets/cpcb/6-trim_and_season.py
       hash: md5
-      md5: a6eb9bc04d578fa7dde3594befcf34fa
-      size: 2377
+      md5: 3983d69ae3e97150fa740c96ed6c0b09
+      size: 2383
     outs:
     - path: data/processed/cpcb
       hash: md5
@@ -91,3 +98,27 @@ stages:
       md5: 1d08a90111317af22fb89c9805fca380.dir
       size: 1365740
       nfiles: 1
+  cpcb_qc_check:
+    cmd: python scripts/datasets/cpcb/7-cpcb_qc_check.py --input 
+      data/processed/cpcb/pm25_delhi_final/pm25_delhi_mar25_feb26_seasoned.csv 
+      --outdir data/interim/cpcb/pm25_qc
+    deps:
+    - path: data/processed/cpcb/pm25_delhi_final
+      hash: md5
+      md5: 1497a63c052ebc194841e398a6f9203f.dir
+      size: 8196495
+      nfiles: 2
+    - path: scripts/datasets/cpcb/7-cpcb_qc_check.py
+      hash: md5
+      md5: 7967fea5497390fa6facb23e3948a56e
+      size: 3832
+    params:
+      params.yaml:
+        cpcb_qc.high_value_limit: 1000
+        cpcb_qc.stuck_run_limit: 3
+    outs:
+    - path: data/interim/cpcb/pm25_qc
+      hash: md5
+      md5: 0b5cb364bd63da724759637248210f03.dir
+      size: 1461
+      nfiles: 2
