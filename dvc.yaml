@@ -37,16 +37,17 @@ stages:
       - data/processed/cpcb/pm25_delhi_windowed
 
   cpcb_qc_check:
-    cmd: python scripts/datasets/cpcb/7-cpcb_qc_check.py --input data/processed/cpcb/pm25_delhi_windowed/pm25_delhi_mar25_feb26_seasoned.csv --outdir data/interim/cpcb/pm25_qc
+    cmd: python scripts/datasets/cpcb/7-cpcb_qc_check.py --input data/processed/cpcb/pm25_delhi_windowed/pm25_delhi_mar25_feb26_seasoned.csv --outdir data/interim/cpcb/pm25_qc_hourly
     deps:
       - scripts/datasets/cpcb/7-cpcb_qc_check.py
       - data/processed/cpcb/pm25_delhi_windowed
-
     params:
       - cpcb_qc.high_value_limit
       - cpcb_qc.stuck_run_limit
     outs:
-      - data/interim/cpcb/pm25_qc
+      - data/interim/cpcb/pm25_qc_hourly
+      - data/interim/cpcb/pm25_qc_hourly
+
   
   cpcb_filter_aggregate:
     cmd: python scripts/datasets/cpcb/8-filter_and_aggregate.py --input data/processed/cpcb/pm25_delhi_windowed/pm25_delhi_mar25_feb26_seasoned.csv --outdir data/processed/cpcb/pm25_daily
@@ -58,6 +59,14 @@ stages:
       - cpcb_filter_aggregate.min_hours
     outs:
       - data/processed/cpcb/pm25_daily
+  
+  cpcb_find_clusters:
+    cmd: python scripts/datasets/cpcb/9-find_station_clusters.py --stations data/stations/cpcb_stations_delhi_status.csv --outdir data/interim/cpcb/pm25_qc_daily
+    deps:
+      - scripts/datasets/cpcb/9-find_station_clusters.py
+      - data/stations/cpcb_stations_delhi_status.csv
+    outs:
+      - data/interim/cpcb/pm25_qc_daily/station_clusters.csv
 
   # ============================================================
   # MAIAC AOD pipeline
