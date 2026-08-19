@@ -28,7 +28,7 @@ stages:
       - data/interim/cpcb
 
   cpcb_trim_and_season:
-    cmd: python scripts/datasets/cpcb/6-trim_and_season.py
+    cmd: python scripts/datasets/cpcb/6-trim_and_season.py --input data/interim/cpcb/pm25_delhi_merged/ALL_COMBINED.csv --outdir data/processed/cpcb/pm25_delhi_final
     deps:
       - scripts/datasets/cpcb/6-trim_and_season.py
       - data/interim/cpcb

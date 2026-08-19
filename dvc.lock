@@ -49,26 +49,28 @@ stages:
     outs:
     - path: data/interim/cpcb
       hash: md5
-      md5: 7b8c805eabe8a87421fc33a74206abf2.dir
-      size: 104080997
-      nfiles: 49
+      md5: 1daf608efda304d68028068073e20d15.dir
+      size: 104082417
+      nfiles: 51
   cpcb_trim_and_season:
-    cmd: python scripts/datasets/cpcb/6-trim_and_season.py
+    cmd: python scripts/datasets/cpcb/6-trim_and_season.py --input 
+      data/interim/cpcb/pm25_delhi_merged/ALL_COMBINED.csv --outdir 
+      data/processed/cpcb/pm25_delhi_final
     deps:
     - path: data/interim/cpcb
       hash: md5
-      md5: 7b8c805eabe8a87421fc33a74206abf2.dir
-      size: 104080997
-      nfiles: 49
+      md5: 1daf608efda304d68028068073e20d15.dir
+      size: 104082417
+      nfiles: 51
     - path: scripts/datasets/cpcb/6-trim_and_season.py
       hash: md5
-      md5: aa12b9d84930e5343deb6cd859242f19
-      size: 2259
+      md5: a6eb9bc04d578fa7dde3594befcf34fa
+      size: 2377
     outs:
     - path: data/processed/cpcb
       hash: md5
-      md5: d0c682d5cdc2ace8da627503c80fabfd.dir
-      size: 49258889
+      md5: 80f352f75a4ba6da07ebafc222e8d7a3.dir
+      size: 8196495
       nfiles: 2
   maiac_extract:
     cmd: python scripts/datasets/maiac_aod/1-extract_gee_covariates.py 

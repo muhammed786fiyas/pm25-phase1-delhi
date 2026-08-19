@@ -24,6 +24,7 @@ def main():
     df = pd.read_csv(args.input)
     df["dt_local"] = pd.to_datetime(df["datetime_from_local"])
 
+    # TRIMMING
     before = len(df)
     df = df[(df["dt_local"] >= WINDOW_START) & (df["dt_local"] <= WINDOW_END + " 23:59:59")]
     print(f"Trimmed to {WINDOW_START} .. {WINDOW_END}: {before} -> {len(df)} rows "
@@ -31,6 +32,9 @@ def main():
 
     df["month"] = df["dt_local"].dt.month
     df["season"] = df["month"].map(SEASON_MONTHS)
+
+    # WINDOW FILTERING
+    df = df[(df["dt_local"].dt.hour >=10) & (df["dt_local"].dt.hour <=13)]
 
     out_path = os.path.join(args.outdir ,"pm25_delhi_mar25_feb26_seasoned.csv")
     df.drop(columns=["dt_local","month"]).to_csv(out_path, index=False)
