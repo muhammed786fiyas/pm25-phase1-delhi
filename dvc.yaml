@@ -29,23 +29,35 @@ stages:
       - data/interim/cpcb/pm25_delhi_merged
 
   cpcb_trim_and_season:
-    cmd: python scripts/datasets/cpcb/6-trim_and_season.py --input data/interim/cpcb/pm25_delhi_merged/ALL_COMBINED.csv --outdir data/processed/cpcb/pm25_delhi_final
+    cmd: python scripts/datasets/cpcb/6-trim_and_season.py --input data/interim/cpcb/pm25_delhi_merged/ALL_COMBINED.csv --outdir data/processed/cpcb/pm25_delhi_windowed
     deps:
       - scripts/datasets/cpcb/6-trim_and_season.py
       - data/interim/cpcb/pm25_delhi_merged
     outs:
-      - data/processed/cpcb
+      - data/processed/cpcb/pm25_delhi_windowed
 
   cpcb_qc_check:
-    cmd: python scripts/datasets/cpcb/7-cpcb_qc_check.py --input data/processed/cpcb/pm25_delhi_final/pm25_delhi_mar25_feb26_seasoned.csv --outdir data/interim/cpcb/pm25_qc
+    cmd: python scripts/datasets/cpcb/7-cpcb_qc_check.py --input data/processed/cpcb/pm25_delhi_windowed/pm25_delhi_mar25_feb26_seasoned.csv --outdir data/interim/cpcb/pm25_qc
     deps:
       - scripts/datasets/cpcb/7-cpcb_qc_check.py
-      - data/processed/cpcb/pm25_delhi_final
+      - data/processed/cpcb/pm25_delhi_windowed
+
     params:
       - cpcb_qc.high_value_limit
       - cpcb_qc.stuck_run_limit
     outs:
       - data/interim/cpcb/pm25_qc
+  
+  cpcb_filter_aggregate:
+    cmd: python scripts/datasets/cpcb/8-filter_and_aggregate.py --input data/processed/cpcb/pm25_delhi_windowed/pm25_delhi_mar25_feb26_seasoned.csv --outdir data/processed/cpcb/pm25_daily
+    deps:
+      - scripts/datasets/cpcb/8-filter_and_aggregate.py
+      - data/processed/cpcb/pm25_delhi_windowed
+    params:
+      - cpcb_filter_aggregate.drop_stations
+      - cpcb_filter_aggregate.min_hours
+    outs:
+      - data/processed/cpcb/pm25_daily
 
   # ============================================================
   # MAIAC AOD pipeline

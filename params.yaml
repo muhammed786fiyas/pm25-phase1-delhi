@@ -1,3 +1,7 @@
 cpcb_qc:
   high_value_limit: 1000
   stuck_run_limit: 3
+
+cpcb_filter_aggregate:
+  drop_stations: [10820, 10900, 10825, 6936]
+  min_hours: 2

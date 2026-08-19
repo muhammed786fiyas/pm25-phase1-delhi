@@ -37,14 +37,14 @@ def main():
     negatives = df[df["value"] < 0]
     print(f"Negative values: {len(negatives)}")
     if len(negatives) > 0:
-        neg_path = os.path.join(args.outdir, "negative_values.csv")
+        neg_path = os.path.join(args.outdir, "negative_values_hourly.csv")
         negatives.to_csv(neg_path, index=False)
         print(f"Wrote negative rows to {neg_path}")
 
     too_high = df[df["value"] > HIGH_VALUE_LIMIT]
     print(f"Values above {HIGH_VALUE_LIMIT}: {len(too_high)}")
     if len(too_high) > 0:
-        high_path = os.path.join(args.outdir, "high_values.csv")
+        high_path = os.path.join(args.outdir, "high_values_hourly.csv")
         too_high.to_csv(high_path, index=False)
         print(f"Wrote high value rows to {high_path}")
 
@@ -74,7 +74,7 @@ def main():
 
     if len(stuck_rows) > 0:
         stuck_df = pd.DataFrame(stuck_rows)
-        stuck_path = os.path.join(args.outdir, "stuck_sensor_summary.csv")
+        stuck_path = os.path.join(args.outdir, "stuck_sensor_summary_hourly.csv")
         stuck_df.to_csv(stuck_path, index=False)
         print(f"Wrote stuck sensor summary to {stuck_path}")
     else:
@@ -93,7 +93,7 @@ def main():
     }).fillna(0)
     zero_summary = zero_summary.sort_values("zero_pct", ascending=False)
 
-    zero_path = os.path.join(args.outdir, "zero_value_summary.csv")
+    zero_path = os.path.join(args.outdir, "zero_value_summary_hourly.csv")
     zero_summary.to_csv(zero_path)
     print(f"Wrote zero value summary to {zero_path}")
     print(zero_summary.head(10))

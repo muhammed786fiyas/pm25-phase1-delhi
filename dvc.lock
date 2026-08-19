@@ -62,7 +62,7 @@ stages:
   cpcb_trim_and_season:
     cmd: python scripts/datasets/cpcb/6-trim_and_season.py --input 
       data/interim/cpcb/pm25_delhi_merged/ALL_COMBINED.csv --outdir 
-      data/processed/cpcb/pm25_delhi_final
+      data/processed/cpcb/pm25_delhi_windowed
     deps:
     - path: data/interim/cpcb/pm25_delhi_merged
       hash: md5
@@ -74,9 +74,9 @@ stages:
       md5: 3983d69ae3e97150fa740c96ed6c0b09
       size: 2383
     outs:
-    - path: data/processed/cpcb
+    - path: data/processed/cpcb/pm25_delhi_windowed
       hash: md5
-      md5: 80f352f75a4ba6da07ebafc222e8d7a3.dir
+      md5: 1497a63c052ebc194841e398a6f9203f.dir
       size: 8196495
       nfiles: 2
   maiac_extract:
@@ -100,18 +100,18 @@ stages:
       nfiles: 1
   cpcb_qc_check:
     cmd: python scripts/datasets/cpcb/7-cpcb_qc_check.py --input 
-      data/processed/cpcb/pm25_delhi_final/pm25_delhi_mar25_feb26_seasoned.csv 
+      data/processed/cpcb/pm25_delhi_windowed/pm25_delhi_mar25_feb26_seasoned.csv
       --outdir data/interim/cpcb/pm25_qc
     deps:
-    - path: data/processed/cpcb/pm25_delhi_final
+    - path: data/processed/cpcb/pm25_delhi_windowed
       hash: md5
       md5: 1497a63c052ebc194841e398a6f9203f.dir
       size: 8196495
       nfiles: 2
     - path: scripts/datasets/cpcb/7-cpcb_qc_check.py
       hash: md5
-      md5: 7967fea5497390fa6facb23e3948a56e
-      size: 3832
+      md5: 7d732b3fa4fe8ecbd56cfbeabe084fec
+      size: 3860
     params:
       params.yaml:
         cpcb_qc.high_value_limit: 1000
@@ -119,6 +119,34 @@ stages:
     outs:
     - path: data/interim/cpcb/pm25_qc
       hash: md5
-      md5: 0b5cb364bd63da724759637248210f03.dir
+      md5: 0428ca3dd85bc261a9f50f00139d32ab.dir
       size: 1461
+      nfiles: 2
+  cpcb_filter_aggregate:
+    cmd: python scripts/datasets/cpcb/8-filter_and_aggregate.py --input 
+      data/processed/cpcb/pm25_delhi_windowed/pm25_delhi_mar25_feb26_seasoned.csv
+      --outdir data/processed/cpcb/pm25_daily
+    deps:
+    - path: data/processed/cpcb/pm25_delhi_windowed
+      hash: md5
+      md5: 1497a63c052ebc194841e398a6f9203f.dir
+      size: 8196495
+      nfiles: 2
+    - path: scripts/datasets/cpcb/8-filter_and_aggregate.py
+      hash: md5
+      md5: e51084367df5a8df22de48ba0d4075a4
+      size: 3248
+    params:
+      params.yaml:
+        cpcb_filter_aggregate.drop_stations:
+        - 10820
+        - 10900
+        - 10825
+        - 6936
+        cpcb_filter_aggregate.min_hours: 2
+    outs:
+    - path: data/processed/cpcb/pm25_daily
+      hash: md5
+      md5: 8df91414889addbc424b12fdef17d59f.dir
+      size: 481569
       nfiles: 2
