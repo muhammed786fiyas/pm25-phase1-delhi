@@ -67,6 +67,34 @@ stages:
       - data/stations/cpcb_stations_delhi_status.csv
     outs:
       - data/interim/cpcb/pm25_qc_daily/station_clusters.csv
+    
+  cpcb_completeness_check:
+    cmd: python scripts/datasets/cpcb/10-completeness_check.py --input data/processed/cpcb/pm25_daily/pm25_daily.csv --outdir data/interim/cpcb/pm25_qc_daily
+    deps:
+      - scripts/datasets/cpcb/10-completeness_check.py
+      - data/processed/cpcb/pm25_daily
+    params:
+      - cpcb_completeness.threshold
+    outs:
+      - data/interim/cpcb/pm25_qc_daily/station_completeness.csv
+
+  cpcb_correlation_check:
+    cmd: python scripts/datasets/cpcb/11-correlation_check.py --daily data/processed/cpcb/pm25_daily/pm25_daily.csv --clusters data/interim/cpcb/pm25_qc_daily/station_clusters.csv --outdir data/interim/cpcb/pm25_qc_daily
+    deps:
+      - scripts/datasets/cpcb/11-correlation_check.py
+      - data/processed/cpcb/pm25_daily
+      - data/interim/cpcb/pm25_qc_daily/station_clusters.csv
+    outs:
+      - data/interim/cpcb/pm25_qc_daily/station_pair_correlation.csv
+  
+  cpcb_final_filter:
+    cmd: python scripts/datasets/cpcb/12-final_filter.py --daily data/processed/cpcb/pm25_daily/pm25_daily.csv --stations data/stations/cpcb_stations_delhi_status.csv --outdir data/processed/cpcb/pm25_daily_final
+    deps:
+      - scripts/datasets/cpcb/12-final_filter.py
+      - data/processed/cpcb/pm25_daily
+      - data/stations/cpcb_stations_delhi_status.csv
+    outs:
+      - data/processed/cpcb/pm25_daily_final
 
   # ============================================================
   # MAIAC AOD pipeline

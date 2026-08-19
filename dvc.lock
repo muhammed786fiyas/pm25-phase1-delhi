@@ -10,16 +10,16 @@ stages:
     outs:
     - path: data/stations
       hash: md5
-      md5: c756b32fcea9b8123e30cb0915720b6e.dir
-      size: 39794
+      md5: 68cb530186f71e4fd5adbe38d6235a41.dir
+      size: 40062
       nfiles: 5
   cpcb_download_pm25:
     cmd: python scripts/datasets/cpcb/3-download_pm25.py
     deps:
     - path: data/stations/cpcb_stations_delhi_status.csv
       hash: md5
-      md5: 05ba0bea2cc9f08e4298c157d40749b6
-      size: 13406
+      md5: 4d2c634b6bdf8d8e9cf3de6d517f6776
+      size: 14245
     - path: scripts/datasets/cpcb/1-cpcb_fetcher.py
       hash: md5
       md5: 59fce616c3f09f9bd1175f48a956b626
@@ -86,8 +86,8 @@ stages:
     deps:
     - path: data/stations/cpcb_stations_delhi_status.csv
       hash: md5
-      md5: 05ba0bea2cc9f08e4298c157d40749b6
-      size: 13406
+      md5: 4d2c634b6bdf8d8e9cf3de6d517f6776
+      size: 14245
     - path: scripts/datasets/maiac_aod/1-extract_gee_covariates.py
       hash: md5
       md5: e32cf60c1237d114fd9af75356d09b04
@@ -157,8 +157,8 @@ stages:
     deps:
     - path: data/stations/cpcb_stations_delhi_status.csv
       hash: md5
-      md5: 7c3f40967caef76c5fc641f541f1fdca
-      size: 13977
+      md5: 4d2c634b6bdf8d8e9cf3de6d517f6776
+      size: 14245
     - path: scripts/datasets/cpcb/9-find_station_clusters.py
       hash: md5
       md5: d5a6acb59407ca5ffc6b3a4d7003d756
@@ -168,3 +168,74 @@ stages:
       hash: md5
       md5: 6e787147874b5ee785f49876b69bf66b
       size: 460
+  cpcb_completeness_check:
+    cmd: python scripts/datasets/cpcb/10-completeness_check.py --input 
+      data/processed/cpcb/pm25_daily/pm25_daily.csv --outdir 
+      data/interim/cpcb/pm25_qc_daily
+    deps:
+    - path: data/processed/cpcb/pm25_daily
+      hash: md5
+      md5: 8df91414889addbc424b12fdef17d59f.dir
+      size: 481569
+      nfiles: 2
+    - path: scripts/datasets/cpcb/10-completeness_check.py
+      hash: md5
+      md5: aea7b16997fc22cb054ac414b8972a9c
+      size: 1586
+    params:
+      params.yaml:
+        cpcb_completeness.threshold: 60
+    outs:
+    - path: data/interim/cpcb/pm25_qc_daily/station_completeness.csv
+      hash: md5
+      md5: 258e5dc78f081be3378de2d50652e7be
+      size: 1104
+  cpcb_correlation_check:
+    cmd: python scripts/datasets/cpcb/11-correlation_check.py --daily 
+      data/processed/cpcb/pm25_daily/pm25_daily.csv --clusters 
+      data/interim/cpcb/pm25_qc_daily/station_clusters.csv --outdir 
+      data/interim/cpcb/pm25_qc_daily
+    deps:
+    - path: data/interim/cpcb/pm25_qc_daily/station_clusters.csv
+      hash: md5
+      md5: 6e787147874b5ee785f49876b69bf66b
+      size: 460
+    - path: data/processed/cpcb/pm25_daily
+      hash: md5
+      md5: 8df91414889addbc424b12fdef17d59f.dir
+      size: 481569
+      nfiles: 2
+    - path: scripts/datasets/cpcb/11-correlation_check.py
+      hash: md5
+      md5: 4f0faffb7046ad99d9d41b79aabf038f
+      size: 2166
+    outs:
+    - path: data/interim/cpcb/pm25_qc_daily/station_pair_correlation.csv
+      hash: md5
+      md5: 2ddd646748e662c4d3b7a2501e6accb4
+      size: 535
+  cpcb_final_filter:
+    cmd: python scripts/datasets/cpcb/12-final_filter.py --daily 
+      data/processed/cpcb/pm25_daily/pm25_daily.csv --stations 
+      data/stations/cpcb_stations_delhi_status.csv --outdir 
+      data/processed/cpcb/pm25_daily_final
+    deps:
+    - path: data/processed/cpcb/pm25_daily
+      hash: md5
+      md5: 8df91414889addbc424b12fdef17d59f.dir
+      size: 481569
+      nfiles: 2
+    - path: data/stations/cpcb_stations_delhi_status.csv
+      hash: md5
+      md5: 4d2c634b6bdf8d8e9cf3de6d517f6776
+      size: 14245
+    - path: scripts/datasets/cpcb/12-final_filter.py
+      hash: md5
+      md5: e99f1e8e5d9ad899df4887f77363cfd6
+      size: 2408
+    outs:
+    - path: data/processed/cpcb/pm25_daily_final
+      hash: md5
+      md5: 8e542b0b64b701a6ffd99a1f8e3193fc.dir
+      size: 470290
+      nfiles: 2

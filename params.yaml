@@ -5,3 +5,6 @@ cpcb_qc:
 cpcb_filter_aggregate:
   drop_stations: [10820, 10900, 10825, 6936]
   min_hours: 2
+
+cpcb_completeness:
+  threshold: 60
