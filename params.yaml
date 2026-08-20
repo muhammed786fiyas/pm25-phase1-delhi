@@ -8,3 +8,10 @@ cpcb_filter_aggregate:
 
 cpcb_completeness:
   threshold: 60
+
+maiac_extract:
+  gee_project: "internship-pm25"
+  collection: "MODIS/061/MCD19A2_GRANULES"
+  bands: ["Optical_Depth_055", "Optical_Depth_047", "AOD_Uncertainty", "AOD_QA"]
+  study_start: "2025-03-01"
+  study_end: "2026-02-28"

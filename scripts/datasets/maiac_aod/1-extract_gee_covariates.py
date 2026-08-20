@@ -2,20 +2,16 @@ import argparse
 import os
 import ee
 import pandas as pd
+import yaml
 
-GEE_PROJECT = "internship-pm25"
+with open("params.yaml") as f:
+    params = yaml.safe_load(f)["maiac_extract"]
 
-MAIAC_COLLECTION = "MODIS/061/MCD19A2_GRANULES"
-
-BANDS_TO_PULL = [
-    "Optical_Depth_055",
-    "Optical_Depth_047",
-    "AOD_Uncertainty",
-    "AOD_QA",
-]
-
-STUDY_START = "2025-03-01"
-STUDY_END = "2026-02-28"
+GEE_PROJECT = params["gee_project"]
+MAIAC_COLLECTION = params["collection"]
+BANDS_TO_PULL = params["bands"]
+STUDY_START = params["study_start"]
+STUDY_END = params["study_end"]
 
 
 def extract_station_data(location_id, latitude, longitude):

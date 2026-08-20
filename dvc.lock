@@ -90,8 +90,19 @@ stages:
       size: 14245
     - path: scripts/datasets/maiac_aod/1-extract_gee_covariates.py
       hash: md5
-      md5: e32cf60c1237d114fd9af75356d09b04
-      size: 3422
+      md5: cb6bd2319d7dbd549a35390066ee8c18
+      size: 3444
+    params:
+      params.yaml:
+        maiac_extract.bands:
+        - Optical_Depth_055
+        - Optical_Depth_047
+        - AOD_Uncertainty
+        - AOD_QA
+        maiac_extract.collection: MODIS/061/MCD19A2_GRANULES
+        maiac_extract.gee_project: internship-pm25
+        maiac_extract.study_end: '2026-02-28'
+        maiac_extract.study_start: '2025-03-01'
     outs:
     - path: data/raw/maiac
       hash: md5

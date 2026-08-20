@@ -104,6 +104,12 @@ stages:
     deps:
       - scripts/datasets/maiac_aod/1-extract_gee_covariates.py
       - data/stations/cpcb_stations_delhi_status.csv
+    params:
+      - maiac_extract.gee_project
+      - maiac_extract.collection
+      - maiac_extract.bands
+      - maiac_extract.study_start
+      - maiac_extract.study_end
     outs:
       - data/raw/maiac
 
