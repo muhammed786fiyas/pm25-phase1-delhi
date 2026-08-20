@@ -10,8 +10,8 @@ stages:
     outs:
     - path: data/stations
       hash: md5
-      md5: 68cb530186f71e4fd5adbe38d6235a41.dir
-      size: 40062
+      md5: 000b4f678110a2cf32ee75863562c265.dir
+      size: 40902
       nfiles: 5
   cpcb_download_pm25:
     cmd: python scripts/datasets/cpcb/3-download_pm25.py
