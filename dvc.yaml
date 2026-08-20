@@ -115,9 +115,35 @@ stages:
 
   # add more stages here once ready: maiac_filter_stations (after CPCB QC
   # finalizes the station list), maiac_preprocess (scale factor + QA decode),
+
+  # ============================================================  
   # maiac_gapfill (calibrated MERRA-2 fill)
   # ============================================================
-
+  map_stations_to_cells:
+    cmd: python scripts/datasets/merra2_aod/1-map_stations_to_cells.py
+      --stations data/stations/cpcb_stations_delhi_status.csv
+      --outdir data/raw/merra2_aod
+      --params params.yaml
+    deps:
+      - scripts/datasets/merra2_aod/1-map_stations_to_cells.py
+      - data/stations/cpcb_stations_delhi_status.csv
+    params:
+      - merra2_station_mapping
+    outs:
+      - data/raw/merra2_aod/station_cell_mapping.csv
+    
+  extract_merra2:
+    cmd: python scripts/datasets/merra2_aod/2-extract_gee_merra2.py
+      --mapping data/raw/merra2_aod/station_cell_mapping.csv
+      --outdir data/raw/merra2_aod
+      --params params.yaml
+    deps:
+      - scripts/datasets/merra2_aod/2-extract_gee_merra2.py
+      - data/raw/merra2_aod/station_cell_mapping.csv
+    params:
+      - merra2_extraction
+    outs:
+      - data/raw/merra2_aod/merra2_aod_raw.csv
   # ============================================================
   # ERA5-Land meteorology — add stages here once scripts/datasets/era5/ exists
   # ============================================================

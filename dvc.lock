@@ -250,3 +250,56 @@ stages:
       md5: 8e542b0b64b701a6ffd99a1f8e3193fc.dir
       size: 470290
       nfiles: 2
+  map_stations_to_cells:
+    cmd: python scripts/datasets/merra2_aod/1-map_stations_to_cells.py 
+      --stations data/stations/cpcb_stations_delhi_status.csv --outdir 
+      data/raw/merra2_aod --params params.yaml
+    deps:
+    - path: data/stations/cpcb_stations_delhi_status.csv
+      hash: md5
+      md5: 4d2c634b6bdf8d8e9cf3de6d517f6776
+      size: 14245
+    - path: scripts/datasets/merra2_aod/1-map_stations_to_cells.py
+      hash: md5
+      md5: 78125cd8fd6ef73f187f7cf36faea716
+      size: 3346
+    params:
+      params.yaml:
+        merra2_station_mapping:
+          gee_project: internship-pm25
+          collection: NASA/GSFC/MERRA/aer/2
+          aot_band: TOTEXTTAU
+          test_date_start: '2025-06-01'
+          test_date_end: '2025-06-02'
+    outs:
+    - path: data/raw/merra2_aod/station_cell_mapping.csv
+      hash: md5
+      md5: e154e309886c3b630297409897c16ae8
+      size: 3092
+  extract_merra2:
+    cmd: python scripts/datasets/merra2_aod/2-extract_gee_merra2.py --mapping 
+      data/raw/merra2_aod/station_cell_mapping.csv --outdir data/raw/merra2_aod 
+      --params params.yaml
+    deps:
+    - path: data/raw/merra2_aod/station_cell_mapping.csv
+      hash: md5
+      md5: e154e309886c3b630297409897c16ae8
+      size: 3092
+    - path: scripts/datasets/merra2_aod/2-extract_gee_merra2.py
+      hash: md5
+      md5: 0a398284a63241cd14ea5dfc69c51b27
+      size: 2213
+    params:
+      params.yaml:
+        merra2_extraction:
+          gee_project: internship-pm25
+          collection: NASA/GSFC/MERRA/aer/2
+          aot_band: TOTEXTTAU
+          date_start: '2025-03-01'
+          date_end: '2026-03-01'
+          scale_meters: 1000
+    outs:
+    - path: data/raw/merra2_aod/merra2_aod_raw.csv
+      hash: md5
+      md5: d10a9887f9e27bb4357d995179c98f50
+      size: 2176429

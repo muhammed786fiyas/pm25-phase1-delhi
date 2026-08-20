@@ -15,3 +15,18 @@ maiac_extract:
   bands: ["Optical_Depth_055", "Optical_Depth_047", "AOD_Uncertainty", "AOD_QA"]
   study_start: "2025-03-01"
   study_end: "2026-02-28"
+
+merra2_station_mapping:
+  gee_project: "internship-pm25"
+  collection: "NASA/GSFC/MERRA/aer/2"
+  aot_band: "TOTEXTTAU"
+  test_date_start: "2025-06-01"
+  test_date_end: "2025-06-02"
+
+merra2_extraction:
+  gee_project: "internship-pm25"
+  collection: "NASA/GSFC/MERRA/aer/2"
+  aot_band: "TOTEXTTAU"
+  date_start: "2025-03-01"
+  date_end: "2026-03-01"   # exclusive in filterDate, so covers through Feb 28 2026
+  scale_meters: 1000
