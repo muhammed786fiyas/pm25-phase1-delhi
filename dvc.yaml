@@ -144,6 +144,35 @@ stages:
       - merra2_extraction
     outs:
       - data/raw/merra2_aod/merra2_aod_raw.csv
+  window_qc_merra2:
+    cmd: python scripts/datasets/merra2_aod/3-window_and_qc_merra2.py
+      --raw data/raw/merra2_aod/merra2_aod_raw.csv
+      --mapping data/raw/merra2_aod/station_cell_mapping.csv
+      --outdir data/interim/merra2_aod
+      --params params.yaml
+    deps:
+      - scripts/datasets/merra2_aod/3-window_and_qc_merra2.py
+      - data/raw/merra2_aod/merra2_aod_raw.csv
+      - data/raw/merra2_aod/station_cell_mapping.csv
+    params:
+      - merra2_windowing_qc
+    outs:
+      - data/interim/merra2_aod/merra2_aod_windowed_qc.csv
+
+  aggregate_merra2:
+    cmd: python scripts/datasets/merra2_aod/4-aggregate_merra2_daily.py
+      --windowed data/interim/merra2_aod/merra2_aod_windowed_qc.csv
+      --mapping data/raw/merra2_aod/station_cell_mapping.csv
+      --outdir data/processed/merra2_aod
+      --params params.yaml
+    deps:
+      - scripts/datasets/merra2_aod/4-aggregate_merra2_daily.py
+      - data/interim/merra2_aod/merra2_aod_windowed_qc.csv
+      - data/raw/merra2_aod/station_cell_mapping.csv
+    params:
+      - merra2_aggregation
+    outs:
+      - data/processed/merra2_aod/merra2_aod_daily.csv
   # ============================================================
   # ERA5-Land meteorology — add stages here once scripts/datasets/era5/ exists
   # ============================================================

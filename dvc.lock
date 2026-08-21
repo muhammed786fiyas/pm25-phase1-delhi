@@ -303,3 +303,65 @@ stages:
       hash: md5
       md5: d10a9887f9e27bb4357d995179c98f50
       size: 2176429
+  window_qc_merra2:
+    cmd: python scripts/datasets/merra2_aod/3-window_and_qc_merra2.py --raw 
+      data/raw/merra2_aod/merra2_aod_raw.csv --mapping 
+      data/raw/merra2_aod/station_cell_mapping.csv --outdir 
+      data/interim/merra2_aod --params params.yaml
+    deps:
+    - path: data/raw/merra2_aod/merra2_aod_raw.csv
+      hash: md5
+      md5: d10a9887f9e27bb4357d995179c98f50
+      size: 2176429
+    - path: data/raw/merra2_aod/station_cell_mapping.csv
+      hash: md5
+      md5: e154e309886c3b630297409897c16ae8
+      size: 3092
+    - path: scripts/datasets/merra2_aod/3-window_and_qc_merra2.py
+      hash: md5
+      md5: c8cc0ef2a512851c11bae62c007a8f36
+      size: 3900
+    params:
+      params.yaml:
+        merra2_windowing_qc:
+          aot_band: TOTEXTTAU
+          overpass_hours_utc:
+          - 5
+          - 6
+          - 7
+          totexttau_min: 0.0
+          totexttau_max: 5.0
+          coord_tolerance_degrees: 0.05
+    outs:
+    - path: data/interim/merra2_aod/merra2_aod_windowed_qc.csv
+      hash: md5
+      md5: c6f2997d5dbecce6cfba116ad0279fc2
+      size: 397060
+  aggregate_merra2:
+    cmd: python scripts/datasets/merra2_aod/4-aggregate_merra2_daily.py 
+      --windowed data/interim/merra2_aod/merra2_aod_windowed_qc.csv --mapping 
+      data/raw/merra2_aod/station_cell_mapping.csv --outdir 
+      data/processed/merra2_aod --params params.yaml
+    deps:
+    - path: data/interim/merra2_aod/merra2_aod_windowed_qc.csv
+      hash: md5
+      md5: c6f2997d5dbecce6cfba116ad0279fc2
+      size: 397060
+    - path: data/raw/merra2_aod/station_cell_mapping.csv
+      hash: md5
+      md5: e154e309886c3b630297409897c16ae8
+      size: 3092
+    - path: scripts/datasets/merra2_aod/4-aggregate_merra2_daily.py
+      hash: md5
+      md5: 42dbab3f3e1cffe410e0a0ca61657388
+      size: 1772
+    params:
+      params.yaml:
+        merra2_aggregation:
+          aot_band: TOTEXTTAU
+          min_hours_required: 2
+    outs:
+    - path: data/processed/merra2_aod/merra2_aod_daily.csv
+      hash: md5
+      md5: a52d3d12668f3cf7304da36eb4bc9fee
+      size: 1572345

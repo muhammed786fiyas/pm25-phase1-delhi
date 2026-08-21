@@ -30,3 +30,14 @@ merra2_extraction:
   date_start: "2025-03-01"
   date_end: "2026-03-01"   # exclusive in filterDate, so covers through Feb 28 2026
   scale_meters: 1000
+
+merra2_windowing_qc:
+  aot_band: "TOTEXTTAU"
+  overpass_hours_utc: [5, 6, 7]
+  totexttau_min: 0.0
+  totexttau_max: 5.0            # loose sanity bound -- catches fill values/unit bugs, not real dust-storm spikes
+  coord_tolerance_degrees: 0.05   # ~5.5km -- well above scale=1000 reprojection jitter (<1km seen),
+                                    # well below cell spacing (~62km) -- still catches a genuine wrong-cell bug
+merra2_aggregation:
+  aot_band: "TOTEXTTAU"
+  min_hours_required: 2
