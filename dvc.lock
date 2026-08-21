@@ -365,3 +365,35 @@ stages:
       hash: md5
       md5: a52d3d12668f3cf7304da36eb4bc9fee
       size: 1572345
+  aod_filter_scale:
+    cmd: python scripts/datasets/maiac_aod/2-filter_and_scale_aod.py --input 
+      data/raw/maiac/maiac_aod_raw.csv --stations 
+      data/stations/cpcb_stations_delhi_status.csv --outdir 
+      data/interim/maiac_aod
+    deps:
+    - path: data/raw/maiac/maiac_aod_raw.csv
+      hash: md5
+      md5: d550a787ca5aeba17023433de7a91f12
+      size: 1365740
+    - path: data/stations/cpcb_stations_delhi_status.csv
+      hash: md5
+      md5: 4d2c634b6bdf8d8e9cf3de6d517f6776
+      size: 14245
+    - path: scripts/datasets/maiac_aod/2-filter_and_scale_aod.py
+      hash: md5
+      md5: 6154eec33f96232b84acd8f944541b2a
+      size: 3370
+    params:
+      params.yaml:
+        aod_filter_scale.aod_valid_max: 8.0
+        aod_filter_scale.aod_valid_min: -0.1
+        aod_filter_scale.scale_aod: 0.001
+        aod_filter_scale.scale_uncertainty: 0.0001
+        aod_filter_scale.uncertainty_valid_max: 3.0
+        aod_filter_scale.uncertainty_valid_min: 0.0
+    outs:
+    - path: data/interim/maiac_aod
+      hash: md5
+      md5: 53061b4ea3d3ea03d5aedf3daec9e1f0.dir
+      size: 1228111
+      nfiles: 1

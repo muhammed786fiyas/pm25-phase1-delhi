@@ -1,3 +1,6 @@
+
+# CPCB
+
 cpcb_qc:
   high_value_limit: 1000
   stuck_run_limit: 3
@@ -9,12 +12,25 @@ cpcb_filter_aggregate:
 cpcb_completeness:
   threshold: 60
 
+
+# MAIAC
+
 maiac_extract:
   gee_project: "internship-pm25"
   collection: "MODIS/061/MCD19A2_GRANULES"
   bands: ["Optical_Depth_055", "Optical_Depth_047", "AOD_Uncertainty", "AOD_QA"]
   study_start: "2025-03-01"
   study_end: "2026-02-28"
+
+aod_filter_scale:
+  scale_aod: 0.001
+  scale_uncertainty: 0.0001
+  aod_valid_min: -0.1
+  aod_valid_max: 8.0
+  uncertainty_valid_min: 0.0
+  uncertainty_valid_max: 3.0
+
+# MERRA-2
 
 merra2_station_mapping:
   gee_project: "internship-pm25"
