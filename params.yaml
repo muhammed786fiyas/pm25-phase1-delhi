@@ -30,6 +30,9 @@ aod_filter_scale:
   uncertainty_valid_min: 0.0
   uncertainty_valid_max: 3.0
 
+aod_qa_filter:
+  strictness: "moderate"
+
 # MERRA-2
 
 merra2_station_mapping:

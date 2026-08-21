@@ -114,7 +114,7 @@ stages:
       - data/raw/maiac
 
   aod_filter_scale:
-    cmd: python scripts/datasets/maiac_aod/2-filter_and_scale_aod.py --input data/raw/maiac/maiac_aod_raw.csv --stations data/stations/cpcb_stations_delhi_status.csv --outdir data/interim/maiac_aod
+    cmd: python scripts/datasets/maiac_aod/2-filter_and_scale_aod.py --input data/raw/maiac/maiac_aod_raw.csv --stations data/stations/cpcb_stations_delhi_status.csv --outdir data/interim/maiac_aod/filter_scale
     deps:
       - scripts/datasets/maiac_aod/2-filter_and_scale_aod.py
       - data/raw/maiac/maiac_aod_raw.csv
@@ -127,7 +127,25 @@ stages:
       - aod_filter_scale.uncertainty_valid_min
       - aod_filter_scale.uncertainty_valid_max
     outs:
-      - data/interim/maiac_aod
+      - data/interim/maiac_aod/filter_scale
+
+  aod_decode_qa:
+    cmd: python scripts/datasets/maiac_aod/3-decode_qa.py --input data/interim/maiac_aod/filter_scale/maiac_aod_filtered_scaled.csv --outdir data/interim/maiac_aod/qa_decode
+    deps:
+      - scripts/datasets/maiac_aod/3-decode_qa.py
+      - data/interim/maiac_aod/filter_scale/maiac_aod_filtered_scaled.csv
+    outs:
+      - data/interim/maiac_aod/qa_decode
+  
+  aod_qa_filter:
+    cmd: python scripts/datasets/maiac_aod/4-apply_qa_filter.py --input data/interim/maiac_aod/qa_decode/maiac_aod_qa_decoded.csv --outdir data/interim/maiac_aod/qa_filter
+    deps:
+      - scripts/datasets/maiac_aod/4-apply_qa_filter.py
+      - data/interim/maiac_aod/qa_decode/maiac_aod_qa_decoded.csv
+    params:
+      - aod_qa_filter.strictness
+    outs:
+      - data/interim/maiac_aod/qa_filter
 
   # add more stages here once ready: maiac_filter_stations (after CPCB QC
   # finalizes the station list), maiac_preprocess (scale factor + QA decode),

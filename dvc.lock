@@ -369,7 +369,7 @@ stages:
     cmd: python scripts/datasets/maiac_aod/2-filter_and_scale_aod.py --input 
       data/raw/maiac/maiac_aod_raw.csv --stations 
       data/stations/cpcb_stations_delhi_status.csv --outdir 
-      data/interim/maiac_aod
+      data/interim/maiac_aod/filter_scale
     deps:
     - path: data/raw/maiac/maiac_aod_raw.csv
       hash: md5
@@ -392,8 +392,49 @@ stages:
         aod_filter_scale.uncertainty_valid_max: 3.0
         aod_filter_scale.uncertainty_valid_min: 0.0
     outs:
-    - path: data/interim/maiac_aod
+    - path: data/interim/maiac_aod/filter_scale
       hash: md5
       md5: 53061b4ea3d3ea03d5aedf3daec9e1f0.dir
       size: 1228111
+      nfiles: 1
+  aod_decode_qa:
+    cmd: python scripts/datasets/maiac_aod/3-decode_qa.py --input 
+      data/interim/maiac_aod/filter_scale/maiac_aod_filtered_scaled.csv --outdir
+      data/interim/maiac_aod/qa_decode
+    deps:
+    - path: data/interim/maiac_aod/filter_scale/maiac_aod_filtered_scaled.csv
+      hash: md5
+      md5: b3053aae509aa19e3484a32b39f3a632
+      size: 1228111
+    - path: scripts/datasets/maiac_aod/3-decode_qa.py
+      hash: md5
+      md5: 8fd9e792b20f89f376ce8e52c3c9cc1f
+      size: 4299
+    outs:
+    - path: data/interim/maiac_aod/qa_decode
+      hash: md5
+      md5: fad4b50c8f5230787de5fded58551ba7.dir
+      size: 1855564
+      nfiles: 2
+  aod_qa_filter:
+    cmd: python scripts/datasets/maiac_aod/4-apply_qa_filter.py --input 
+      data/interim/maiac_aod/qa_decode/maiac_aod_qa_decoded.csv --outdir 
+      data/interim/maiac_aod/qa_filter
+    deps:
+    - path: data/interim/maiac_aod/qa_decode/maiac_aod_qa_decoded.csv
+      hash: md5
+      md5: b3ea5e9f42bb73dbb5c626af08f96bb7
+      size: 1855175
+    - path: scripts/datasets/maiac_aod/4-apply_qa_filter.py
+      hash: md5
+      md5: 3aaa7e5a1e28ffec4a6f1af5cf3c8cdf
+      size: 2795
+    params:
+      params.yaml:
+        aod_qa_filter.strictness: moderate
+    outs:
+    - path: data/interim/maiac_aod/qa_filter
+      hash: md5
+      md5: 1c8ab4235246e184d45879e11e8889e3.dir
+      size: 1685101
       nfiles: 1
