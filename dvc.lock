@@ -438,3 +438,22 @@ stages:
       md5: 1c8ab4235246e184d45879e11e8889e3.dir
       size: 1685101
       nfiles: 1
+  aod_aggregate_daily:
+    cmd: python scripts/datasets/maiac_aod/5-aggregate_aod_daily.py --input 
+      data/interim/maiac_aod/qa_filter/maiac_aod_qa_filtered.csv --outdir 
+      data/processed/maiac_aod
+    deps:
+    - path: data/interim/maiac_aod/qa_filter/maiac_aod_qa_filtered.csv
+      hash: md5
+      md5: 8b2bc0965875253b6ef18aff15ddb52c
+      size: 1685101
+    - path: scripts/datasets/maiac_aod/5-aggregate_aod_daily.py
+      hash: md5
+      md5: 33a67e7a82967ffe1fc2fa190ae10be9
+      size: 2938
+    outs:
+    - path: data/processed/maiac_aod
+      hash: md5
+      md5: 1ba575a30ec5992e1d07c395fdb015d6.dir
+      size: 421466
+      nfiles: 3

@@ -146,9 +146,15 @@ stages:
       - aod_qa_filter.strictness
     outs:
       - data/interim/maiac_aod/qa_filter
+  
+  aod_aggregate_daily:
+    cmd: python scripts/datasets/maiac_aod/5-aggregate_aod_daily.py --input data/interim/maiac_aod/qa_filter/maiac_aod_qa_filtered.csv --outdir data/processed/maiac_aod
+    deps:
+      - scripts/datasets/maiac_aod/5-aggregate_aod_daily.py
+      - data/interim/maiac_aod/qa_filter/maiac_aod_qa_filtered.csv
+    outs:
+      - data/processed/maiac_aod
 
-  # add more stages here once ready: maiac_filter_stations (after CPCB QC
-  # finalizes the station list), maiac_preprocess (scale factor + QA decode),
 
   # ============================================================  
   # maiac_gapfill (calibrated MERRA-2 fill)
