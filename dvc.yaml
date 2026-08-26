@@ -236,6 +236,17 @@ stages:
     outs:
       - data/raw/era5_land/era5_land_raw.csv
 
+  window_qc_era5_land:
+    cmd: python scripts/datasets/era5_land/3-window_and_qc_era5land.py --raw data/raw/era5_land/era5_land_raw.csv --mapping data/raw/era5_land/station_cell_mapping.csv --params params.yaml --outdir data/interim/era5_land
+    deps:
+      - scripts/datasets/era5_land/3-window_and_qc_era5land.py
+      - data/raw/era5_land/era5_land_raw.csv
+      - data/raw/era5_land/station_cell_mapping.csv
+    params:
+      - era5_land.window_qc
+    outs:
+      - data/interim/era5_land/era5_land_windowed.csv
+      - data/interim/era5_land/era5_land_window_summary.csv
   # ============================================================
   # OSM / static covariates (roads, land use, elevation) —
   # add stages here once scripts/datasets/osm/ exists

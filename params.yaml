@@ -73,6 +73,7 @@ era5_land:
   map_stations_to_cells:
     gee_project: internship-pm25
     collection: ECMWF/ERA5_LAND/HOURLY
+  
   extract:
     gee_project: internship-pm25
     collection: ECMWF/ERA5_LAND/HOURLY
@@ -84,3 +85,10 @@ era5_land:
     study_start: "2025-03-01"
     study_end: "2026-03-01"
     chunk_months: 3
+  
+  window_qc:
+    tolerance_degrees: 0.01
+    window_hours: [5, 6, 7]
+    temp_min_c: 0
+    temp_max_c: 50
+    wind_component_max_ms: 20

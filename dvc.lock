@@ -511,3 +511,41 @@ stages:
       hash: md5
       md5: 9bbf50d6bb6736543b0b97aada6ffbeb
       size: 21277469
+  window_qc_era5_land:
+    cmd: python scripts/datasets/era5_land/3-window_and_qc_era5land.py --raw 
+      data/raw/era5_land/era5_land_raw.csv --mapping 
+      data/raw/era5_land/station_cell_mapping.csv --params params.yaml --outdir 
+      data/interim/era5_land
+    deps:
+    - path: data/raw/era5_land/era5_land_raw.csv
+      hash: md5
+      md5: 9bbf50d6bb6736543b0b97aada6ffbeb
+      size: 21277469
+    - path: data/raw/era5_land/station_cell_mapping.csv
+      hash: md5
+      md5: a04786930e0d02f86cc13b24431178f6
+      size: 4054
+    - path: scripts/datasets/era5_land/3-window_and_qc_era5land.py
+      hash: md5
+      md5: 663fc675a4c79e43e26999ebb4ad784e
+      size: 6208
+    params:
+      params.yaml:
+        era5_land.window_qc:
+          tolerance_degrees: 0.01
+          window_hours:
+          - 5
+          - 6
+          - 7
+          temp_min_c: 0
+          temp_max_c: 50
+          wind_component_max_ms: 20
+    outs:
+    - path: data/interim/era5_land/era5_land_window_summary.csv
+      hash: md5
+      md5: 894bf50bc8729c11f80ce5d4fc5d8d9c
+      size: 4810
+    - path: data/interim/era5_land/era5_land_windowed.csv
+      hash: md5
+      md5: bca5f3c6dfe80c562f7dc0bdaa99f1ee
+      size: 5837333
