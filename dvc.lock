@@ -106,8 +106,8 @@ stages:
     outs:
     - path: data/raw/maiac
       hash: md5
-      md5: 1d08a90111317af22fb89c9805fca380.dir
-      size: 1365740
+      md5: a9e072ed9104c1a8bf7a2b0d8b236179.dir
+      size: 1374106
       nfiles: 1
   cpcb_qc_check:
     cmd: python scripts/datasets/cpcb/7-cpcb_qc_check.py --input 
@@ -373,8 +373,8 @@ stages:
     deps:
     - path: data/raw/maiac/maiac_aod_raw.csv
       hash: md5
-      md5: d550a787ca5aeba17023433de7a91f12
-      size: 1365740
+      md5: c91af1d68dcb1b2179ba70908bac7de0
+      size: 1374106
     - path: data/stations/cpcb_stations_delhi_status.csv
       hash: md5
       md5: 4d2c634b6bdf8d8e9cf3de6d517f6776
@@ -394,8 +394,8 @@ stages:
     outs:
     - path: data/interim/maiac_aod/filter_scale
       hash: md5
-      md5: 53061b4ea3d3ea03d5aedf3daec9e1f0.dir
-      size: 1228111
+      md5: 740b6aa10229dad2a93ee8056376e033.dir
+      size: 1235744
       nfiles: 1
   aod_decode_qa:
     cmd: python scripts/datasets/maiac_aod/3-decode_qa.py --input 
@@ -404,8 +404,8 @@ stages:
     deps:
     - path: data/interim/maiac_aod/filter_scale/maiac_aod_filtered_scaled.csv
       hash: md5
-      md5: b3053aae509aa19e3484a32b39f3a632
-      size: 1228111
+      md5: c5553cb55c9de819496927ea5ed8ff3a
+      size: 1235744
     - path: scripts/datasets/maiac_aod/3-decode_qa.py
       hash: md5
       md5: 8fd9e792b20f89f376ce8e52c3c9cc1f
@@ -413,8 +413,8 @@ stages:
     outs:
     - path: data/interim/maiac_aod/qa_decode
       hash: md5
-      md5: fad4b50c8f5230787de5fded58551ba7.dir
-      size: 1855564
+      md5: 2321d22cf638c5781cc73179cb8de7e2.dir
+      size: 1867046
       nfiles: 2
   aod_qa_filter:
     cmd: python scripts/datasets/maiac_aod/4-apply_qa_filter.py --input 
@@ -423,8 +423,8 @@ stages:
     deps:
     - path: data/interim/maiac_aod/qa_decode/maiac_aod_qa_decoded.csv
       hash: md5
-      md5: b3ea5e9f42bb73dbb5c626af08f96bb7
-      size: 1855175
+      md5: 85c57b5682052711b53d3fa32d4e5824
+      size: 1866657
     - path: scripts/datasets/maiac_aod/4-apply_qa_filter.py
       hash: md5
       md5: 3aaa7e5a1e28ffec4a6f1af5cf3c8cdf
@@ -435,8 +435,8 @@ stages:
     outs:
     - path: data/interim/maiac_aod/qa_filter
       hash: md5
-      md5: 1c8ab4235246e184d45879e11e8889e3.dir
-      size: 1685101
+      md5: ef62f81c1e799105f119888c4ae5096e.dir
+      size: 1696419
       nfiles: 1
   aod_aggregate_daily:
     cmd: python scripts/datasets/maiac_aod/5-aggregate_aod_daily.py --input 
@@ -445,8 +445,8 @@ stages:
     deps:
     - path: data/interim/maiac_aod/qa_filter/maiac_aod_qa_filtered.csv
       hash: md5
-      md5: 8b2bc0965875253b6ef18aff15ddb52c
-      size: 1685101
+      md5: 3efa449ab4a5beadcd84135b69ea61de
+      size: 1696419
     - path: scripts/datasets/maiac_aod/5-aggregate_aod_daily.py
       hash: md5
       md5: 33a67e7a82967ffe1fc2fa190ae10be9
@@ -454,6 +454,60 @@ stages:
     outs:
     - path: data/processed/maiac_aod
       hash: md5
-      md5: 1ba575a30ec5992e1d07c395fdb015d6.dir
-      size: 421466
+      md5: 682777ff1c36ae4fda155dd7708419e0.dir
+      size: 423860
       nfiles: 3
+  map_stations_to_cells_era5:
+    cmd: python scripts/datasets/era5_land/1-map_stations_to_cells.py --stations
+      data/stations/cpcb_stations_delhi_status.csv --params params.yaml --outdir
+      data/raw/era5_land
+    deps:
+    - path: data/stations/cpcb_stations_delhi_status.csv
+      hash: md5
+      md5: 4d2c634b6bdf8d8e9cf3de6d517f6776
+      size: 14245
+    - path: scripts/datasets/era5_land/1-map_stations_to_cells.py
+      hash: md5
+      md5: 4a1bd8dff89c2c67d6e527cd04be41b1
+      size: 2959
+    params:
+      params.yaml:
+        era5_land.map_stations_to_cells:
+          gee_project: internship-pm25
+          collection: ECMWF/ERA5_LAND/HOURLY
+    outs:
+    - path: data/raw/era5_land/station_cell_mapping.csv
+      hash: md5
+      md5: a04786930e0d02f86cc13b24431178f6
+      size: 4054
+  extract_era5_land:
+    cmd: python scripts/datasets/era5_land/2-extract_gee_era5land.py --mapping 
+      data/raw/era5_land/station_cell_mapping.csv --params params.yaml --outdir 
+      data/raw/era5_land
+    deps:
+    - path: data/raw/era5_land/station_cell_mapping.csv
+      hash: md5
+      md5: a04786930e0d02f86cc13b24431178f6
+      size: 4054
+    - path: scripts/datasets/era5_land/2-extract_gee_era5land.py
+      hash: md5
+      md5: b8e854d1baa8dbcd5b5bfaaf308275c3
+      size: 3146
+    params:
+      params.yaml:
+        era5_land.extract:
+          gee_project: internship-pm25
+          collection: ECMWF/ERA5_LAND/HOURLY
+          bands:
+          - temperature_2m
+          - dewpoint_temperature_2m
+          - u_component_of_wind_10m
+          - v_component_of_wind_10m
+          study_start: '2025-03-01'
+          study_end: '2026-03-01'
+          chunk_months: 3
+    outs:
+    - path: data/raw/era5_land/era5_land_raw.csv
+      hash: md5
+      md5: 9bbf50d6bb6736543b0b97aada6ffbeb
+      size: 21277469

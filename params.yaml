@@ -1,6 +1,6 @@
-
-# CPCB
-
+# ============================================================
+# CPCB ground-station pipeline (Phase 1: Delhi)
+# ============================================================
 cpcb_qc:
   high_value_limit: 1000
   stuck_run_limit: 3
@@ -13,7 +13,9 @@ cpcb_completeness:
   threshold: 60
 
 
-# MAIAC
+# ============================================================
+# MAIAC AOD pipeline
+# ============================================================
 
 maiac_extract:
   gee_project: "internship-pm25"
@@ -33,7 +35,9 @@ aod_filter_scale:
 aod_qa_filter:
   strictness: "moderate"
 
-# MERRA-2
+# ============================================================  
+# maiac_gapfill (calibrated MERRA-2 fill)
+# ============================================================
 
 merra2_station_mapping:
   gee_project: "internship-pm25"
@@ -60,3 +64,23 @@ merra2_windowing_qc:
 merra2_aggregation:
   aot_band: "TOTEXTTAU"
   min_hours_required: 2
+
+# ============================================================
+# ERA5-Land meteorology 
+# ============================================================
+
+era5_land:
+  map_stations_to_cells:
+    gee_project: internship-pm25
+    collection: ECMWF/ERA5_LAND/HOURLY
+  extract:
+    gee_project: internship-pm25
+    collection: ECMWF/ERA5_LAND/HOURLY
+    bands:
+      - temperature_2m
+      - dewpoint_temperature_2m
+      - u_component_of_wind_10m
+      - v_component_of_wind_10m
+    study_start: "2025-03-01"
+    study_end: "2026-03-01"
+    chunk_months: 3
