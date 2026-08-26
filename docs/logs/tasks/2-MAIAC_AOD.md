@@ -1,60 +1,60 @@
-# Task Log: MERRA-2
+# Task Log: MAIAC AOD
 _Last updated: 2026-08-21_
 
 ## Scope
-Extract MERRA-2 hourly aerosol optical thickness (TOTEXTTAU) as the calibrated gap-fill source for MAIAC AOD gaps, for the Delhi Phase 1 study window (2025-03-01 to 2026-02-28), matched to the 42 finalized CPCB stations.
+Google Earth Engine extraction and preprocessing of MAIAC (MCD19A2) AOD at 550nm for all
+Delhi/NCR stations, from raw overpass-level extraction through to a clean daily station-level
+dataset ready for temporal alignment with CPCB.
 
 ## Completed
+**GEE account setup** — done 2026-08-17. GEE Cloud Project `internship-pm25` (no dot), `earthengine-api` installed and authenticated.
 
-**Setup & validation** (2026-08-20)
-- Confirmed GEE collection: `NASA/GSFC/MERRA/aer/2` (M2T1NXAER), band `TOTEXTTAU`, ~62km native resolution (0.5° x 0.625°).
-- Sanity-checked in GEE Code Editor: 24 hourly images/day confirmed; TOTEXTTAU = 1.39 on a June test date (pre-monsoon dust season, plausible); TOTEXTTAU = 0.23 on a monsoon date (2025-07-15), consistent with wet scavenging.
-- Saved the sanity-check script as `scripts/datasets/merra2_aod/gee_console_checks.js` (reference only, not a DVC stage).
+**Collection and band validation (Code Editor)** — done 2026-08-17. Collection `MODIS/061/MCD19A2_GRANULES`, bands `Optical_Depth_055` (primary), `Optical_Depth_047`, `AOD_Uncertainty`, `AOD_QA`. `filterBounds` false-positive issue found and worked around with per-image `reduceRegion` + null-filtering.
 
-**Station-to-cell mapping** (2026-08-20)
-- Wrote and ran `scripts/datasets/merra2_aod/1-map_stations_to_cells.py`.
-- All 42 finalized KEEP stations mapped to their true MERRA-2 grid cell center using `pixelLonLat().reproject(merra_projection)` — not `filterBounds` (no swath-geometry issue here, unlike MAIAC) and not manual grid math (avoids grid-origin misalignment risk).
-- Result: 3 unique cells. Cell 1 (28.75, 77.3125): 38 stations. Cell 2 (28.25, 77.3125): 3 stations (NISE Gwal Pahari, Aya Nagar, Karni Singh Shooting Range — southern edge). Cell 3 (28.75, 76.6875): 1 station (Najafgarh — westernmost).
-- Output: `data/raw/merra2_aod/station_cell_mapping.csv`, DVC stage `map_stations_to_cells`.
+**Script 1 — raw extraction** — done 2026-08-17/20. `scripts/datasets/maiac_aod/1-extract_gee_covariates.py`. Raw overpass level, single-pixel point extraction. Ran against all 56 candidate stations (unfiltered): 17,767 rows, `data/raw/maiac/maiac_aod_raw.csv`. DVC stage `maiac_extract`.
 
-**Raw hourly extraction** (2026-08-20)
-- Wrote and ran `scripts/datasets/merra2_aod/2-extract_gee_merra2.py` — one `.getRegion()` call per unique cell (3 calls total, not 42) pulling the full hourly time series for the study window.
-- Got 8,616 hourly rows per cell (8,760 expected for a full 365-day year) — 144 hours short, identical across all 3 cells.
-- Investigated: 6 fully-missing days, all September 2025 (09-04, 09-05, 09-20, 09-23, 09-26, 09-28), 24/24 hours missing each, identical across cells — a real MERRA-2 collection gap, not a script bug. No action needed; these days simply have zero rows going into the windowing step.
-- Output: `data/raw/merra2_aod/merra2_aod_raw.csv`, DVC stage `extract_merra2`.
+**Station finalization dependency resolved** — CPCB completeness QC completed 2026-08-20, station list finalized at 42 (see `cpcb.md`).
 
-**Windowing, QC & daily aggregation** (2026-08-21)
-- Added a coordinate-consistency check to `3-window_and_qc_merra2.py`: compares GEE's actually-sampled point (`longitude`/`latitude` in the raw file) against the intended cell center (`cell_lat`/`cell_lon` in the mapping file), per `cell_id`. Runs first, before windowing/duplicates/range filtering — designed as a hard-fail correctness gate, not a data-quality filter, since a mismatch implicates a whole cell's data, not just a few rows. Required adding a `--mapping` argument to script 3.
-- Corrected DVC output folder structure to match the `raw/interim/processed` convention: `station_cell_mapping.csv` stays in `data/raw/merra2_aod/` (dependency of the raw extraction step, not itself a derived output); `merra2_aod_windowed_qc.csv` → `data/interim/merra2_aod/`; `merra2_aod_daily.csv` → `data/processed/merra2_aod/`.
-- First `dvc repro` after adding the check failed: all 25,848 raw rows flagged as coordinate mismatches (~90–310m offsets, consistent within each cell). Diagnosed as `getRegion(scale=1000)` snapping the reported longitude/latitude to a 1km reprojection grid before echoing them back — not a real bug, and not affecting the actual `TOTEXTTAU` values (negligible relative to the ~62km native cell size).
-- Fixed by loosening `coord_tolerance_degrees` from `1e-6` to `0.05` (~5.5km) — comfortably above the observed jitter, comfortably below the ~62km cell spacing, so it still catches a genuine wrong-cell bug. Params-only fix, no code change or re-extraction needed.
-- Reran `dvc repro` — `window_qc_merra2` and `aggregate_merra2` both completed successfully (confirmed via `git status`: `dvc.lock` updated, `data/interim/merra2_aod/` and `data/processed/merra2_aod/` created).
-- Reaffirmed `totexttau_max: 5.0` as a "catch broken data" backstop rather than a literal physical AOD ceiling — MERRA-2's ~62km spatial averaging dilutes even genuine extreme events well below that bound, so it shouldn't clip real data while still catching fill values or unit-scale bugs.
-- Output: `data/processed/merra2_aod/merra2_aod_daily.csv` — station-level daily TOTEXTTAU for all 42 stations, DVC stages `window_qc_merra2` and `aggregate_merra2`.
-- Tagged `delhi-phase1-v7`: MERRA-2 pipeline complete end-to-end (map → raw extract → window/QC → daily aggregation).
+**Script 2 — filter and scale** — done 2026-08-21. `scripts/datasets/maiac_aod/2-filter_and_scale_aod.py`. Filtered to 42 finalized stations (17,767 → 13,339 rows), applied official NASA scale factors (`aod_055`/`aod_047` ×0.001, `aod_uncertainty` ×0.0001, both confirmed from the MCD19A2 User Guide Table 5.3), fill-value (-28672) handling before scaling, duplicate check (0 found), range check (0 out of range). Output: `data/interim/maiac_aod/filter_scale/maiac_aod_filtered_scaled.csv`. DVC stage `aod_filter_scale`, with `params.yaml` section of the same name.
+
+**Script 3 — QA bitmask decode** — done 2026-08-21. `scripts/datasets/maiac_aod/3-decode_qa.py`. Decoded all `AOD_QA` fields (cloud mask, adjacency mask, qa_aod, glint mask, aerosol model) into labeled columns using the confirmed official bit layout (NASA User Guide Table 5.4). No filtering — outputs full decoded dataset plus a `qa_summary.csv` for human review. DVC stage `aod_decode_qa`.
+
+**Script 4 — QA filter** — done 2026-08-21. `scripts/datasets/maiac_aod/4-apply_qa_filter.py`. Applies the human-reviewed strictness decision from `params.yaml` (`aod_qa_filter.strictness`), guarded against a `"NOT_SET"` placeholder so `dvc repro` fails safely until a real decision is made. Chosen strictness: **moderate** (keep best quality + 1-neighbor-cloud). Result: 13,339 → 12,241 rows (91.8% kept), all 42 stations retained with none losing all data. DVC stage `aod_qa_filter`.
+
+**Script 5 — daily aggregation** — done 2026-08-21. `scripts/datasets/maiac_aod/5-aggregate_aod_daily.py`. Aggregates valid overpasses to one row per station-day (mean of `aod_055`/`aod_047`/`aod_uncertainty`), adds `n_overpasses` and `season` columns. Also outputs a per-station-per-season count file (with a `total` column) mirroring CPCB's own completeness-check shape, and an `n_overpasses` distribution summary. Output: `data/processed/maiac_aod/maiac_aod_daily.csv`. DVC stage `aod_aggregate_daily`.
+
+**Final dataset verified** — season labels correct, `aod_047` consistently > `aod_055` (expected physical relationship), July-August monsoon gap consistent across all 42 stations, `n_overpasses` only 1 or 2 (matches QA-filtered data). AOD coverage per station: ~165-208 days out of 365 (45-57%), heavily concentrated gap in monsoon (~10-22% vs CPCB's ~86-97%).
+
+**AOD preprocessing pipeline (scripts 1-5) is fully DONE.**
+
+**Git** — tagged `delhi-phase1-v8` (QA decode+filter) and `delhi-phase1-v9` (full AOD preprocessing complete).
 
 ## Key decisions
-- 2026-08-20: Group stations by shared MERRA-2 grid cell instead of extracting per station — Delhi's full station spread (~40km) is smaller than one MERRA-2 cell (~62km), so 42 point extractions would have been redundant. Cut GEE calls from 42 to 3.
-- 2026-08-20: Determine cell membership via GEE's own `pixelLonLat()`, reprojected to MERRA-2's native projection — not manual lat/lon rounding against the documented grid spacing, since getting the grid origin wrong would silently misassign stations with no error thrown.
-- 2026-08-20: Split MERRA-2 processing into 4 separate numbered scripts (map cells → raw extract → window+QC → aggregate) rather than one combined script, mirroring the CPCB pipeline's separation of QC from aggregation. Keeps the expensive/slow GEE call isolated from the cheap, easily-rerun-on-tweak pandas logic.
-- 2026-08-20: Overpass window for MERRA-2 set to UTC hours 5, 6, 7 (05:00–08:00 UTC = 10:30–13:30 IST), matching the window already used for CPCB and MAIAC, and matching the Maheshwarkar & Sunder Raman (2021) precedent.
-- 2026-08-20: Daily aggregation requires at least 2 of 3 overpass hours present (`min_hours_required=2`), mirroring CPCB's own "min 2 overpass hours/day" completeness rule.
-- 2026-08-20: TOTEXTTAU sanity range set loosely to [0, 5] — meant to catch fill values/unit bugs, not real dust-storm spikes, so genuine extreme readings shouldn't be removed.
-- 2026-08-20: All script configuration (GEE project ID, collection, band, dates, thresholds) now loads from `params.yaml` per-script, not hardcoded — standing rule going forward for all pipeline scripts, with a matching `dvc.yaml` stage provided alongside each one.
-- 2026-08-21: Coordinate-consistency check treats any mismatch as a hard failure, not a warning or row-drop — a mismatch implicates the whole cell's data, not just individual rows.
-- 2026-08-21: `station_cell_mapping.csv` kept in `data/raw/merra2_aod/` rather than moved to `interim` — it's a direct dependency of the raw extraction step (used to choose query points), not itself a processed/derived output.
-- 2026-08-21: `coord_tolerance_degrees` set to 0.05° rather than a near-zero value — the check exists to catch genuine wrong-cell errors, not to flag expected sub-kilometer reprojection jitter from GEE's `getRegion(scale=...)` behavior.
+- **2026-08-17** — Use AOD at 550nm (`Optical_Depth_055`), not 470nm — matches MERRA-2's reporting wavelength, AERONET convention, and both literature anchors.
+- **2026-08-17** — Raw overpass level (no Terra/Aqua averaging), single-pixel (no 3x3 buffer) for the first working version — both deliberate, deferred design choices.
+- **2026-08-17** — Ran full extraction against unfiltered 56-station list rather than waiting for CPCB QC — avoids re-running slow GEE extraction; filtering afterward is cheap.
+- **2026-08-20/21** — Preprocessing order: filter to 42 stations → scale → decode QA → filter QA → aggregate daily → (then) temporal alignment.
+- **2026-08-21** — QA filtering strictness set to **moderate**, directly grounded in NASA's documented guidance (single-cloud-adjacency "often represents false cloud detection").
+- **2026-08-21** — Human-judgment pipeline steps use a `"NOT_SET"` placeholder pattern in `params.yaml` with a guard clause, so `dvc repro` fails safely rather than silently proceeding with an undecided threshold. This generalizes to future reruns on different regions/times.
+- **2026-08-21** — `data/interim/maiac_aod/` restructured into per-stage subfolders (`filter_scale/`, `qa_decode/`, `qa_filter/`) to satisfy DVC's non-overlapping-output requirement.
+- Plan (still pending) — left join with CPCB as base table for temporal alignment, add `aod_source` column (`'maiac'` now, `'merra2_gapfilled'` later). Do NOT drop CPCB rows lacking AOD — MERRA-2 gap-fill is meant to fill those.
 
 ## Data notes & gotchas
-- Caught before it reached the real script: `ee.Image.pixelLonLat().reduceRegion(scale=1000)` without reprojecting first does NOT return the true MERRA-2 cell center — it silently returns something very close to the queried point's own coordinates instead, because `pixelLonLat()` has no fixed native resolution until reprojected onto the target grid. Fixed by calling `.reproject(merra_projection)` before reducing. Real TOTEXTTAU value sampling (not `pixelLonLat`) at scale=1000 was unaffected, since the actual MERRA-2 image already carries its correct native projection.
-- pandas version difference: `pd.factorize()` on a plain `list(zip(...))` fails on newer pandas ("factorize requires a Series..."). Replaced with `drop_duplicates()` + `reset_index()` + `merge()` for the `cell_id` assignment instead — also cleaner, plain-pandas style.
-- MERRA-2 image IDs are timestamped `YYYYMMDDHH` in UTC (e.g. `NASA/GSFC/MERRA/aer/2/2025060100`) — the HH segment maps directly to the overpass-window hours (05, 06, 07) needed for filtering.
-- 6 fully-missing days in Sept 2025 across all cells (real MERRA-2 gap, listed above under Completed) — surfaced as skipped days in the windowing/aggregation step; no fix needed, was expected.
-- `getRegion(geometry, scale)` does not echo back the exact query point's coordinates — at `scale=1000` it reprojects to a 1km grid first and reports that pixel's center, producing up to ~1km of drift in the returned `longitude`/`latitude` columns (but not in the sampled band value itself, which still reflects the correct native ~62km cell). Same underlying category of issue as the `pixelLonLat()` scale bug above, but shows up differently since `getRegion` samples a real image with its own native projection rather than a synthetic coordinate image.
+- MCD19A2 official scale/fill values (NASA LP DAAC User Guide V61): `Optical_Depth_047`/`Optical_Depth_055` scale 0.001, fill -28672, valid range -100 to 8000 (raw). `AOD_Uncertainty` scale 0.0001 (NOT the same as AOD bands), fill -28672, valid range 0 to 30000 (raw).
+- `AOD_QA` bit layout (16-bit uint): bits 0-2 cloud mask, 3-4 land/water/snow/ice, 5-7 adjacency mask, 8-11 QA-for-AOD (0000=best quality, this is NASA's own pre-computed combination of cloud+adjacency), 12 glint mask, 13-14 aerosol model, 15 reserved.
+- `qa_aod` (bits 8-11) directly aggregates `cloud_mask` + `adjacency_mask` — confirmed by matching row counts exactly between the fields in this dataset's QA summary.
+- July–August (peak monsoon) shows a sharp, consistent drop in valid overpasses across all 42 stations — expected MAIAC cloud-loss behavior, not a pipeline bug. This is the core justification for MERRA-2 gap-fill.
+- `filterBounds` returning ~395 "matches" for a single point over 5 days (vs. ~6 genuinely valid ones) was the first sign something was off in early testing — root cause was MODIS swath geometry, not a code bug.
+- Each station's extraction (`filterBounds` + `reduceRegion`) is fully independent per station — not a shared regional filter.
+- `image_id` structure: `MCD19A2_A{YYYYDDD}_h{HH}v{VV}_{version}_{production timestamp}_{overpass index}` — e.g. acquisition date is Julian day format, production timestamp shows processing delay (~2 days after acquisition typically), overpass index distinguishes multiple same-day passes.
 
 ## Pending
-- Sanity-check `merra2_aod_daily.csv` output ranges and station coverage (row counts per station, TOTEXTTAU distribution, dropped-day counts) — not yet explicitly reviewed, only confirmed the pipeline ran without error.
-- Feed into the MAIAC↔MERRA-2 calibration regression per airshed (`MAIAC ≈ a + b · MERRA2`) — next real milestone for this data, blocked on the temporal-alignment/gap-fill-ordering decision currently open in the AOD preprocessing task log.
+- Decide order: gap-fill calibration before or after CPCB↔AOD temporal alignment join — open question.
+- Temporal alignment script: left join `maiac_aod_daily.csv` with CPCB daily PM2.5 on `[location_id, date]`.
+- MAIAC-MERRA2 gap-fill calibration: fit `MAIAC_AOD ~= a + b*MERRA2_AOD` per airshed, apply to fill AOD gaps (mostly monsoon).
+- Confirm MERRA-2's final output file path/name (pipeline reported complete, exact path not yet in this session's context) before referencing it in the join/gap-fill script.
+- Externalize `extract_gee_covariates.py`'s hardcoded constants (`GEE_PROJECT`, `MAIAC_COLLECTION`, `BANDS_TO_PULL`, `STUDY_START`, `STUDY_END`) into `params.yaml` — planned, not yet done.
+- Decide on and implement Terra vs Aqua overpass identification — still open, not blocking.
 
 ## Ideas / under consideration
-- None raised yet for this module.
+- 3x3 pixel buffer averaging around each station point (instead of single-pixel) — deferred, not rejected. Compare against current single-pixel values before deciding.
