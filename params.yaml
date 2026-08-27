@@ -151,9 +151,12 @@ static_gee_layers:
       study_start: "2025-03-01"
       study_end: "2026-02-28"
       period_days: 5
-      
+
     qc:
       station_file: data/stations/cpcb_stations_delhi_status.csv
       null_rate_warn_pct: 30
       ndvi_plausible_min: -1.0
       ndvi_plausible_max: 1.0
+    
+    fill:
+      max_fill_distance_periods: 5

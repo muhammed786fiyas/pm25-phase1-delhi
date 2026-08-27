@@ -838,3 +838,52 @@ stages:
       hash: md5
       md5: 7bfcf0a7d8892de5ef5d7155a1f139ad
       size: 4329
+  analyze_ndvi_fill_distances:
+    cmd: python scripts/datasets/static_gee/06_analyze_ndvi_fill_distances.py 
+      --input data/raw/static_gee/ndvi/ndvi_raw_periods.csv --output 
+      data/interim/static_gee/ndvi/ndvi_fill_distance_analysis.csv
+    deps:
+    - path: data/interim/static_gee/ndvi/ndvi_qc_summary.csv
+      hash: md5
+      md5: 7bfcf0a7d8892de5ef5d7155a1f139ad
+      size: 4329
+    - path: data/raw/static_gee/ndvi/ndvi_raw_periods.csv
+      hash: md5
+      md5: 794fc4594cd57f9336750c96913ecb6c
+      size: 301583
+    - path: scripts/datasets/static_gee/06_analyze_ndvi_fill_distances.py
+      hash: md5
+      md5: 48347b4bc16a2c8b35b81e1b77cc2591
+      size: 3848
+    outs:
+    - path: data/interim/static_gee/ndvi/ndvi_fill_distance_analysis.csv
+      hash: md5
+      md5: e2ef1535e89899094eda40a7b44caba3
+      size: 18092
+  fill_ndvi_gaps:
+    cmd: python scripts/datasets/static_gee/07_fill_ndvi_gaps.py --raw_input 
+      data/raw/static_gee/ndvi/ndvi_raw_periods.csv --distance_input 
+      data/interim/static_gee/ndvi/ndvi_fill_distance_analysis.csv --output 
+      data/processed/static_gee/ndvi_gapfilled.csv
+    deps:
+    - path: data/interim/static_gee/ndvi/ndvi_fill_distance_analysis.csv
+      hash: md5
+      md5: e2ef1535e89899094eda40a7b44caba3
+      size: 18092
+    - path: data/raw/static_gee/ndvi/ndvi_raw_periods.csv
+      hash: md5
+      md5: 794fc4594cd57f9336750c96913ecb6c
+      size: 301583
+    - path: scripts/datasets/static_gee/07_fill_ndvi_gaps.py
+      hash: md5
+      md5: ba22b66e02e1b1799accac7f1521a1d2
+      size: 4509
+    params:
+      params.yaml:
+        static_gee_layers.ndvi.fill:
+          max_fill_distance_periods: 5
+    outs:
+    - path: data/processed/static_gee/ndvi_gapfilled.csv
+      hash: md5
+      md5: 106182e8e37981596b4e9bcc5bfe1569
+      size: 318739

@@ -360,6 +360,26 @@ stages:
       - static_gee_layers.ndvi.qc
     outs:
       - data/interim/static_gee/ndvi/ndvi_qc_summary.csv
+  
+  analyze_ndvi_fill_distances:
+    cmd: python scripts/datasets/static_gee/06_analyze_ndvi_fill_distances.py --input data/raw/static_gee/ndvi/ndvi_raw_periods.csv --output data/interim/static_gee/ndvi/ndvi_fill_distance_analysis.csv
+    deps:
+      - scripts/datasets/static_gee/06_analyze_ndvi_fill_distances.py
+      - data/raw/static_gee/ndvi/ndvi_raw_periods.csv
+      - data/interim/static_gee/ndvi/ndvi_qc_summary.csv
+    outs:
+      - data/interim/static_gee/ndvi/ndvi_fill_distance_analysis.csv
+  
+  fill_ndvi_gaps:
+    cmd: python scripts/datasets/static_gee/07_fill_ndvi_gaps.py --raw_input data/raw/static_gee/ndvi/ndvi_raw_periods.csv --distance_input data/interim/static_gee/ndvi/ndvi_fill_distance_analysis.csv --output data/processed/static_gee/ndvi_gapfilled.csv
+    deps:
+      - scripts/datasets/static_gee/07_fill_ndvi_gaps.py
+      - data/raw/static_gee/ndvi/ndvi_raw_periods.csv
+      - data/interim/static_gee/ndvi/ndvi_fill_distance_analysis.csv
+    params:
+      - static_gee_layers.ndvi.fill
+    outs:
+      - data/processed/static_gee/ndvi_gapfilled.csv
 
   # ============================================================
   # OSM / static covariates (roads, land use, elevation) —
