@@ -314,10 +314,30 @@ stages:
       - scripts/datasets/static_gee/01_extract_worldcover_raw.py
       - data/stations/cpcb_stations_delhi_status.csv
     params:
-      - static_gee_layers
+      - static_gee_layers.worldcover.extract
     outs:
       - data/raw/static_gee/worldcover/worldcover_raw_histogram.csv
       - data/raw/static_gee/worldcover/worldcover_extraction_summary.csv
+
+  qc_worldcover:
+    cmd: python scripts/datasets/static_gee/02_qc_worldcover.py --input data/raw/static_gee/worldcover/worldcover_raw_histogram.csv --output data/interim/static_gee/worldcover/worldcover_qc_summary.csv
+    deps:
+      - scripts/datasets/static_gee/02_qc_worldcover.py
+      - data/raw/static_gee/worldcover/worldcover_raw_histogram.csv
+      - data/stations/cpcb_stations_delhi_status.csv
+    params:
+      - static_gee_layers.worldcover.qc
+    outs:
+      - data/interim/static_gee/worldcover/worldcover_qc_summary.csv
+  
+  compute_worldcover_fractions:
+    cmd: python scripts/datasets/static_gee/03_compute_worldcover_fractions.py --input data/raw/static_gee/worldcover/worldcover_raw_histogram.csv --output data/processed/static_gee/worldcover_landuse.csv
+    deps:
+      - scripts/datasets/static_gee/03_compute_worldcover_fractions.py
+      - data/raw/static_gee/worldcover/worldcover_raw_histogram.csv
+      - data/interim/static_gee/worldcover/worldcover_qc_summary.csv
+    outs:
+      - data/processed/static_gee/worldcover_landuse.csv
 
   # ============================================================
   # OSM / static covariates (roads, land use, elevation) —

@@ -6,7 +6,6 @@ import pandas as pd
 import ee
 
 PARAMS_FILE = "params.yaml"
-PARAMS_SECTION = "static_gee_layers"
 
 WORLDCOVER_CLASSES = ["10", "20", "30", "40", "50", "60", "70", "80", "90", "95", "100"]
 
@@ -21,19 +20,19 @@ def main():
     print("=== Loading params ===")
     with open(args.params) as f:
         all_params = yaml.safe_load(f)
-    params = all_params[PARAMS_SECTION]
+    params = all_params["static_gee_layers"]["worldcover"]["extract"]
 
     print("=== Initializing Earth Engine ===")
-    ee.Initialize(project=params["GEE_PROJECT"])
+    ee.Initialize(project=params["gee_project"])
 
     print("=== Loading station list ===")
-    stations = pd.read_csv(params["STATION_FILE"])
+    stations = pd.read_csv(params["station_file"])
     stations = stations[stations["status"] == "KEEP"]
     print("Stations to process:", len(stations))
 
-    worldcover = ee.Image(params["WORLDCOVER_COLLECTION"]).select(params["WORLDCOVER_BAND"])
-    buffer_radius = params["BUFFER_RADIUS_M"]
-    scale = params["WORLDCOVER_SCALE_M"]
+    worldcover = ee.Image(params["collection"]).select(params["band"])
+    buffer_radius = params["buffer_radius_m"]
+    scale = params["scale_m"]
 
     rows = []
     failed_stations = []
@@ -56,7 +55,7 @@ def main():
                 maxPixels=1e9,
             )
 
-            class_counts = hist_result.get(params["WORLDCOVER_BAND"]).getInfo()
+            class_counts = hist_result.get(params["band"]).getInfo()
 
             row = {}
             row["location_id"] = location_id
@@ -88,7 +87,7 @@ def main():
     print("=== Building extraction summary ===")
     summary_rows = []
     summary_rows.append({"metric": "run_timestamp", "value": datetime.datetime.now().isoformat()})
-    summary_rows.append({"metric": "worldcover_collection", "value": params["WORLDCOVER_COLLECTION"]})
+    summary_rows.append({"metric": "worldcover_collection", "value": params["collection"]})
     summary_rows.append({"metric": "buffer_radius_m", "value": buffer_radius})
     summary_rows.append({"metric": "scale_m", "value": scale})
     summary_rows.append({"metric": "stations_expected", "value": len(stations)})

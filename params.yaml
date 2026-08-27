@@ -126,11 +126,17 @@ era5_blh:
 # ============================================================
 
 static_gee_layers:
-  GEE_PROJECT: "internship-pm25"
-  STATION_FILE: "data/stations/cpcb_stations_delhi_status.csv"
-  BUFFER_RADIUS_M: 1000
+  worldcover:
+    extract:
+      gee_project: internship-pm25
+      station_file: data/stations/cpcb_stations_delhi_status.csv
+      collection: ESA/WorldCover/v200/2021
+      band: Map
+      buffer_radius_m: 1000
+      scale_m: 10
 
-  WORLDCOVER_COLLECTION: "ESA/WorldCover/v200/2021"
-  WORLDCOVER_BAND: "Map"
-  WORLDCOVER_SCALE_M: 10
-  WORLDCOVER_EXPECTED_PIXELS_TOLERANCE_PCT: 5
+    qc:
+      station_file: data/stations/cpcb_stations_delhi_status.csv
+      expected_pixels_tolerance_pct: 5
+      dominant_class_warn_pct: 99
+      implausible_classes: [70, 95, 100]
