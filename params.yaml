@@ -120,3 +120,17 @@ era5_blh:
   
   daily_aggregation:
     min_hours_required: 2
+
+# ============================================================
+# ESA world cover , NDVI, Elevation 
+# ============================================================
+
+static_gee_layers:
+  GEE_PROJECT: "internship-pm25"
+  STATION_FILE: "data/stations/cpcb_stations_delhi_status.csv"
+  BUFFER_RADIUS_M: 1000
+
+  WORLDCOVER_COLLECTION: "ESA/WorldCover/v200/2021"
+  WORLDCOVER_BAND: "Map"
+  WORLDCOVER_SCALE_M: 10
+  WORLDCOVER_EXPECTED_PIXELS_TOLERANCE_PCT: 5

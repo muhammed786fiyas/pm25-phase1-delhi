@@ -306,6 +306,20 @@ stages:
       - data/processed/era5_blh/era5_blh_daily_summary.csv
 
   # ============================================================
+  # Static GEE - ESA worldcover , NDVI , Elevation
+  # ============================================================
+  extract_worldcover_raw:
+    cmd: python scripts/datasets/static_gee/01_extract_worldcover_raw.py --output data/raw/static_gee/worldcover/worldcover_raw_histogram.csv --summary_output data/raw/static_gee/worldcover/worldcover_extraction_summary.csv
+    deps:
+      - scripts/datasets/static_gee/01_extract_worldcover_raw.py
+      - data/stations/cpcb_stations_delhi_status.csv
+    params:
+      - static_gee_layers
+    outs:
+      - data/raw/static_gee/worldcover/worldcover_raw_histogram.csv
+      - data/raw/static_gee/worldcover/worldcover_extraction_summary.csv
+
+  # ============================================================
   # OSM / static covariates (roads, land use, elevation) —
   # add stages here once scripts/datasets/osm/ exists
   # ============================================================

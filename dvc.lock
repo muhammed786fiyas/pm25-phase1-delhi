@@ -690,3 +690,36 @@ stages:
       hash: md5
       md5: cc46db13e7409bea74f4b2237d805107
       size: 3822
+  extract_worldcover_raw:
+    cmd: python scripts/datasets/static_gee/01_extract_worldcover_raw.py 
+      --output data/raw/static_gee/worldcover/worldcover_raw_histogram.csv 
+      --summary_output 
+      data/raw/static_gee/worldcover/worldcover_extraction_summary.csv
+    deps:
+    - path: data/stations/cpcb_stations_delhi_status.csv
+      hash: md5
+      md5: 4d2c634b6bdf8d8e9cf3de6d517f6776
+      size: 14245
+    - path: scripts/datasets/static_gee/01_extract_worldcover_raw.py
+      hash: md5
+      md5: 4ddae72d3e11279043eaf44204dbc2b5
+      size: 4395
+    params:
+      params.yaml:
+        static_gee_layers:
+          GEE_PROJECT: internship-pm25
+          STATION_FILE: data/stations/cpcb_stations_delhi_status.csv
+          BUFFER_RADIUS_M: 1000
+          WORLDCOVER_COLLECTION: ESA/WorldCover/v200/2021
+          WORLDCOVER_BAND: Map
+          WORLDCOVER_SCALE_M: 10
+          WORLDCOVER_EXPECTED_PIXELS_TOLERANCE_PCT: 5
+    outs:
+    - path: data/raw/static_gee/worldcover/worldcover_extraction_summary.csv
+      hash: md5
+      md5: ae7dead67a86e5c278ade5c628dbad2b
+      size: 367
+    - path: data/raw/static_gee/worldcover/worldcover_raw_histogram.csv
+      hash: md5
+      md5: dd8d93870ad56ced8e6bda59c5e68cde
+      size: 8115
