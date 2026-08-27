@@ -140,3 +140,20 @@ static_gee_layers:
       expected_pixels_tolerance_pct: 5
       dominant_class_warn_pct: 99
       implausible_classes: [70, 95, 100]
+  
+  ndvi:
+    extract:
+      gee_project: internship-pm25
+      station_file: data/stations/cpcb_stations_delhi_status.csv
+      collection: COPERNICUS/S2_SR_HARMONIZED
+      buffer_radius_m: 1000
+      scale_m: 10
+      study_start: "2025-03-01"
+      study_end: "2026-02-28"
+      period_days: 5
+      
+    qc:
+      station_file: data/stations/cpcb_stations_delhi_status.csv
+      null_rate_warn_pct: 30
+      ndvi_plausible_min: -1.0
+      ndvi_plausible_max: 1.0

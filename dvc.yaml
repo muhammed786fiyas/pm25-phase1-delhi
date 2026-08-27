@@ -338,6 +338,28 @@ stages:
       - data/interim/static_gee/worldcover/worldcover_qc_summary.csv
     outs:
       - data/processed/static_gee/worldcover_landuse.csv
+  
+  extract_ndvi_raw:
+    cmd: python scripts/datasets/static_gee/04_extract_ndvi_raw.py --output data/raw/static_gee/ndvi/ndvi_raw_periods.csv --summary_output data/raw/static_gee/ndvi/ndvi_extraction_summary.csv
+    deps:
+      - scripts/datasets/static_gee/04_extract_ndvi_raw.py
+      - data/stations/cpcb_stations_delhi_status.csv
+    params:
+      - static_gee_layers.ndvi.extract
+    outs:
+      - data/raw/static_gee/ndvi/ndvi_raw_periods.csv
+      - data/raw/static_gee/ndvi/ndvi_extraction_summary.csv
+    
+  qc_ndvi:
+    cmd: python scripts/datasets/static_gee/05_qc_ndvi.py --input data/raw/static_gee/ndvi/ndvi_raw_periods.csv --output data/interim/static_gee/ndvi/ndvi_qc_summary.csv
+    deps:
+      - scripts/datasets/static_gee/05_qc_ndvi.py
+      - data/raw/static_gee/ndvi/ndvi_raw_periods.csv
+      - data/stations/cpcb_stations_delhi_status.csv
+    params:
+      - static_gee_layers.ndvi.qc
+    outs:
+      - data/interim/static_gee/ndvi/ndvi_qc_summary.csv
 
   # ============================================================
   # OSM / static covariates (roads, land use, elevation) —

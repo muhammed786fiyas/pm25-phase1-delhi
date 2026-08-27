@@ -776,3 +776,65 @@ stages:
       hash: md5
       md5: 059f615204a5c5bf9b428f8c79945dbe
       size: 8429
+  extract_ndvi_raw:
+    cmd: python scripts/datasets/static_gee/04_extract_ndvi_raw.py --output 
+      data/raw/static_gee/ndvi/ndvi_raw_periods.csv --summary_output 
+      data/raw/static_gee/ndvi/ndvi_extraction_summary.csv
+    deps:
+    - path: data/stations/cpcb_stations_delhi_status.csv
+      hash: md5
+      md5: 4d2c634b6bdf8d8e9cf3de6d517f6776
+      size: 14245
+    - path: scripts/datasets/static_gee/04_extract_ndvi_raw.py
+      hash: md5
+      md5: 22b5858a5babf82342c55a3233ac0644
+      size: 7305
+    params:
+      params.yaml:
+        static_gee_layers.ndvi.extract:
+          gee_project: internship-pm25
+          station_file: data/stations/cpcb_stations_delhi_status.csv
+          collection: COPERNICUS/S2_SR_HARMONIZED
+          buffer_radius_m: 1000
+          scale_m: 10
+          study_start: '2025-03-01'
+          study_end: '2026-02-28'
+          period_days: 5
+    outs:
+    - path: data/raw/static_gee/ndvi/ndvi_extraction_summary.csv
+      hash: md5
+      md5: 4c9c79a9d812cb05036e4f6909f0de91
+      size: 445
+    - path: data/raw/static_gee/ndvi/ndvi_raw_periods.csv
+      hash: md5
+      md5: 794fc4594cd57f9336750c96913ecb6c
+      size: 301583
+  qc_ndvi:
+    cmd: python scripts/datasets/static_gee/05_qc_ndvi.py --input 
+      data/raw/static_gee/ndvi/ndvi_raw_periods.csv --output 
+      data/interim/static_gee/ndvi/ndvi_qc_summary.csv
+    deps:
+    - path: data/raw/static_gee/ndvi/ndvi_raw_periods.csv
+      hash: md5
+      md5: 794fc4594cd57f9336750c96913ecb6c
+      size: 301583
+    - path: data/stations/cpcb_stations_delhi_status.csv
+      hash: md5
+      md5: 4d2c634b6bdf8d8e9cf3de6d517f6776
+      size: 14245
+    - path: scripts/datasets/static_gee/05_qc_ndvi.py
+      hash: md5
+      md5: 6311e04bfb041b2116e372e2b887d661
+      size: 6254
+    params:
+      params.yaml:
+        static_gee_layers.ndvi.qc:
+          station_file: data/stations/cpcb_stations_delhi_status.csv
+          null_rate_warn_pct: 30
+          ndvi_plausible_min: -1.0
+          ndvi_plausible_max: 1.0
+    outs:
+    - path: data/interim/static_gee/ndvi/ndvi_qc_summary.csv
+      hash: md5
+      md5: 7bfcf0a7d8892de5ef5d7155a1f139ad
+      size: 4329
