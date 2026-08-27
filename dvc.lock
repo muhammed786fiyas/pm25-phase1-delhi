@@ -599,3 +599,30 @@ stages:
       hash: md5
       md5: 1131fdb260400e8e258352e3b34fa6c8
       size: 2979
+  extract_era5_blh:
+    cmd: python scripts/datasets/era5_blh/2-extract_gee_era5blh.py --mapping 
+      data/raw/era5_blh/station_cell_mapping.csv --params params.yaml --outdir 
+      data/raw/era5_blh
+    deps:
+    - path: data/raw/era5_blh/station_cell_mapping.csv
+      hash: md5
+      md5: 1131fdb260400e8e258352e3b34fa6c8
+      size: 2979
+    - path: scripts/datasets/era5_blh/2-extract_gee_era5blh.py
+      hash: md5
+      md5: 35f6edca3305f84056ceb0c602e5b841
+      size: 2966
+    params:
+      params.yaml:
+        era5_blh.extract:
+          gee_project: internship-pm25
+          collection: ECMWF/ERA5/HOURLY
+          band: boundary_layer_height
+          study_start: '2025-03-01'
+          study_end: '2026-03-01'
+          chunk_months: 3
+    outs:
+    - path: data/raw/era5_blh/era5_blh_raw.csv
+      hash: md5
+      md5: 6699d9e77de5ca2f1aee8e596b684307
+      size: 3699040
