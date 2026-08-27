@@ -95,3 +95,11 @@ era5_land:
   
   daily_aggregation:
     min_hours_required: 2
+
+# ============================================================
+# ERA5-BLH
+# ============================================================
+era5_blh:
+  map_stations_to_cells:
+    gee_project: internship-pm25
+    collection: ECMWF/ERA5/HOURLY

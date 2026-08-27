@@ -576,3 +576,26 @@ stages:
       hash: md5
       md5: 865361dbe8d995d975dc04cc729176a3
       size: 5026
+  map_stations_to_cells_era5_blh:
+    cmd: python scripts/datasets/era5_blh/1-map_stations_to_cells.py --stations 
+      data/stations/cpcb_stations_delhi_status.csv --params params.yaml --outdir
+      data/raw/era5_blh
+    deps:
+    - path: data/stations/cpcb_stations_delhi_status.csv
+      hash: md5
+      md5: 4d2c634b6bdf8d8e9cf3de6d517f6776
+      size: 14245
+    - path: scripts/datasets/era5_blh/1-map_stations_to_cells.py
+      hash: md5
+      md5: 8173dd32137bccdf62fa62f0f183bac3
+      size: 2919
+    params:
+      params.yaml:
+        era5_blh.map_stations_to_cells:
+          gee_project: internship-pm25
+          collection: ECMWF/ERA5/HOURLY
+    outs:
+    - path: data/raw/era5_blh/station_cell_mapping.csv
+      hash: md5
+      md5: 1131fdb260400e8e258352e3b34fa6c8
+      size: 2979
