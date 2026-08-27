@@ -92,3 +92,6 @@ era5_land:
     temp_min_c: 0
     temp_max_c: 50
     wind_component_max_ms: 20
+  
+  daily_aggregation:
+    min_hours_required: 2

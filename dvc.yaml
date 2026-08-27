@@ -247,6 +247,17 @@ stages:
     outs:
       - data/interim/era5_land/era5_land_windowed.csv
       - data/interim/era5_land/era5_land_window_summary.csv
+  
+  aggregate_era5_land_daily:
+    cmd: python scripts/datasets/era5_land/4-aggregate_era5land_daily.py --windowed data/interim/era5_land/era5_land_windowed.csv --params params.yaml --outdir data/processed/era5_land
+    deps:
+      - scripts/datasets/era5_land/4-aggregate_era5land_daily.py
+      - data/interim/era5_land/era5_land_windowed.csv
+    params:
+      - era5_land.daily_aggregation
+    outs:
+      - data/processed/era5_land/era5_land_daily.csv
+      - data/processed/era5_land/era5_land_daily_summary.csv
   # ============================================================
   # OSM / static covariates (roads, land use, elevation) —
   # add stages here once scripts/datasets/osm/ exists
