@@ -281,6 +281,18 @@ stages:
       - era5_blh.extract
     outs:
       - data/raw/era5_blh/era5_blh_raw.csv
+  
+  window_qc_era5_blh:
+    cmd: python scripts/datasets/era5_blh/3-window_and_qc_era5blh.py --raw data/raw/era5_blh/era5_blh_raw.csv --mapping data/raw/era5_blh/station_cell_mapping.csv --params params.yaml --outdir data/interim/era5_blh
+    deps:
+      - scripts/datasets/era5_blh/3-window_and_qc_era5blh.py
+      - data/raw/era5_blh/era5_blh_raw.csv
+      - data/raw/era5_blh/station_cell_mapping.csv
+    params:
+      - era5_blh.window_qc
+    outs:
+      - data/interim/era5_blh/era5_blh_windowed.csv
+      - data/interim/era5_blh/era5_blh_window_summary.csv
 
   # ============================================================
   # OSM / static covariates (roads, land use, elevation) —

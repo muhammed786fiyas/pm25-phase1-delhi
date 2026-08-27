@@ -626,3 +626,41 @@ stages:
       hash: md5
       md5: 6699d9e77de5ca2f1aee8e596b684307
       size: 3699040
+  window_qc_era5_blh:
+    cmd: python scripts/datasets/era5_blh/3-window_and_qc_era5blh.py --raw 
+      data/raw/era5_blh/era5_blh_raw.csv --mapping 
+      data/raw/era5_blh/station_cell_mapping.csv --params params.yaml --outdir 
+      data/interim/era5_blh
+    deps:
+    - path: data/raw/era5_blh/era5_blh_raw.csv
+      hash: md5
+      md5: 6699d9e77de5ca2f1aee8e596b684307
+      size: 3699040
+    - path: data/raw/era5_blh/station_cell_mapping.csv
+      hash: md5
+      md5: 1131fdb260400e8e258352e3b34fa6c8
+      size: 2979
+    - path: scripts/datasets/era5_blh/3-window_and_qc_era5blh.py
+      hash: md5
+      md5: a5ceb1082b44201aaf743f9b592dd638
+      size: 4058
+    params:
+      params.yaml:
+        era5_blh.window_qc:
+          tolerance_degrees: 0.05
+          window_hours:
+          - 5
+          - 6
+          - 7
+          - 8
+          blh_min_m: 0
+          blh_max_m: 6000
+    outs:
+    - path: data/interim/era5_blh/era5_blh_window_summary.csv
+      hash: md5
+      md5: ae9f187b688924ceec71c07ed6c31e2a
+      size: 3616
+    - path: data/interim/era5_blh/era5_blh_windowed.csv
+      hash: md5
+      md5: 6e6e27bb572b3d0546826e769a82071a
+      size: 4324726
