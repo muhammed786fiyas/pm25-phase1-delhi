@@ -664,3 +664,29 @@ stages:
       hash: md5
       md5: 6e6e27bb572b3d0546826e769a82071a
       size: 4324726
+  aggregate_era5_blh_daily:
+    cmd: python scripts/datasets/era5_blh/4-aggregate_era5blh_daily.py 
+      --windowed data/interim/era5_blh/era5_blh_windowed.csv --params 
+      params.yaml --outdir data/processed/era5_blh
+    deps:
+    - path: data/interim/era5_blh/era5_blh_windowed.csv
+      hash: md5
+      md5: 6e6e27bb572b3d0546826e769a82071a
+      size: 4324726
+    - path: scripts/datasets/era5_blh/4-aggregate_era5blh_daily.py
+      hash: md5
+      md5: 558fe5f0c8567774bcea5c33f72df5e5
+      size: 3217
+    params:
+      params.yaml:
+        era5_blh.daily_aggregation:
+          min_hours_required: 2
+    outs:
+    - path: data/processed/era5_blh/era5_blh_daily.csv
+      hash: md5
+      md5: 88eb99aa9d274dcb7f64d9ebeb5820c2
+      size: 1029256
+    - path: data/processed/era5_blh/era5_blh_daily_summary.csv
+      hash: md5
+      md5: cc46db13e7409bea74f4b2237d805107
+      size: 3822
