@@ -134,7 +134,6 @@ static_gee_layers:
       band: Map
       buffer_radius_m: 1000
       scale_m: 10
-
     qc:
       station_file: data/stations/cpcb_stations_delhi_status.csv
       expected_pixels_tolerance_pct: 5
@@ -151,12 +150,24 @@ static_gee_layers:
       study_start: "2025-03-01"
       study_end: "2026-02-28"
       period_days: 5
-
     qc:
       station_file: data/stations/cpcb_stations_delhi_status.csv
       null_rate_warn_pct: 30
       ndvi_plausible_min: -1.0
-      ndvi_plausible_max: 1.0
-    
+      ndvi_plausible_max: 1.0  
     fill:
       max_fill_distance_periods: 5
+  
+  srtm:
+    extract:
+      gee_project: internship-pm25
+      station_file: data/stations/cpcb_stations_delhi_status.csv
+      collection: USGS/SRTMGL1_003
+      buffer_radius_m: 1000
+      scale_m: 30
+    qc:
+      station_file: data/stations/cpcb_stations_delhi_status.csv
+      elevation_min_m: 150
+      elevation_max_m: 300
+      slope_min_deg: 0
+      slope_max_deg: 15

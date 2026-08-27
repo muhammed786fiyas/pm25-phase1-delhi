@@ -380,6 +380,37 @@ stages:
       - static_gee_layers.ndvi.fill
     outs:
       - data/processed/static_gee/ndvi_gapfilled.csv
+  
+  extract_srtm_raw:
+    cmd: python scripts/datasets/static_gee/08_extract_srtm_raw.py --output data/raw/static_gee/srtm/srtm_raw.csv --summary_output data/raw/static_gee/srtm/srtm_extraction_summary.csv
+    deps:
+      - scripts/datasets/static_gee/08_extract_srtm_raw.py
+      - data/stations/cpcb_stations_delhi_status.csv
+    params:
+      - static_gee_layers.srtm.extract
+    outs:
+      - data/raw/static_gee/srtm/srtm_raw.csv
+      - data/raw/static_gee/srtm/srtm_extraction_summary.csv
+
+  qc_srtm:
+    cmd: python scripts/datasets/static_gee/09_qc_srtm.py --input data/raw/static_gee/srtm/srtm_raw.csv --output data/interim/static_gee/srtm/srtm_qc_summary.csv
+    deps:
+      - scripts/datasets/static_gee/09_qc_srtm.py
+      - data/raw/static_gee/srtm/srtm_raw.csv
+      - data/stations/cpcb_stations_delhi_status.csv
+    params:
+      - static_gee_layers.srtm.qc
+    outs:
+      - data/interim/static_gee/srtm/srtm_qc_summary.csv
+
+  finalize_srtm:
+    cmd: python scripts/datasets/static_gee/10_finalize_srtm.py --input data/raw/static_gee/srtm/srtm_raw.csv --output data/processed/static_gee/srtm_terrain.csv
+    deps:
+      - scripts/datasets/static_gee/10_finalize_srtm.py
+      - data/raw/static_gee/srtm/srtm_raw.csv
+      - data/interim/static_gee/srtm/srtm_qc_summary.csv
+    outs:
+      - data/processed/static_gee/srtm_terrain.csv
 
   # ============================================================
   # OSM / static covariates (roads, land use, elevation) —

@@ -887,3 +887,85 @@ stages:
       hash: md5
       md5: 106182e8e37981596b4e9bcc5bfe1569
       size: 318739
+  extract_srtm_raw:
+    cmd: python scripts/datasets/static_gee/08_extract_srtm_raw.py --output 
+      data/raw/static_gee/srtm/srtm_raw.csv --summary_output 
+      data/raw/static_gee/srtm/srtm_extraction_summary.csv
+    deps:
+    - path: data/stations/cpcb_stations_delhi_status.csv
+      hash: md5
+      md5: 4d2c634b6bdf8d8e9cf3de6d517f6776
+      size: 14245
+    - path: scripts/datasets/static_gee/08_extract_srtm_raw.py
+      hash: md5
+      md5: caca91d609864d2c8d267cbcac8fe7db
+      size: 4209
+    params:
+      params.yaml:
+        static_gee_layers.srtm.extract:
+          gee_project: internship-pm25
+          station_file: data/stations/cpcb_stations_delhi_status.csv
+          collection: USGS/SRTMGL1_003
+          buffer_radius_m: 1000
+          scale_m: 30
+    outs:
+    - path: data/raw/static_gee/srtm/srtm_extraction_summary.csv
+      hash: md5
+      md5: 6e0fafdc90101cc1bb0701603a5d82ed
+      size: 403
+    - path: data/raw/static_gee/srtm/srtm_raw.csv
+      hash: md5
+      md5: a75db597bb6a0d7b3226b9a332cdc0f7
+      size: 3981
+  qc_srtm:
+    cmd: python scripts/datasets/static_gee/09_qc_srtm.py --input 
+      data/raw/static_gee/srtm/srtm_raw.csv --output 
+      data/interim/static_gee/srtm/srtm_qc_summary.csv
+    deps:
+    - path: data/raw/static_gee/srtm/srtm_raw.csv
+      hash: md5
+      md5: a75db597bb6a0d7b3226b9a332cdc0f7
+      size: 3981
+    - path: data/stations/cpcb_stations_delhi_status.csv
+      hash: md5
+      md5: 4d2c634b6bdf8d8e9cf3de6d517f6776
+      size: 14245
+    - path: scripts/datasets/static_gee/09_qc_srtm.py
+      hash: md5
+      md5: ec4488f0c7f56605a6aad9f88d0bf209
+      size: 3846
+    params:
+      params.yaml:
+        static_gee_layers.srtm.qc:
+          station_file: data/stations/cpcb_stations_delhi_status.csv
+          elevation_min_m: 150
+          elevation_max_m: 300
+          slope_min_deg: 0
+          slope_max_deg: 15
+    outs:
+    - path: data/interim/static_gee/srtm/srtm_qc_summary.csv
+      hash: md5
+      md5: 6b1f37d3f52219afff0201b8e347c53c
+      size: 88
+  finalize_srtm:
+    cmd: python scripts/datasets/static_gee/10_finalize_srtm.py --input 
+      data/raw/static_gee/srtm/srtm_raw.csv --output 
+      data/processed/static_gee/srtm_terrain.csv
+    deps:
+    - path: data/interim/static_gee/srtm/srtm_qc_summary.csv
+      hash: md5
+      md5: 6b1f37d3f52219afff0201b8e347c53c
+      size: 88
+    - path: data/raw/static_gee/srtm/srtm_raw.csv
+      hash: md5
+      md5: a75db597bb6a0d7b3226b9a332cdc0f7
+      size: 3981
+    - path: scripts/datasets/static_gee/10_finalize_srtm.py
+      hash: md5
+      md5: 7923b4c640b93c9721766f6c8b29049d
+      size: 768
+    outs:
+    - path: data/processed/static_gee/srtm_terrain.csv
+      hash: md5
+      md5: 0b03765878b175b418f345cab1dfd9b2
+      size: 3964
