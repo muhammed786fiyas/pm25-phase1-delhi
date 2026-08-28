@@ -6,14 +6,30 @@ Non-GEE static covariates sourced from OpenStreetMap for Delhi Phase 1: road den
 
 ## Completed
 
-**All three features -- 2026-08-28**
-- Data source: manual Overpass Turbo exports (GeoJSON), not a live API call -- see "Network constraint" below.
-- Roads: bbox (28.40,76.91,28.84,77.34) -- tight, around the 42-station cluster.
-- Industrial land-use: same tight bbox.
-- Power plants: bbox (27.0,75.5,30.0,79.0) -- wide, covers ~110-160km margin around the station cluster so nearby out-of-Delhi plants (Dadri, Jhajjar, Panipat) aren't missed.
-- Pipeline: `scripts/datasets/osm/01-09`, extract -> QC -> compute/finalize per feature, wired into `dvc.yaml` (9 new stages, 46 total) and `params.yaml` (`osm_layers.{roads,industrial,powerplants}`).
-- Result: 42/42 KEEP stations, 0 hard fails, 0 QC flags across all three features.
-- Tagged `delhi-phase1-v16`.
+**Data source (all three features)** -- 2026-08-28
+- Manual Overpass Turbo exports (GeoJSON), not a live API call -- see Data notes below for why.
+- Roads + industrial land-use: bbox (28.40,76.91,28.84,77.34) -- tight, around the 42-station cluster.
+- Power plants: bbox (27.0,75.5,30.0,79.0) -- wide, ~110-160km margin around the station cluster so nearby out-of-Delhi plants (Dadri, Jhajjar, Panipat) aren't missed.
+
+**Road density (km per km²)** -- 2026-08-28
+- Script 01 (`01_extract_road_lengths.py`): loads the 42 KEEP stations and the roads GeoJSON (`highway=*` ways), reprojects to UTM 43N, clips each station's 1km-radius buffer against the road network, and sums the clipped segment lengths per station. Writes raw length (m) + segment count per station, plus an extraction summary (min/max/median length, failed stations).
+- Script 02 (`02_qc_roads.py`): QC gate -- missing-station check against the KEEP list, zero-length flag, and an implausible-density flag (`max_plausible_density_km_per_km2` from params). Hard-fails (`SystemExit`) on any missing station.
+- Script 03 (`03_compute_road_density.py`): converts each station's raw length into road density (km / km², dividing by the 1km buffer's circular area) and writes the final `road_density_km_per_km2` to processed.
+- Result: 42/42 stations, 0 hard fails, 0 zero-length, 0 implausible-density flags. Density range 5.6-41.4 km/km², matching Delhi's urban-density gradient (Najafgarh/Alipur lowest, Patparganj/Jahangirpuri highest).
+
+**Industrial land-use fraction** -- 2026-08-28
+- Script 04 (`04_extract_industrial_area.py`): loads the industrial land-use GeoJSON (`landuse=industrial` polygons/relations), reprojects to UTM 43N, fixes invalid geometries (`buffer(0)`), clips each station's 1km buffer against the polygons, and sums the clipped area (m²) per station alongside the buffer's own area.
+- Script 05 (`05_qc_industrial.py`): QC gate -- missing-station check, and a geometry-bug check (industrial area exceeding buffer area, which would mean a bad clip). Zero-industrial stations are logged but not treated as an error (expected for residential-area monitors).
+- Script 06 (`06_compute_industrial_fraction.py`): divides industrial area by buffer area per station to produce the final `industrial_landuse_fraction`, written to processed.
+- Result: 42/42 stations, 0 hard fails, 0 geometry-area bugs, 19/42 zero-industrial (expected). Fractions match known Delhi industrial estates (Okhla Phase-2 52.3%, Narela 46.7%, Wazirpur 27.2%, Bawana 28.1%).
+
+**Distance to nearest power plant** -- 2026-08-28
+- Script 07 (`07_extract_powerplant_distances.py`): loads the power plants GeoJSON (`power=plant` nodes/ways/relations), collapses every plant geometry to its centroid, and computes the straight-line distance from each station to its single nearest plant (plus that plant's name, when tagged).
+- Script 08 (`08_qc_powerplants.py`): QC gate -- missing-station check, and an edge-effect check (flags a station whose nearest distance exceeds a threshold close to the download bbox's own margin, meaning a closer real-world plant might sit outside the downloaded area).
+- Script 09 (`09_finalize_powerplant_distance.py`): straight-copy finalize step (mirrors SRTM script 10's pattern) -- converts the QC-passed raw distance from meters to km and writes the final `dist_to_nearest_powerplant_km` + nearest plant name to processed.
+- Result: 42/42 stations, 0 hard fails, 0 edge-effect flags. Distances range 0.17-8.2km, all well under the 110km edge-effect threshold.
+
+**Pipeline wiring**: all 9 scripts wired into `dvc.yaml` (9 new stages, 46 total) and `params.yaml` (`osm_layers.{roads,industrial,powerplants}`), following the extract -> QC -> compute/finalize pattern from static_gee. Tagged `delhi-phase1-v16`.
 
 ## Key decisions
 
