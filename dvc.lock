@@ -969,3 +969,294 @@ stages:
       hash: md5
       md5: 0b03765878b175b418f345cab1dfd9b2
       size: 3964
+  extract_road_lengths:
+    cmd: python scripts/datasets/osm/01_extract_road_lengths.py --station_file 
+      data/stations/cpcb_stations_delhi_status.csv --roads_geojson 
+      data/raw/osm/roads.geojson --buffer_radius_m 1000 --output 
+      data/raw/osm/road_lengths_raw.csv --summary_output 
+      data/raw/osm/road_lengths_extraction_summary.csv
+    deps:
+    - path: data/raw/osm/roads.geojson
+      hash: md5
+      md5: 17a81d0915a0fdf9b24ded8af32c1ea9
+      size: 159353725
+      isexec: true
+    - path: data/stations/cpcb_stations_delhi_status.csv
+      hash: md5
+      md5: 4d2c634b6bdf8d8e9cf3de6d517f6776
+      size: 14245
+      isexec: true
+    - path: scripts/datasets/osm/01_extract_road_lengths.py
+      hash: md5
+      md5: abbbbad62a2529e4735b43450b416b56
+      size: 3904
+      isexec: true
+    params:
+      params.yaml:
+        osm_layers.roads.extract:
+          station_file: data/stations/cpcb_stations_delhi_status.csv
+          roads_geojson: data/raw/osm/roads.geojson
+          buffer_radius_m: 1000
+    outs:
+    - path: data/raw/osm/road_lengths_extraction_summary.csv
+      hash: md5
+      md5: d81c52033c6b47d2e70d6482ab45b5c1
+      size: 154
+      isexec: true
+    - path: data/raw/osm/road_lengths_raw.csv
+      hash: md5
+      md5: a33ccb6524ec8789a3775579b1c57a4a
+      size: 3627
+      isexec: true
+  qc_roads:
+    cmd: python scripts/datasets/osm/02_qc_roads.py --input 
+      data/raw/osm/road_lengths_raw.csv --station_file 
+      data/stations/cpcb_stations_delhi_status.csv 
+      --max_plausible_density_km_per_km2 50 --output 
+      data/interim/osm/road_qc_summary.csv
+    deps:
+    - path: data/raw/osm/road_lengths_raw.csv
+      hash: md5
+      md5: a33ccb6524ec8789a3775579b1c57a4a
+      size: 3627
+      isexec: true
+    - path: data/stations/cpcb_stations_delhi_status.csv
+      hash: md5
+      md5: 4d2c634b6bdf8d8e9cf3de6d517f6776
+      size: 14245
+      isexec: true
+    - path: scripts/datasets/osm/02_qc_roads.py
+      hash: md5
+      md5: ad14dacf9074e54d20cc97aadc07eb3e
+      size: 2379
+      isexec: true
+    params:
+      params.yaml:
+        osm_layers.roads.qc:
+          station_file: data/stations/cpcb_stations_delhi_status.csv
+          max_plausible_density_km_per_km2: 50
+    outs:
+    - path: data/interim/osm/road_qc_summary.csv
+      hash: md5
+      md5: 4a44e85dc08a5002a5a1ae30fdfa5c13
+      size: 96
+      isexec: true
+  compute_road_density:
+    cmd: python scripts/datasets/osm/03_compute_road_density.py --input 
+      data/raw/osm/road_lengths_raw.csv --output 
+      data/processed/osm/road_density.csv
+    deps:
+    - path: data/interim/osm/road_qc_summary.csv
+      hash: md5
+      md5: 4a44e85dc08a5002a5a1ae30fdfa5c13
+      size: 96
+      isexec: true
+    - path: data/raw/osm/road_lengths_raw.csv
+      hash: md5
+      md5: a33ccb6524ec8789a3775579b1c57a4a
+      size: 3627
+      isexec: true
+    - path: scripts/datasets/osm/03_compute_road_density.py
+      hash: md5
+      md5: a8bc6ac7abba21bf4ad77c66229a51c0
+      size: 1320
+      isexec: true
+    outs:
+    - path: data/processed/osm/road_density.csv
+      hash: md5
+      md5: 63cdc762eda52fe12a610351e70254d7
+      size: 3150
+      isexec: true
+  extract_industrial_area:
+    cmd: python scripts/datasets/osm/04_extract_industrial_area.py 
+      --station_file data/stations/cpcb_stations_delhi_status.csv 
+      --industrial_geojson data/raw/osm/industrial_landuse.geojson 
+      --buffer_radius_m 1000 --output data/raw/osm/industrial_area_raw.csv 
+      --summary_output data/raw/osm/industrial_area_extraction_summary.csv
+    deps:
+    - path: data/raw/osm/industrial_landuse.geojson
+      hash: md5
+      md5: 40a83af1c7503a19499df9e172f4fabf
+      size: 475189
+      isexec: true
+    - path: data/stations/cpcb_stations_delhi_status.csv
+      hash: md5
+      md5: 4d2c634b6bdf8d8e9cf3de6d517f6776
+      size: 14245
+      isexec: true
+    - path: scripts/datasets/osm/04_extract_industrial_area.py
+      hash: md5
+      md5: 9e126691f28f7e68e360d27d37a26ed1
+      size: 3817
+      isexec: true
+    params:
+      params.yaml:
+        osm_layers.industrial.extract:
+          station_file: data/stations/cpcb_stations_delhi_status.csv
+          industrial_geojson: data/raw/osm/industrial_landuse.geojson
+          buffer_radius_m: 1000
+    outs:
+    - path: data/raw/osm/industrial_area_extraction_summary.csv
+      hash: md5
+      md5: df0ee592e4e9972a9692e34bf3405a72
+      size: 87
+      isexec: true
+    - path: data/raw/osm/industrial_area_raw.csv
+      hash: md5
+      md5: 6653d8ff82462400dc5020d9a33ce749
+      size: 4101
+      isexec: true
+  qc_industrial:
+    cmd: python scripts/datasets/osm/05_qc_industrial.py --input 
+      data/raw/osm/industrial_area_raw.csv --station_file 
+      data/stations/cpcb_stations_delhi_status.csv --output 
+      data/interim/osm/industrial_qc_summary.csv
+    deps:
+    - path: data/raw/osm/industrial_area_raw.csv
+      hash: md5
+      md5: 6653d8ff82462400dc5020d9a33ce749
+      size: 4101
+      isexec: true
+    - path: data/stations/cpcb_stations_delhi_status.csv
+      hash: md5
+      md5: 4d2c634b6bdf8d8e9cf3de6d517f6776
+      size: 14245
+      isexec: true
+    - path: scripts/datasets/osm/05_qc_industrial.py
+      hash: md5
+      md5: cabe5570846b5909abd7666fc5c51a62
+      size: 1975
+      isexec: true
+    params:
+      params.yaml:
+        osm_layers.industrial.qc:
+          station_file: data/stations/cpcb_stations_delhi_status.csv
+    outs:
+    - path: data/interim/osm/industrial_qc_summary.csv
+      hash: md5
+      md5: 93ab4cbc4566efaa2e335ac777075d52
+      size: 94
+      isexec: true
+  compute_industrial_fraction:
+    cmd: python scripts/datasets/osm/06_compute_industrial_fraction.py --input 
+      data/raw/osm/industrial_area_raw.csv --output 
+      data/processed/osm/industrial_fraction.csv
+    deps:
+    - path: data/interim/osm/industrial_qc_summary.csv
+      hash: md5
+      md5: 93ab4cbc4566efaa2e335ac777075d52
+      size: 94
+      isexec: true
+    - path: data/raw/osm/industrial_area_raw.csv
+      hash: md5
+      md5: 6653d8ff82462400dc5020d9a33ce749
+      size: 4101
+      isexec: true
+    - path: scripts/datasets/osm/06_compute_industrial_fraction.py
+      hash: md5
+      md5: 5346612ea9ac5719889973c862d83d1f
+      size: 1157
+      isexec: true
+    outs:
+    - path: data/processed/osm/industrial_fraction.csv
+      hash: md5
+      md5: 4f242056ddc17a323ceb9ced5db7ee4a
+      size: 2911
+      isexec: true
+  extract_powerplant_distances:
+    cmd: python scripts/datasets/osm/07_extract_powerplant_distances.py 
+      --station_file data/stations/cpcb_stations_delhi_status.csv 
+      --powerplants_geojson data/raw/osm/power_plants.geojson --output 
+      data/raw/osm/powerplant_distances_raw.csv --summary_output 
+      data/raw/osm/powerplant_distances_extraction_summary.csv
+    deps:
+    - path: data/raw/osm/power_plants.geojson
+      hash: md5
+      md5: 0b654649c9f270c422fc0d8ca64fc2c4
+      size: 85807
+      isexec: true
+    - path: data/stations/cpcb_stations_delhi_status.csv
+      hash: md5
+      md5: 4d2c634b6bdf8d8e9cf3de6d517f6776
+      size: 14245
+      isexec: true
+    - path: scripts/datasets/osm/07_extract_powerplant_distances.py
+      hash: md5
+      md5: bc925c7529895015f1c3e320888c5f49
+      size: 3785
+      isexec: true
+    params:
+      params.yaml:
+        osm_layers.powerplants.extract:
+          station_file: data/stations/cpcb_stations_delhi_status.csv
+          powerplants_geojson: data/raw/osm/power_plants.geojson
+    outs:
+    - path: data/raw/osm/powerplant_distances_extraction_summary.csv
+      hash: md5
+      md5: b435e373e85e8a9d03a5eccee8caabb5
+      size: 144
+      isexec: true
+    - path: data/raw/osm/powerplant_distances_raw.csv
+      hash: md5
+      md5: f2bebe3b10addd3c404102c107581126
+      size: 3666
+      isexec: true
+  qc_powerplants:
+    cmd: python scripts/datasets/osm/08_qc_powerplants.py --input 
+      data/raw/osm/powerplant_distances_raw.csv --station_file 
+      data/stations/cpcb_stations_delhi_status.csv 
+      --edge_effect_distance_km_threshold 110 --output 
+      data/interim/osm/powerplant_qc_summary.csv
+    deps:
+    - path: data/raw/osm/powerplant_distances_raw.csv
+      hash: md5
+      md5: f2bebe3b10addd3c404102c107581126
+      size: 3666
+      isexec: true
+    - path: data/stations/cpcb_stations_delhi_status.csv
+      hash: md5
+      md5: 4d2c634b6bdf8d8e9cf3de6d517f6776
+      size: 14245
+      isexec: true
+    - path: scripts/datasets/osm/08_qc_powerplants.py
+      hash: md5
+      md5: 1f87631e290d3d8820976d20e5691695
+      size: 1875
+      isexec: true
+    params:
+      params.yaml:
+        osm_layers.powerplants.qc:
+          station_file: data/stations/cpcb_stations_delhi_status.csv
+          edge_effect_distance_km_threshold: 110
+    outs:
+    - path: data/interim/osm/powerplant_qc_summary.csv
+      hash: md5
+      md5: a9b707ce2cd5e1b3f250f658624a2eb6
+      size: 79
+      isexec: true
+  finalize_powerplant_distance:
+    cmd: python scripts/datasets/osm/09_finalize_powerplant_distance.py --input 
+      data/raw/osm/powerplant_distances_raw.csv --output 
+      data/processed/osm/powerplant_distance.csv
+    deps:
+    - path: data/interim/osm/powerplant_qc_summary.csv
+      hash: md5
+      md5: a9b707ce2cd5e1b3f250f658624a2eb6
+      size: 79
+      isexec: true
+    - path: data/raw/osm/powerplant_distances_raw.csv
+      hash: md5
+      md5: f2bebe3b10addd3c404102c107581126
+      size: 3666
+      isexec: true
+    - path: scripts/datasets/osm/09_finalize_powerplant_distance.py
+      hash: md5
+      md5: ff4baed64debb849da633ce36f14af1f
+      size: 897
+      isexec: true
+    outs:
+    - path: data/processed/osm/powerplant_distance.csv
+      hash: md5
+      md5: 583338339120a61e38b5cb58a16e73d5
+      size: 3480
+      isexec: true

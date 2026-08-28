@@ -3,3 +3,5 @@ pandas>=2.0.0
 pytz>=2023.3
 python-dotenv>=1.0.0
 earthengine-api==1.7.39
+geopandas>=0.14.0
+shapely>=2.0.0

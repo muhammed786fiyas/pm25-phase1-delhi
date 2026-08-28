@@ -413,9 +413,104 @@ stages:
       - data/processed/static_gee/srtm_terrain.csv
 
   # ============================================================
-  # OSM / static covariates (roads, land use, elevation) —
-  # add stages here once scripts/datasets/osm/ exists
+  # OSM features (road density, industrial land-use %, distance to power plant)
   # ============================================================
+  extract_road_lengths:
+    cmd: python scripts/datasets/osm/01_extract_road_lengths.py --station_file data/stations/cpcb_stations_delhi_status.csv --roads_geojson data/raw/osm/roads.geojson --buffer_radius_m 1000 --output data/raw/osm/road_lengths_raw.csv --summary_output data/raw/osm/road_lengths_extraction_summary.csv
+    deps:
+      - scripts/datasets/osm/01_extract_road_lengths.py
+      - data/stations/cpcb_stations_delhi_status.csv
+      - data/raw/osm/roads.geojson
+    params:
+      - osm_layers.roads.extract
+    outs:
+      - data/raw/osm/road_lengths_raw.csv
+      - data/raw/osm/road_lengths_extraction_summary.csv
+
+  qc_roads:
+    cmd: python scripts/datasets/osm/02_qc_roads.py --input data/raw/osm/road_lengths_raw.csv --station_file data/stations/cpcb_stations_delhi_status.csv --max_plausible_density_km_per_km2 50 --output data/interim/osm/road_qc_summary.csv
+    deps:
+      - scripts/datasets/osm/02_qc_roads.py
+      - data/raw/osm/road_lengths_raw.csv
+      - data/stations/cpcb_stations_delhi_status.csv
+    params:
+      - osm_layers.roads.qc
+    outs:
+      - data/interim/osm/road_qc_summary.csv
+
+  compute_road_density:
+    cmd: python scripts/datasets/osm/03_compute_road_density.py --input data/raw/osm/road_lengths_raw.csv --output data/processed/osm/road_density.csv
+    deps:
+      - scripts/datasets/osm/03_compute_road_density.py
+      - data/raw/osm/road_lengths_raw.csv
+      - data/interim/osm/road_qc_summary.csv
+    outs:
+      - data/processed/osm/road_density.csv
+
+  extract_industrial_area:
+    cmd: python scripts/datasets/osm/04_extract_industrial_area.py --station_file data/stations/cpcb_stations_delhi_status.csv --industrial_geojson data/raw/osm/industrial_landuse.geojson --buffer_radius_m 1000 --output data/raw/osm/industrial_area_raw.csv --summary_output data/raw/osm/industrial_area_extraction_summary.csv
+    deps:
+      - scripts/datasets/osm/04_extract_industrial_area.py
+      - data/stations/cpcb_stations_delhi_status.csv
+      - data/raw/osm/industrial_landuse.geojson
+    params:
+      - osm_layers.industrial.extract
+    outs:
+      - data/raw/osm/industrial_area_raw.csv
+      - data/raw/osm/industrial_area_extraction_summary.csv
+
+  qc_industrial:
+    cmd: python scripts/datasets/osm/05_qc_industrial.py --input data/raw/osm/industrial_area_raw.csv --station_file data/stations/cpcb_stations_delhi_status.csv --output data/interim/osm/industrial_qc_summary.csv
+    deps:
+      - scripts/datasets/osm/05_qc_industrial.py
+      - data/raw/osm/industrial_area_raw.csv
+      - data/stations/cpcb_stations_delhi_status.csv
+    params:
+      - osm_layers.industrial.qc
+    outs:
+      - data/interim/osm/industrial_qc_summary.csv
+
+  compute_industrial_fraction:
+    cmd: python scripts/datasets/osm/06_compute_industrial_fraction.py --input data/raw/osm/industrial_area_raw.csv --output data/processed/osm/industrial_fraction.csv
+    deps:
+      - scripts/datasets/osm/06_compute_industrial_fraction.py
+      - data/raw/osm/industrial_area_raw.csv
+      - data/interim/osm/industrial_qc_summary.csv
+    outs:
+      - data/processed/osm/industrial_fraction.csv
+
+  extract_powerplant_distances:
+    cmd: python scripts/datasets/osm/07_extract_powerplant_distances.py --station_file data/stations/cpcb_stations_delhi_status.csv --powerplants_geojson data/raw/osm/power_plants.geojson --output data/raw/osm/powerplant_distances_raw.csv --summary_output data/raw/osm/powerplant_distances_extraction_summary.csv
+    deps:
+      - scripts/datasets/osm/07_extract_powerplant_distances.py
+      - data/stations/cpcb_stations_delhi_status.csv
+      - data/raw/osm/power_plants.geojson
+    params:
+      - osm_layers.powerplants.extract
+    outs:
+      - data/raw/osm/powerplant_distances_raw.csv
+      - data/raw/osm/powerplant_distances_extraction_summary.csv
+
+  qc_powerplants:
+    cmd: python scripts/datasets/osm/08_qc_powerplants.py --input data/raw/osm/powerplant_distances_raw.csv --station_file data/stations/cpcb_stations_delhi_status.csv --edge_effect_distance_km_threshold 110 --output data/interim/osm/powerplant_qc_summary.csv
+    deps:
+      - scripts/datasets/osm/08_qc_powerplants.py
+      - data/raw/osm/powerplant_distances_raw.csv
+      - data/stations/cpcb_stations_delhi_status.csv
+    params:
+      - osm_layers.powerplants.qc
+    outs:
+      - data/interim/osm/powerplant_qc_summary.csv
+
+  finalize_powerplant_distance:
+    cmd: python scripts/datasets/osm/09_finalize_powerplant_distance.py --input data/raw/osm/powerplant_distances_raw.csv --output data/processed/osm/powerplant_distance.csv
+    deps:
+      - scripts/datasets/osm/09_finalize_powerplant_distance.py
+      - data/raw/osm/powerplant_distances_raw.csv
+      - data/interim/osm/powerplant_qc_summary.csv
+    outs:
+      - data/processed/osm/powerplant_distance.csv
+
 
   # ============================================================
   # Modeling — add stages here once scripts/modeling/ has content

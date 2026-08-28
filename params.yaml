@@ -171,3 +171,33 @@ static_gee_layers:
       elevation_max_m: 300
       slope_min_deg: 0
       slope_max_deg: 15
+
+# ============================================================================
+# OSM features (road density, industrial land-use %, distance to power plant)
+# ============================================================================
+
+osm_layers:
+  roads:
+    extract:
+      station_file: data/stations/cpcb_stations_delhi_status.csv
+      roads_geojson: data/raw/osm/roads.geojson
+      buffer_radius_m: 1000
+    qc:
+      station_file: data/stations/cpcb_stations_delhi_status.csv
+      max_plausible_density_km_per_km2: 50
+
+  industrial:
+    extract:
+      station_file: data/stations/cpcb_stations_delhi_status.csv
+      industrial_geojson: data/raw/osm/industrial_landuse.geojson
+      buffer_radius_m: 1000
+    qc:
+      station_file: data/stations/cpcb_stations_delhi_status.csv
+
+  powerplants:
+    extract:
+      station_file: data/stations/cpcb_stations_delhi_status.csv
+      powerplants_geojson: data/raw/osm/power_plants.geojson
+    qc:
+      station_file: data/stations/cpcb_stations_delhi_status.csv
+      edge_effect_distance_km_threshold: 110
