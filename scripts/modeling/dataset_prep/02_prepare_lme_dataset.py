@@ -1,5 +1,6 @@
 import argparse
 import os
+import numpy as np
 import pandas as pd
 
 REFERENCE_SEASON = "summer"
@@ -51,11 +52,61 @@ def build_aod_interactions(df):
         df[f"aod_x_{season}"] = df["aod_055"] * df[f"season_{season}"]
     return df
 
+def check_target_transform_is_set(target_transform):
+    # this stage refuses to run until a human has looked at the EDA notebook
+    # and typed in a real choice -- same NOT_SET guard pattern already used
+    # in scripts/maiac_gapfill/04_score_confidence.py
+    if target_transform == "NOT_SET":
+        print("=== STOPPING: modeling.lme_prep.target_transform is still NOT_SET ===")
+        print("EDA (notebooks/01_eda_master_feature_table.ipynb, Phase 4) found pm25_daily")
+        print("is right-skewed: skew = 1.89 on the raw scale, skew = -0.41 after a log")
+        print("transform. Review the notebook, then set target_transform in params.yaml")
+        print("to \"raw\" or \"log\" (and update the matching --target_transform value in")
+        print("dvc.yaml's cmd, per this repo's convention of keeping both in sync).")
+        raise SystemExit("target_transform is NOT_SET -- EDA must be reviewed and a real choice made first")
+
+def drop_rows_with_zero_target(df):
+    # EDA (Phase 2) found 46 station-days with pm25_daily == 0, which is an
+    # implausible ground-truth reading and also breaks the log transform
+    before = len(df)
+    df = df[df["pm25_daily"] > 0].copy()
+    print(f"Dropped {before - len(df)} rows with pm25_daily <= 0 (before: {before}, after: {len(df)})")
+    return df
+
+def clip_negative_aod(df):
+    # EDA (Phase 2) found 11 station-days with a physically impossible
+    # negative AOD value (an artifact of the gap-filling step, not real haze)
+    n_negative = (df["aod_055"] < 0).sum()
+    df["aod_055"] = df["aod_055"].clip(lower=0)
+    print(f"Clipped {n_negative} negative aod_055 values to 0")
+    return df
+
+def add_modeling_target(df, target_transform):
+    if target_transform == "raw":
+        df["modeling_target"] = df["pm25_daily"]
+    elif target_transform == "log":
+        n_non_positive = (df["pm25_daily"] <= 0).sum()
+        if n_non_positive > 0:
+            raise SystemExit(f"Cannot log-transform: {n_non_positive} rows still have "
+                              f"pm25_daily <= 0. Set drop_zero_target_rows to true.")
+        df["modeling_target"] = np.log(df["pm25_daily"])
+    else:
+        raise SystemExit(f"Unknown target_transform: {target_transform}")
+    return df
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", required=True, help="master_feature_table.csv")
     parser.add_argument("--output", required=True)
+    parser.add_argument("--target_transform", required=True, choices=["NOT_SET", "raw", "log"],
+                         help="raw or log transform of pm25_daily -- set only after reviewing the EDA notebook")
+    parser.add_argument("--drop_zero_target_rows", required=True, choices=["true", "false"],
+                         help="drop rows where pm25_daily <= 0 before modeling")
+    parser.add_argument("--clip_negative_aod_to_zero", required=True, choices=["true", "false"],
+                         help="clip negative aod_055 values to 0 before scaling")
     args = parser.parse_args()
+
+    check_target_transform_is_set(args.target_transform)
 
     outdir = os.path.dirname(args.output)
     os.makedirs(outdir, exist_ok=True)
@@ -68,6 +119,12 @@ def main():
         n_missing = df[col].isna().sum()
         if n_missing > 0:
             print(f"{col}: {n_missing} missing")
+
+    if args.drop_zero_target_rows == "true":
+        df = drop_rows_with_zero_target(df)
+
+    if args.clip_negative_aod_to_zero == "true":
+        df = clip_negative_aod(df)
 
     before = len(df)
     df = df.dropna(subset=REQUIRED_COLS)
@@ -82,7 +139,9 @@ def main():
     df, scaling_stats = scale_columns(df, SCALE_COLS)
     df = build_aod_interactions(df)
 
-    lme_cols = ["location_id", "name", "date", "season", "pm25_daily",
+    df = add_modeling_target(df, args.target_transform)
+
+    lme_cols = ["location_id", "name", "date", "season", "pm25_daily", "modeling_target",
                 "aod_055", "aod_x_monsoon", "aod_x_post_monsoon", "aod_x_winter",
                 "season_monsoon", "season_post_monsoon", "season_winter"] + \
                MET_COLS + ["ndvi_mean"] + WORLDCOVER_KEEP_COLS + TERRAIN_COLS + OSM_COLS + \

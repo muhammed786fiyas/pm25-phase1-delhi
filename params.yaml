@@ -235,6 +235,12 @@ modeling:
 
   lme_prep:
     reference_season: summer
+    # target_transform must be reviewed and set by hand after reading the EDA notebook
+    # (notebooks/01_eda_master_feature_table.ipynb) - the prepare_lme_dataset stage
+    # hard-fails while this stays NOT_SET. Set to "raw" or "log".
+    target_transform: NOT_SET
+    drop_zero_target_rows: true
+    clip_negative_aod_to_zero: true
     worldcover_drop_cols: [snow_ice_pct, mangroves_pct, moss_lichen_pct, wetland_herbaceous_pct, water_pct]
     scale_cols: [aod_055, temperature_c, relative_humidity, wind_speed, boundary_layer_height,
                  ndvi_mean, elevation_m, slope_deg, road_density_km_per_km2,
