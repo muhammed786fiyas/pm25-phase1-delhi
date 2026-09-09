@@ -32,14 +32,23 @@ FIXED_EFFECTS = AOD_COLS + SEASON_COLS + MET_COLS + LANDUSE_COLS
 TARGET_COL = "modeling_target"
 GROUP_COL = "location_id"
 
-MLFLOW_EXPERIMENT = "delhi_phase1_lme"
-MLFLOW_RUN_NAME = "full_data_reml_fit"
-# Registers each run's model.statsmodels artifact as a new numbered version of
-# this same named model in the MLflow Model Registry, so the fitted model can
-# be referenced as "models:/delhi_phase1_lme/<version>" (or "/latest") instead
-# of only by run_id. Registry works on this repo's plain file-store tracking
-# URI in the installed MLflow version (verified 2026-09-09) -- older MLflow
-# versions required a database-backed store for this.
+# Same experiment split as scripts/modeling/lme/02_validate_lme_cv.py: the
+# gapfill-robustness variant (confidence_bucket == low excluded) always logs
+# to its own MLflow experiment, never mixed into the primary one.
+MLFLOW_EXPERIMENT_FULL = "delhi_phase1_lme"
+MLFLOW_EXPERIMENT_GAPFILL_ROBUSTNESS = "delhi_phase1_lme_gapfill_robustness"
+MLFLOW_RUN_NAME_BASE = "full_data_reml_fit"
+# Registers each PRIMARY run's model.statsmodels artifact as a new numbered
+# version of this same named model in the MLflow Model Registry, so the
+# fitted model can be referenced as "models:/delhi_phase1_lme/<version>" (or
+# "/latest") instead of only by run_id. Diagnostic variants (gapfill
+# robustness / AOD winsorized / excl outlier stations) are NOT registered --
+# they exist for comparison, not as a candidate "the" model, and mixing them
+# into the same version history as the primary fit would make the registry
+# ambiguous about which version is production-representative. Registry works
+# on this repo's plain file-store tracking URI in the installed MLflow
+# version (verified 2026-09-09) -- older MLflow versions required a
+# database-backed store for this.
 MLFLOW_REGISTERED_MODEL_NAME = "delhi_phase1_lme"
 
 
@@ -103,6 +112,20 @@ def main():
     parser.add_argument("--model_output", required=True, help="pickled fitted MixedLMResults")
     parser.add_argument("--coef_output", required=True, help="fixed-effect coefficient table csv")
     parser.add_argument("--summary_output", required=True, help="full model summary text file")
+    parser.add_argument("--exclude_low_confidence", default="false", choices=["true", "false"],
+                         help="true fits on the gap-fill robustness variant "
+                              "(excludes confidence_bucket == low), logged to a separate "
+                              "MLflow experiment, matching 02_validate_lme_cv.py. "
+                              "Default: false (primary fit, all data).")
+    parser.add_argument("--exclude_stations", default="",
+                         help="Comma-separated location_ids to drop entirely before fitting "
+                              "(e.g. for a with/without outlier-station comparison fit). "
+                              "Default: none excluded.")
+    parser.add_argument("--run_tag", default="",
+                         help="Optional tag appended to the MLflow run name, so a diagnostic "
+                              "variant (e.g. a fit against a winsorized --input dataset) "
+                              "doesn't collide with the primary run in the same MLflow "
+                              "experiment. Default: no tag.")
     args = parser.parse_args()
 
     load_dotenv()
@@ -114,10 +137,35 @@ def main():
     if not tracking_uri:
         raise SystemExit("No MLFLOW_TRACKING_URI found. Set it in .env")
     mlflow.set_tracking_uri(tracking_uri)
-    mlflow.set_experiment(MLFLOW_EXPERIMENT)
 
     df = pd.read_csv(args.input)
     print(f"Loaded {args.input}: {len(df)} rows, {df[GROUP_COL].nunique()} stations")
+
+    exclude_station_ids = set()
+    if args.exclude_stations:
+        exclude_station_ids = {int(x.strip()) for x in args.exclude_stations.split(",") if x.strip()}
+        before = len(df)
+        df = df[~df[GROUP_COL].isin(exclude_station_ids)].reset_index(drop=True)
+        print(f"Excluded stations {sorted(exclude_station_ids)}: {before} -> {len(df)} rows, "
+              f"{df[GROUP_COL].nunique()} stations remaining")
+
+    exclude_low_confidence = args.exclude_low_confidence == "true"
+    if exclude_low_confidence:
+        before = len(df)
+        df = df[df["confidence_bucket"] != "low"].reset_index(drop=True)
+        print(f"Excluded confidence_bucket == 'low' rows: {before} -> {len(df)} rows")
+        mlflow.set_experiment(MLFLOW_EXPERIMENT_GAPFILL_ROBUSTNESS)
+        run_name_suffix = "_excl_low_confidence"
+    else:
+        mlflow.set_experiment(MLFLOW_EXPERIMENT_FULL)
+        run_name_suffix = ""
+
+    if args.run_tag:
+        run_name_suffix += "_" + args.run_tag
+
+    # Only the primary fit (no exclusions, no run_tag) is registered to the
+    # Model Registry -- see MLFLOW_REGISTERED_MODEL_NAME comment above.
+    is_primary = not exclude_low_confidence and not exclude_station_ids and not args.run_tag
 
     print("Fitting MixedLM (REML=True, random intercept by station)...")
     result = fit_lme(df, reml=True)
@@ -157,11 +205,14 @@ def main():
         f.write(f"Residual variance: {residual_var}\n")
     print(f"Wrote {args.summary_output}")
 
-    with mlflow.start_run(run_name=MLFLOW_RUN_NAME):
+    with mlflow.start_run(run_name=MLFLOW_RUN_NAME_BASE + run_name_suffix):
         mlflow.log_param("formula", build_formula())
         mlflow.log_param("reml", True)
         mlflow.log_param("n_rows", len(df))
         mlflow.log_param("n_stations", df[GROUP_COL].nunique())
+        mlflow.log_param("exclude_low_confidence", exclude_low_confidence)
+        mlflow.log_param("exclude_stations", sorted(exclude_station_ids) if exclude_station_ids else "none")
+        mlflow.log_param("run_tag", args.run_tag or "none")
         mlflow.log_metric("log_likelihood", result.llf)
         mlflow.log_metric("aic", aic)
         mlflow.log_metric("bic", bic)
@@ -173,11 +224,15 @@ def main():
         mlflow.log_artifact(args.model_output)
         mlflow.statsmodels.log_model(result, name="model")
 
-        run_id = mlflow.active_run().info.run_id
-        registered = mlflow.register_model(f"runs:/{run_id}/model", MLFLOW_REGISTERED_MODEL_NAME)
-        print(f"Registered model '{MLFLOW_REGISTERED_MODEL_NAME}' version {registered.version}")
+        if is_primary:
+            run_id = mlflow.active_run().info.run_id
+            registered = mlflow.register_model(f"runs:/{run_id}/model", MLFLOW_REGISTERED_MODEL_NAME)
+            print(f"Registered model '{MLFLOW_REGISTERED_MODEL_NAME}' version {registered.version}")
+        else:
+            print("Diagnostic variant run -- not registered to the Model Registry")
 
-        print("Logged run to MLflow experiment: " + MLFLOW_EXPERIMENT)
+        print("Logged run to MLflow experiment: " +
+              (MLFLOW_EXPERIMENT_GAPFILL_ROBUSTNESS if exclude_low_confidence else MLFLOW_EXPERIMENT_FULL))
 
 
 if __name__ == "__main__":

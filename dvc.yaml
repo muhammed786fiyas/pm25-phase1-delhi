@@ -652,17 +652,49 @@ stages:
   # ============================================================
 
   fit_lme_model:
-    cmd: python scripts/modeling/lme/01_fit_lme_model.py --input data/processed/modeling_datasets/lme_ready_dataset.csv --model_output models/lme/lme_full_model.pkl --coef_output reports/lme/lme_fixed_effects.csv --summary_output reports/lme/lme_model_summary.txt
+    cmd: python scripts/modeling/lme/01_fit_lme_model.py --input data/processed/modeling_datasets/lme_ready_dataset.csv --model_output models/lme/lme_full_model.pkl --coef_output reports/lme/primary/lme_fixed_effects.csv --summary_output reports/lme/primary/lme_model_summary.txt --exclude_low_confidence false
     deps:
       - scripts/modeling/lme/01_fit_lme_model.py
       - data/processed/modeling_datasets/lme_ready_dataset.csv
     outs:
       - models/lme/lme_full_model.pkl
-      - reports/lme/lme_fixed_effects.csv
-      - reports/lme/lme_model_summary.txt
+      - reports/lme/primary/lme_fixed_effects.csv
+      - reports/lme/primary/lme_model_summary.txt
+
+  fit_lme_model_gapfill_robustness:
+    cmd: python scripts/modeling/lme/01_fit_lme_model.py --input data/processed/modeling_datasets/lme_ready_dataset.csv --model_output models/lme/lme_full_model_gapfill_robustness.pkl --coef_output reports/lme/gapfill_robustness/lme_fixed_effects.csv --summary_output reports/lme/gapfill_robustness/lme_model_summary.txt --exclude_low_confidence true
+    deps:
+      - scripts/modeling/lme/01_fit_lme_model.py
+      - data/processed/modeling_datasets/lme_ready_dataset.csv
+    outs:
+      - models/lme/lme_full_model_gapfill_robustness.pkl
+      - reports/lme/gapfill_robustness/lme_fixed_effects.csv
+      - reports/lme/gapfill_robustness/lme_model_summary.txt
+
+  fit_lme_model_aod_winsorized:
+    cmd: python scripts/modeling/lme/01_fit_lme_model.py --input data/processed/modeling_datasets/lme_ready_dataset_aod_winsorized.csv --model_output models/lme/lme_full_model_aod_winsorized.pkl --coef_output reports/lme/aod_winsorized/lme_fixed_effects.csv --summary_output reports/lme/aod_winsorized/lme_model_summary.txt --exclude_low_confidence false --run_tag aod_winsorized
+    deps:
+      - scripts/modeling/lme/01_fit_lme_model.py
+      - data/processed/modeling_datasets/lme_ready_dataset_aod_winsorized.csv
+    outs:
+      - models/lme/lme_full_model_aod_winsorized.pkl
+      - reports/lme/aod_winsorized/lme_fixed_effects.csv
+      - reports/lme/aod_winsorized/lme_model_summary.txt
+
+  fit_lme_model_excl_outlier_stations:
+    cmd: python scripts/modeling/lme/01_fit_lme_model.py --input data/processed/modeling_datasets/lme_ready_dataset.csv --model_output models/lme/lme_full_model_excl_outlier_stations.pkl --coef_output reports/lme/excl_outlier_stations/lme_fixed_effects.csv --summary_output reports/lme/excl_outlier_stations/lme_model_summary.txt --exclude_low_confidence false --exclude_stations 5598,6934 --run_tag excl_outlier_stations
+    deps:
+      - scripts/modeling/lme/01_fit_lme_model.py
+      - data/processed/modeling_datasets/lme_ready_dataset.csv
+    params:
+      - modeling.lme_validation_excl_outlier_stations
+    outs:
+      - models/lme/lme_full_model_excl_outlier_stations.pkl
+      - reports/lme/excl_outlier_stations/lme_fixed_effects.csv
+      - reports/lme/excl_outlier_stations/lme_model_summary.txt
 
   validate_lme_cv:
-    cmd: python scripts/modeling/lme/02_validate_lme_cv.py --input data/processed/modeling_datasets/lme_ready_dataset.csv --station_file data/stations/cpcb_stations_delhi_status.csv --buffer_km 2.0 --n_random_folds 42 --random_seed 42 --exclude_low_confidence false --output_dir reports/lme
+    cmd: python scripts/modeling/lme/02_validate_lme_cv.py --input data/processed/modeling_datasets/lme_ready_dataset.csv --station_file data/stations/cpcb_stations_delhi_status.csv --buffer_km 2.0 --n_random_folds 42 --random_seed 42 --exclude_low_confidence false --output_dir reports/lme/primary
     deps:
       - scripts/modeling/lme/02_validate_lme_cv.py
       - data/processed/modeling_datasets/lme_ready_dataset.csv
@@ -670,14 +702,14 @@ stages:
     params:
       - modeling.lme_validation
     outs:
-      - reports/lme/station_buffer_exclusions.csv
-      - reports/lme/cv_spatial_loso_folds.csv
-      - reports/lme/cv_spatial_loso_aggregated.json
-      - reports/lme/cv_random_folds.csv
-      - reports/lme/cv_random_aggregated.json
+      - reports/lme/primary/station_buffer_exclusions.csv
+      - reports/lme/primary/cv_spatial_loso_folds.csv
+      - reports/lme/primary/cv_spatial_loso_aggregated.json
+      - reports/lme/primary/cv_random_folds.csv
+      - reports/lme/primary/cv_random_aggregated.json
 
   validate_lme_cv_gapfill_robustness:
-    cmd: python scripts/modeling/lme/02_validate_lme_cv.py --input data/processed/modeling_datasets/lme_ready_dataset.csv --station_file data/stations/cpcb_stations_delhi_status.csv --buffer_km 2.0 --n_random_folds 42 --random_seed 42 --exclude_low_confidence true --output_dir reports/lme
+    cmd: python scripts/modeling/lme/02_validate_lme_cv.py --input data/processed/modeling_datasets/lme_ready_dataset.csv --station_file data/stations/cpcb_stations_delhi_status.csv --buffer_km 2.0 --n_random_folds 42 --random_seed 42 --exclude_low_confidence true --output_dir reports/lme/gapfill_robustness
     deps:
       - scripts/modeling/lme/02_validate_lme_cv.py
       - data/processed/modeling_datasets/lme_ready_dataset.csv
@@ -685,8 +717,8 @@ stages:
     params:
       - modeling.lme_validation
     outs:
-      - reports/lme/cv_spatial_loso_excl_low_confidence_folds.csv
-      - reports/lme/cv_spatial_loso_excl_low_confidence_aggregated.json
+      - reports/lme/gapfill_robustness/cv_spatial_loso_folds.csv
+      - reports/lme/gapfill_robustness/cv_spatial_loso_aggregated.json
 
   winsorize_aod_dataset:
     cmd: python scripts/modeling/lme/03_winsorize_aod.py --input data/processed/modeling_datasets/lme_ready_dataset.csv --output data/processed/modeling_datasets/lme_ready_dataset_aod_winsorized.csv --zscore_cap 3.0
@@ -699,7 +731,7 @@ stages:
       - data/processed/modeling_datasets/lme_ready_dataset_aod_winsorized.csv
 
   validate_lme_cv_aod_winsorized:
-    cmd: python scripts/modeling/lme/02_validate_lme_cv.py --input data/processed/modeling_datasets/lme_ready_dataset_aod_winsorized.csv --station_file data/stations/cpcb_stations_delhi_status.csv --buffer_km 2.0 --n_random_folds 42 --random_seed 42 --exclude_low_confidence false --run_tag aod_winsorized --output_dir reports/lme
+    cmd: python scripts/modeling/lme/02_validate_lme_cv.py --input data/processed/modeling_datasets/lme_ready_dataset_aod_winsorized.csv --station_file data/stations/cpcb_stations_delhi_status.csv --buffer_km 2.0 --n_random_folds 42 --random_seed 42 --exclude_low_confidence false --run_tag aod_winsorized --output_dir reports/lme/aod_winsorized
     deps:
       - scripts/modeling/lme/02_validate_lme_cv.py
       - data/processed/modeling_datasets/lme_ready_dataset_aod_winsorized.csv
@@ -707,14 +739,14 @@ stages:
     params:
       - modeling.lme_validation
     outs:
-      - reports/lme/station_buffer_exclusions_aod_winsorized.csv
-      - reports/lme/cv_spatial_loso_aod_winsorized_folds.csv
-      - reports/lme/cv_spatial_loso_aod_winsorized_aggregated.json
-      - reports/lme/cv_random_aod_winsorized_folds.csv
-      - reports/lme/cv_random_aod_winsorized_aggregated.json
+      - reports/lme/aod_winsorized/station_buffer_exclusions.csv
+      - reports/lme/aod_winsorized/cv_spatial_loso_folds.csv
+      - reports/lme/aod_winsorized/cv_spatial_loso_aggregated.json
+      - reports/lme/aod_winsorized/cv_random_folds.csv
+      - reports/lme/aod_winsorized/cv_random_aggregated.json
 
   validate_lme_cv_excl_outlier_stations:
-    cmd: python scripts/modeling/lme/02_validate_lme_cv.py --input data/processed/modeling_datasets/lme_ready_dataset.csv --station_file data/stations/cpcb_stations_delhi_status.csv --buffer_km 2.0 --n_random_folds 42 --random_seed 42 --exclude_low_confidence false --exclude_stations 5598,6934 --run_tag excl_outlier_stations --output_dir reports/lme
+    cmd: python scripts/modeling/lme/02_validate_lme_cv.py --input data/processed/modeling_datasets/lme_ready_dataset.csv --station_file data/stations/cpcb_stations_delhi_status.csv --buffer_km 2.0 --n_random_folds 42 --random_seed 42 --exclude_low_confidence false --exclude_stations 5598,6934 --run_tag excl_outlier_stations --output_dir reports/lme/excl_outlier_stations
     deps:
       - scripts/modeling/lme/02_validate_lme_cv.py
       - data/processed/modeling_datasets/lme_ready_dataset.csv
@@ -723,11 +755,11 @@ stages:
       - modeling.lme_validation
       - modeling.lme_validation_excl_outlier_stations
     outs:
-      - reports/lme/station_buffer_exclusions_excl_outlier_stations.csv
-      - reports/lme/cv_spatial_loso_excl_outlier_stations_folds.csv
-      - reports/lme/cv_spatial_loso_excl_outlier_stations_aggregated.json
-      - reports/lme/cv_random_excl_outlier_stations_folds.csv
-      - reports/lme/cv_random_excl_outlier_stations_aggregated.json
+      - reports/lme/excl_outlier_stations/station_buffer_exclusions.csv
+      - reports/lme/excl_outlier_stations/cv_spatial_loso_folds.csv
+      - reports/lme/excl_outlier_stations/cv_spatial_loso_aggregated.json
+      - reports/lme/excl_outlier_stations/cv_random_folds.csv
+      - reports/lme/excl_outlier_stations/cv_random_aggregated.json
 
   # ============================================================
   # Validation — add stages here once scripts/validation/ has content

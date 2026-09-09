@@ -384,13 +384,17 @@ def main():
                               "validation run (e.g. for a with/without outlier-station "
                               "comparison). Default: none excluded.")
     parser.add_argument("--run_tag", default="",
-                         help="Optional tag appended to MLflow run names and output "
-                              "filenames, so a diagnostic variant (e.g. an "
-                              "--exclude_stations run, or a run against a different "
-                              "--input dataset) doesn't collide with the primary run in "
-                              "the same MLflow experiment / reports/lme/ directory. "
-                              "Default: no tag.")
-    parser.add_argument("--output_dir", required=True)
+                         help="Optional tag appended to MLflow run names, so a diagnostic "
+                              "variant (e.g. an --exclude_stations run, or a run against a "
+                              "different --input dataset) doesn't collide with the primary "
+                              "run's names in the same MLflow experiment. Output filenames "
+                              "don't need this -- give each variant its own --output_dir "
+                              "(e.g. reports/lme/cv_<variant>/) instead. Default: no tag.")
+    parser.add_argument("--output_dir", required=True,
+                         help="Give each run variant its own directory (e.g. "
+                              "reports/lme/cv_primary/, reports/lme/cv_aod_winsorized/) so "
+                              "output filenames can stay plain and reports/lme/ stays "
+                              "organized by run rather than by suffixed filename.")
     args = parser.parse_args()
 
     load_dotenv()
@@ -423,22 +427,18 @@ def main():
         df = df[df["confidence_bucket"] != "low"].reset_index(drop=True)
         print(f"Excluded confidence_bucket == 'low' rows: {before} -> {len(df)} rows")
         mlflow.set_experiment(MLFLOW_EXPERIMENT_GAPFILL_ROBUSTNESS)
-        suffix = "_excl_low_confidence"
+        run_name_suffix = "_excl_low_confidence"
     else:
         mlflow.set_experiment(MLFLOW_EXPERIMENT_FULL)
-        suffix = ""
+        run_name_suffix = ""
 
     if args.run_tag:
-        suffix += "_" + args.run_tag
+        run_name_suffix += "_" + args.run_tag
 
     if not exclude_low_confidence:
-        # Named with the same suffix as everything else in this run so a
-        # diagnostic variant (aod_winsorized, excl_outlier_stations, ...)
-        # never overwrites another variant'''s buffer-exclusion report -- the
-        # report'''s content only depends on station_file/buffer_km, not on
-        # which rows are in df, but each variant still gets its own file so
-        # DVC'''s declared outs never collide across stages.
-        exclusion_path = os.path.join(args.output_dir, f"station_buffer_exclusions{suffix}.csv")
+        # Plain filename -- each run variant gets its own --output_dir (see
+        # dvc.yaml), so no suffix is needed to keep variants from colliding.
+        exclusion_path = os.path.join(args.output_dir, "station_buffer_exclusions.csv")
         exclusion_report.to_csv(exclusion_path, index=False)
         print(f"Wrote {exclusion_path}")
 
@@ -446,10 +446,10 @@ def main():
 
     print("=== Spatial LOSO CV (primary, out-of-site, 2km buffer) ===")
     spatial_folds_df, spatial_aggregated = run_spatial_loso_cv(df, exclusions, true_group_means)
-    spatial_folds_path = os.path.join(args.output_dir, f"cv_spatial_loso{suffix}_folds.csv")
+    spatial_folds_path = os.path.join(args.output_dir, "cv_spatial_loso_folds.csv")
     spatial_folds_df.to_csv(spatial_folds_path, index=False)
     print(f"Wrote {spatial_folds_path}")
-    spatial_agg_path = os.path.join(args.output_dir, f"cv_spatial_loso{suffix}_aggregated.json")
+    spatial_agg_path = os.path.join(args.output_dir, "cv_spatial_loso_aggregated.json")
     with open(spatial_agg_path, "w") as f:
         json.dump(spatial_aggregated, f, indent=2)
     print(f"Wrote {spatial_agg_path}")
@@ -458,7 +458,7 @@ def main():
           f"RMSE={spatial_aggregated['rmse']:.3f} MAE={spatial_aggregated['mae']:.3f}")
 
     log_cv_run_to_mlflow(
-        run_name="spatial_loso_cv" + suffix,
+        run_name="spatial_loso_cv" + run_name_suffix,
         cv_scheme="spatial_loso",
         folds_df=spatial_folds_df,
         aggregated=spatial_aggregated,
@@ -480,10 +480,10 @@ def main():
 
     print("=== Random CV (comparison, ignores station grouping) ===")
     random_folds_df, random_aggregated = run_random_cv(df, args.n_random_folds, args.random_seed, true_group_means)
-    random_folds_path = os.path.join(args.output_dir, f"cv_random{suffix}_folds.csv")
+    random_folds_path = os.path.join(args.output_dir, "cv_random_folds.csv")
     random_folds_df.to_csv(random_folds_path, index=False)
     print(f"Wrote {random_folds_path}")
-    random_agg_path = os.path.join(args.output_dir, f"cv_random{suffix}_aggregated.json")
+    random_agg_path = os.path.join(args.output_dir, "cv_random_aggregated.json")
     with open(random_agg_path, "w") as f:
         json.dump(random_aggregated, f, indent=2)
     print(f"Wrote {random_agg_path}")
@@ -492,7 +492,7 @@ def main():
           f"RMSE={random_aggregated['rmse']:.3f} MAE={random_aggregated['mae']:.3f}")
 
     log_cv_run_to_mlflow(
-        run_name="random_cv" + suffix,
+        run_name="random_cv" + run_name_suffix,
         cv_scheme="random_cv",
         folds_df=random_folds_df,
         aggregated=random_aggregated,
