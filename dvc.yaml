@@ -625,7 +625,7 @@ stages:
       - data/processed/modeling_datasets/master_feature_table.csv
 
   prepare_lme_dataset:
-    cmd: python scripts/modeling/dataset_prep/02_prepare_lme_dataset.py --input data/processed/modeling_datasets/master_feature_table.csv --output data/processed/modeling_datasets/lme_ready_dataset.csv --target_transform NOT_SET --drop_zero_target_rows true --clip_negative_aod_to_zero true
+    cmd: python scripts/modeling/dataset_prep/02_prepare_lme_dataset.py --input data/processed/modeling_datasets/master_feature_table.csv --output data/processed/modeling_datasets/lme_ready_dataset.csv --target_transform log --drop_zero_target_rows true --clip_negative_aod_to_zero true
     deps:
       - scripts/modeling/dataset_prep/02_prepare_lme_dataset.py
       - data/processed/modeling_datasets/master_feature_table.csv

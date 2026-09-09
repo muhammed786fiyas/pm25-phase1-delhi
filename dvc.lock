@@ -1544,22 +1544,31 @@ stages:
   prepare_lme_dataset:
     cmd: python scripts/modeling/dataset_prep/02_prepare_lme_dataset.py --input 
       data/processed/modeling_datasets/master_feature_table.csv --output 
-      data/processed/modeling_datasets/lme_ready_dataset.csv
+      data/processed/modeling_datasets/lme_ready_dataset.csv --target_transform 
+      log --drop_zero_target_rows true --clip_negative_aod_to_zero true
     deps:
     - path: data/processed/modeling_datasets/master_feature_table.csv
       hash: md5
       md5: 45dc88a0c2cc3c64599799a83f7640cb
       size: 6642873
       isexec: true
+    - path: notebooks/01_eda_master_feature_table.ipynb
+      hash: md5
+      md5: 3b074e19616528c490e054e395a5dcce
+      size: 1890341
+      isexec: true
     - path: scripts/modeling/dataset_prep/02_prepare_lme_dataset.py
       hash: md5
-      md5: e0140bba383ccddfcb232e9e1a0f238e
-      size: 4622
+      md5: 0c623ea8fd5a5610066f27667bb9b09b
+      size: 7751
       isexec: true
     params:
       params.yaml:
         modeling.lme_prep:
           reference_season: summer
+          target_transform: log
+          drop_zero_target_rows: true
+          clip_negative_aod_to_zero: true
           worldcover_drop_cols:
           - snow_ice_pct
           - mangroves_pct
@@ -1587,13 +1596,13 @@ stages:
     outs:
     - path: data/processed/modeling_datasets/lme_ready_dataset.csv
       hash: md5
-      md5: 7a75fd4a2999d85dec54c28a6f4bd079
-      size: 5899811
+      md5: 0704a7334e908e619e81b759a0e0caf5
+      size: 6119824
       isexec: true
     - path: data/processed/modeling_datasets/lme_scaling_params.csv
       hash: md5
-      md5: bb62f1009384fc9b41cd45d0d06a7c6d
-      size: 926
+      md5: cd0ce6f301722c39756ca16a259c0a8b
+      size: 920
       isexec: true
   prepare_lightgbm_dataset:
     cmd: python scripts/modeling/dataset_prep/03_prepare_lightgbm_dataset.py 
