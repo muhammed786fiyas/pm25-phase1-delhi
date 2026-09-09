@@ -607,7 +607,7 @@ stages:
   # ============================================================
 
   build_master_feature_table:
-    cmd: python scripts/modeling/dataset_prep/01_build_master_table.py --station_file data/stations/cpcb_stations_delhi_status.csv --pm25 data/processed/cpcb/pm25_daily_final/pm25_daily_final.csv --aod data/processed/maiac_gapfill/maiac_aod_gapfilled.csv --era5_land data/processed/era5_land/era5_land_daily.csv --era5_blh data/processed/era5_blh/era5_blh_daily.csv --ndvi data/processed/static_gee/ndvi_gapfilled.csv --worldcover data/processed/static_gee/worldcover_landuse.csv --srtm data/processed/static_gee/srtm_terrain.csv --roads data/processed/osm/road_density.csv --industrial data/processed/osm/industrial_fraction.csv --powerplants data/processed/osm/powerplant_distance.csv --output data/processed/modeling/master_feature_table.csv
+    cmd: python scripts/modeling/dataset_prep/01_build_master_table.py --station_file data/stations/cpcb_stations_delhi_status.csv --pm25 data/processed/cpcb/pm25_daily_final/pm25_daily_final.csv --aod data/processed/maiac_gapfill/maiac_aod_gapfilled.csv --era5_land data/processed/era5_land/era5_land_daily.csv --era5_blh data/processed/era5_blh/era5_blh_daily.csv --ndvi data/processed/static_gee/ndvi_gapfilled.csv --worldcover data/processed/static_gee/worldcover_landuse.csv --srtm data/processed/static_gee/srtm_terrain.csv --roads data/processed/osm/road_density.csv --industrial data/processed/osm/industrial_fraction.csv --powerplants data/processed/osm/powerplant_distance.csv --output data/processed/modeling_datasets/master_feature_table.csv
     deps:
       - scripts/modeling/dataset_prep/01_build_master_table.py
       - data/stations/cpcb_stations_delhi_status.csv
@@ -622,28 +622,28 @@ stages:
       - data/processed/osm/industrial_fraction.csv
       - data/processed/osm/powerplant_distance.csv
     outs:
-      - data/processed/modeling/master_feature_table.csv
+      - data/processed/modeling_datasets/master_feature_table.csv
 
   prepare_lme_dataset:
-    cmd: python scripts/modeling/dataset_prep/02_prepare_lme_dataset.py --input data/processed/modeling/master_feature_table.csv --output data/processed/modeling/lme_ready_dataset.csv
+    cmd: python scripts/modeling/dataset_prep/02_prepare_lme_dataset.py --input data/processed/modeling_datasets/master_feature_table.csv --output data/processed/modeling_datasets/lme_ready_dataset.csv
     deps:
       - scripts/modeling/dataset_prep/02_prepare_lme_dataset.py
-      - data/processed/modeling/master_feature_table.csv
+      - data/processed/modeling_datasets/master_feature_table.csv
     params:
       - modeling.lme_prep
     outs:
-      - data/processed/modeling/lme_ready_dataset.csv
-      - data/processed/modeling/lme_scaling_params.csv
+      - data/processed/modeling_datasets/lme_ready_dataset.csv
+      - data/processed/modeling_datasets/lme_scaling_params.csv
 
   prepare_lightgbm_dataset:
-    cmd: python scripts/modeling/dataset_prep/03_prepare_lightgbm_dataset.py --input data/processed/modeling/master_feature_table.csv --output data/processed/modeling/lightgbm_ready_dataset.csv
+    cmd: python scripts/modeling/dataset_prep/03_prepare_lightgbm_dataset.py --input data/processed/modeling_datasets/master_feature_table.csv --output data/processed/modeling_datasets/lightgbm_ready_dataset.csv
     deps:
       - scripts/modeling/dataset_prep/03_prepare_lightgbm_dataset.py
-      - data/processed/modeling/master_feature_table.csv
+      - data/processed/modeling_datasets/master_feature_table.csv
     params:
       - modeling.lightgbm_prep
     outs:
-      - data/processed/modeling/lightgbm_ready_dataset.csv
+      - data/processed/modeling_datasets/lightgbm_ready_dataset.csv
 
   # ============================================================
   # Validation — add stages here once scripts/validation/ has content

@@ -1473,7 +1473,7 @@ stages:
       data/processed/osm/road_density.csv --industrial 
       data/processed/osm/industrial_fraction.csv --powerplants 
       data/processed/osm/powerplant_distance.csv --output 
-      data/processed/modeling/master_feature_table.csv
+      data/processed/modeling_datasets/master_feature_table.csv
     deps:
     - path: data/processed/cpcb/pm25_daily_final/pm25_daily_final.csv
       hash: md5
@@ -1536,17 +1536,17 @@ stages:
       size: 5935
       isexec: true
     outs:
-    - path: data/processed/modeling/master_feature_table.csv
+    - path: data/processed/modeling_datasets/master_feature_table.csv
       hash: md5
       md5: 45dc88a0c2cc3c64599799a83f7640cb
       size: 6642873
       isexec: true
   prepare_lme_dataset:
     cmd: python scripts/modeling/dataset_prep/02_prepare_lme_dataset.py --input 
-      data/processed/modeling/master_feature_table.csv --output 
-      data/processed/modeling/lme_ready_dataset.csv
+      data/processed/modeling_datasets/master_feature_table.csv --output 
+      data/processed/modeling_datasets/lme_ready_dataset.csv
     deps:
-    - path: data/processed/modeling/master_feature_table.csv
+    - path: data/processed/modeling_datasets/master_feature_table.csv
       hash: md5
       md5: 45dc88a0c2cc3c64599799a83f7640cb
       size: 6642873
@@ -1585,22 +1585,22 @@ stages:
           - built_up_pct
           - bare_sparse_veg_pct
     outs:
-    - path: data/processed/modeling/lme_ready_dataset.csv
+    - path: data/processed/modeling_datasets/lme_ready_dataset.csv
       hash: md5
       md5: 7a75fd4a2999d85dec54c28a6f4bd079
       size: 5899811
       isexec: true
-    - path: data/processed/modeling/lme_scaling_params.csv
+    - path: data/processed/modeling_datasets/lme_scaling_params.csv
       hash: md5
       md5: bb62f1009384fc9b41cd45d0d06a7c6d
       size: 926
       isexec: true
   prepare_lightgbm_dataset:
     cmd: python scripts/modeling/dataset_prep/03_prepare_lightgbm_dataset.py 
-      --input data/processed/modeling/master_feature_table.csv --output 
-      data/processed/modeling/lightgbm_ready_dataset.csv
+      --input data/processed/modeling_datasets/master_feature_table.csv --output
+      data/processed/modeling_datasets/lightgbm_ready_dataset.csv
     deps:
-    - path: data/processed/modeling/master_feature_table.csv
+    - path: data/processed/modeling_datasets/master_feature_table.csv
       hash: md5
       md5: 45dc88a0c2cc3c64599799a83f7640cb
       size: 6642873
@@ -1619,7 +1619,7 @@ stages:
           - mangroves_pct
           - moss_lichen_pct
     outs:
-    - path: data/processed/modeling/lightgbm_ready_dataset.csv
+    - path: data/processed/modeling_datasets/lightgbm_ready_dataset.csv
       hash: md5
       md5: a1a7eab0eca9e73d04419db99e695469
       size: 5326225
