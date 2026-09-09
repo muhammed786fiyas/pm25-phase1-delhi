@@ -637,7 +637,7 @@ stages:
       - data/processed/modeling_datasets/lme_scaling_params.csv
 
   prepare_lightgbm_dataset:
-    cmd: python scripts/modeling/dataset_prep/03_prepare_lightgbm_dataset.py --input data/processed/modeling_datasets/master_feature_table.csv --output data/processed/modeling_datasets/lightgbm_ready_dataset.csv
+    cmd: python scripts/modeling/dataset_prep/03_prepare_lightgbm_dataset.py --input data/processed/modeling_datasets/master_feature_table.csv --output data/processed/modeling_datasets/lightgbm_ready_dataset.csv --drop_zero_target_rows true --clip_negative_aod_to_zero true
     deps:
       - scripts/modeling/dataset_prep/03_prepare_lightgbm_dataset.py
       - data/processed/modeling_datasets/master_feature_table.csv

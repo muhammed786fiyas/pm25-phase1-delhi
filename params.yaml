@@ -250,4 +250,6 @@ modeling:
 
   lightgbm_prep:
     reference_season: summer
+    drop_zero_target_rows: true
+    clip_negative_aod_to_zero: true
     worldcover_drop_cols: [snow_ice_pct, mangroves_pct, moss_lichen_pct]
