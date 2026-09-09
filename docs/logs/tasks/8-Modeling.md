@@ -7,14 +7,14 @@ Build the final modeling-ready datasets for the Delhi Phase 1 pilot: join every 
 ## Completed
 
 **Master feature table** (2026-09-09)
-- `scripts/modeling/01_build_master_table.py`: starts from `pm25_daily_final.csv` (13,641 station-days, 42 stations) and left-joins everything else onto it. Canonical station name/lat/lon comes from `cpcb_stations_delhi_status.csv` filtered to `status == 'KEEP'`, not from any of the covariate tables (several of which carry their own copies).
+- `scripts/modeling/dataset_prep/01_build_master_table.py`: starts from `pm25_daily_final.csv` (13,641 station-days, 42 stations) and left-joins everything else onto it. Canonical station name/lat/lon comes from `cpcb_stations_delhi_status.csv` filtered to `status == 'KEEP'`, not from any of the covariate tables (several of which carry their own copies).
 - Time-varying joins on `[location_id, date]`: AOD gapfilled (renaming its `gap_filled` -> `aod_gap_filled` to avoid a name clash with NDVI's own `gap_filled` column), ERA5-Land (dropping `dewpoint_c` -- redundant with `relative_humidity`, an explicit earlier decision; renaming `n_hours_used` -> `n_hours_met`), ERA5-BLH (renaming `n_hours_used` -> `n_hours_blh`).
 - NDVI is 5-day composites, not daily, so it needed a period-range join instead of a direct date match: `pd.merge_asof(direction="backward", by="location_id")` matching each station-day to the period whose `period_start` is the closest one at-or-before that date, then verifying every matched date actually falls at-or-before `period_end` too (0 rows failed this check across all 13,641 rows). Its own `gap_filled` column renamed to `ndvi_gap_filled`.
 - Static per-station joins on `location_id` alone: WorldCover (all 11 land-use % columns kept in the master table -- reduction happens downstream, differently per model), SRTM terrain, OSM road density/industrial fraction/powerplant distance.
 - Master table: 13,641 rows x 42 columns. Missing-value check: `aod_055` missing for 101 rows (station-days where both MAIAC and MERRA2 were unavailable, and which also happened to have a valid PM2.5 reading -- a subset of the 113 fully-unfillable station-days in the full AOD calendar grid), `confidence_rmse` missing for 7,093 rows (these are the *observed*, non-gap-filled AOD rows, where confidence doesn't apply), `nearest_powerplant_name` missing for 10,007 rows (informational only, not a feature).
 
 **LME-ready dataset** (2026-09-09)
-- `scripts/modeling/02_prepare_lme_dataset.py`. Complete-case filter: drops any row with a NaN in a model column. In practice only `aod_055` ever triggers this (met/NDVI/land-use/terrain/OSM covariates have 0 missing across all 13,641 rows) -- 13,641 -> 13,540 rows.
+- `scripts/modeling/dataset_prep/02_prepare_lme_dataset.py`. Complete-case filter: drops any row with a NaN in a model column. In practice only `aod_055` ever triggers this (met/NDVI/land-use/terrain/OSM covariates have 0 missing across all 13,641 rows) -- 13,641 -> 13,540 rows.
 - WorldCover reduced to 6 columns for LME: dropped `snow_ice_pct`/`mangroves_pct`/`moss_lichen_pct` (literally 0% at all 42 Delhi stations -- verified, not assumed), `wetland_herbaceous_pct` (nonzero at only 3 of 42 stations, max 1.28% -- negligible), and `water_pct` as the implicit reference category (smallest mean at 0.51%, present at only 55% of stations) to resolve the perfect multicollinearity from the 11 columns summing to a constant 100%. Kept: `tree_cover_pct, shrubland_pct, grassland_pct, cropland_pct, built_up_pct, bare_sparse_veg_pct`.
 - Every continuous regressor (AOD, met, NDVI, terrain, OSM, the 6 kept land-use columns) is z-scored (mean 0, std 1); scaling stats written to a companion `lme_scaling_params.csv` so fitted coefficients can be back-transformed to original units later.
 - Season dummies built with `summer` as the reference category (`season_monsoon`, `season_post_monsoon`, `season_winter`), then AOD x season interaction columns (`aod_x_monsoon`, `aod_x_post_monsoon`, `aod_x_winter`) built from the *scaled* AOD -- summer's interaction is implicitly the plain `aod_055` coefficient and needs no separate column.
@@ -22,7 +22,7 @@ Build the final modeling-ready datasets for the Delhi Phase 1 pilot: join every 
 - Result: 13,540 rows x 29 columns. Rows per season: summer 3,481 / monsoon 4,617 / post_monsoon 2,375 / winter 3,067, all 42 stations represented in every season. Rows per `confidence_bucket`: observed 6,992 / medium 3,180 / high 2,151 / low 1,217.
 
 **LightGBM-ready dataset** (2026-09-09)
-- `scripts/modeling/03_prepare_lightgbm_dataset.py`. No complete-case filtering -- all 13,641 rows kept, native NaNs preserved (101 rows with NaN `aod_055`, 7,093 with NaN `confidence_rmse`).
+- `scripts/modeling/dataset_prep/03_prepare_lightgbm_dataset.py`. No complete-case filtering -- all 13,641 rows kept, native NaNs preserved (101 rows with NaN `aod_055`, 7,093 with NaN `confidence_rmse`).
 - WorldCover reduced to 8 columns (only the 3 always-zero columns dropped) -- deliberately *not* matched to LME's 6, since `water_pct` and `wetland_herbaceous_pct` carry real (if modest) station-to-station variation and trees pay no collinearity cost for keeping them, unlike a linear model.
 - `confidence_rmse`, `aod_gap_filled`, `ndvi_gap_filled` kept as informative features (not just for filtering) -- the confidence score reflects real MAIAC-vs-MERRA2 calibration fit quality, a genuine signal a tree model can use.
 - `location_id` kept in the file as an ID/grouping column (e.g. for station-based CV splits) but documented as excluded from the actual training feature list. `season` kept as a plain string (CSV can't carry dtype info -- documented to cast to category or pass `categorical_feature=['season']` at training time).
@@ -52,3 +52,7 @@ Build the final modeling-ready datasets for the Delhi Phase 1 pilot: join every 
 
 ## Ideas / under consideration
 - None new this session.
+
+
+## Note (2026-09-09, later same day)
+Moved the 3 dataset-prep scripts into `scripts/modeling/dataset_prep/` (previously flat in `scripts/modeling/`), to make room for upcoming `scripts/modeling/lme/` and `scripts/modeling/lightgbm/` model-fitting sub-pipelines -- mirrors how `scripts/datasets/` is itself a folder of per-module subfolders rather than one flat sequence. `dvc.yaml`'s 3 stage `cmd`/`deps` paths updated to match; re-ran all 3 stages (identical output, only the recorded script path changed in `dvc.lock`).
