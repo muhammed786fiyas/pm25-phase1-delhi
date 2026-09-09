@@ -1260,3 +1260,203 @@ stages:
       md5: 583338339120a61e38b5cb58a16e73d5
       size: 3480
       isexec: true
+  maiac_gapfill_build_dataset:
+    cmd: python scripts/datasets/maiac_gapfill/01_build_calibration_dataset.py 
+      --maiac_input data/processed/maiac_aod/maiac_aod_daily.csv --merra2_input 
+      data/processed/merra2_aod/merra2_aod_daily.csv --station_file 
+      data/stations/cpcb_stations_delhi_status.csv --output 
+      data/raw/maiac_gapfill/calibration_dataset.csv --summary_output 
+      data/raw/maiac_gapfill/overlap_summary.csv
+    deps:
+    - path: data/processed/maiac_aod/maiac_aod_daily.csv
+      hash: md5
+      md5: 5fa82874b97aa0c16c1fc3642f159fc6
+      size: 422834
+      isexec: true
+    - path: data/processed/merra2_aod/merra2_aod_daily.csv
+      hash: md5
+      md5: a52d3d12668f3cf7304da36eb4bc9fee
+      size: 1572345
+      isexec: true
+    - path: data/stations/cpcb_stations_delhi_status.csv
+      hash: md5
+      md5: 4d2c634b6bdf8d8e9cf3de6d517f6776
+      size: 14245
+      isexec: true
+    - path: scripts/datasets/maiac_gapfill/01_build_calibration_dataset.py
+      hash: md5
+      md5: 5c6ea7422b62ce06476b179fc76cf7bb
+      size: 3217
+      isexec: true
+    outs:
+    - path: data/raw/maiac_gapfill/calibration_dataset.csv
+      hash: md5
+      md5: 52fce99a7fc56fcd8a4f307675a9a10a
+      size: 807488
+      isexec: true
+    - path: data/raw/maiac_gapfill/overlap_summary.csv
+      hash: md5
+      md5: a6714e8aa0c42e811cd142c9a5fd1e60
+      size: 408
+      isexec: true
+  maiac_gapfill_fit_calibration:
+    cmd: python scripts/datasets/maiac_gapfill/02_fit_station_calibration.py 
+      --input data/raw/maiac_gapfill/calibration_dataset.csv --station_file 
+      data/stations/cpcb_stations_delhi_status.csv --output 
+      data/raw/maiac_gapfill/station_calibration_raw.csv --params params.yaml
+    deps:
+    - path: data/raw/maiac_gapfill/calibration_dataset.csv
+      hash: md5
+      md5: 52fce99a7fc56fcd8a4f307675a9a10a
+      size: 807488
+      isexec: true
+    - path: data/stations/cpcb_stations_delhi_status.csv
+      hash: md5
+      md5: 4d2c634b6bdf8d8e9cf3de6d517f6776
+      size: 14245
+      isexec: true
+    - path: scripts/datasets/maiac_gapfill/02_fit_station_calibration.py
+      hash: md5
+      md5: 317d64fb13b9429ace4c1308c5e0c116
+      size: 4932
+      isexec: true
+    params:
+      params.yaml:
+        maiac_gapfill.calibration:
+          aod_column: aod_055
+          merra2_column: totexttau
+    outs:
+    - path: data/raw/maiac_gapfill/station_calibration_raw.csv
+      hash: md5
+      md5: 81a433ccf12fa2e62ab9425abe44a96d
+      size: 7543
+      isexec: true
+  maiac_gapfill_qc_calibration:
+    cmd: python scripts/datasets/maiac_gapfill/03_qc_calibration.py --input 
+      data/raw/maiac_gapfill/station_calibration_raw.csv --station_file 
+      data/stations/cpcb_stations_delhi_status.csv --output 
+      data/interim/maiac_gapfill/calibration_qc_summary.csv --params params.yaml
+    deps:
+    - path: data/raw/maiac_gapfill/station_calibration_raw.csv
+      hash: md5
+      md5: 81a433ccf12fa2e62ab9425abe44a96d
+      size: 7543
+      isexec: true
+    - path: data/stations/cpcb_stations_delhi_status.csv
+      hash: md5
+      md5: 4d2c634b6bdf8d8e9cf3de6d517f6776
+      size: 14245
+      isexec: true
+    - path: scripts/datasets/maiac_gapfill/03_qc_calibration.py
+      hash: md5
+      md5: 78571335d5379942d42d8b751b01d8e9
+      size: 3840
+      isexec: true
+    params:
+      params.yaml:
+        maiac_gapfill.qc:
+          min_obs_for_fit: 20
+          min_slope: 0.0
+          r_squared_warn_threshold: 0.1
+    outs:
+    - path: data/interim/maiac_gapfill/calibration_qc_summary.csv
+      hash: md5
+      md5: 6252a370fa36c57dd47bc6e2f9e1a431
+      size: 126
+      isexec: true
+  maiac_gapfill_apply_fill:
+    cmd: python scripts/datasets/maiac_gapfill/05_apply_gapfill.py --maiac_input
+      data/processed/maiac_aod/maiac_aod_daily.csv --merra2_input 
+      data/processed/merra2_aod/merra2_aod_daily.csv --calibration_input 
+      data/raw/maiac_gapfill/station_calibration_raw.csv --confidence_input 
+      data/processed/maiac_gapfill/confidence_scores.csv --station_file 
+      data/stations/cpcb_stations_delhi_status.csv --output 
+      data/processed/maiac_gapfill/maiac_aod_gapfilled.csv --summary_output 
+      data/processed/maiac_gapfill/fill_summary.csv --params params.yaml
+    deps:
+    - path: data/processed/maiac_aod/maiac_aod_daily.csv
+      hash: md5
+      md5: 5fa82874b97aa0c16c1fc3642f159fc6
+      size: 422834
+      isexec: true
+    - path: data/processed/maiac_gapfill/confidence_scores.csv
+      hash: md5
+      md5: 48e0d530ebee72f353e5499545d922e7
+      size: 10339
+      isexec: true
+    - path: data/processed/merra2_aod/merra2_aod_daily.csv
+      hash: md5
+      md5: a52d3d12668f3cf7304da36eb4bc9fee
+      size: 1572345
+      isexec: true
+    - path: data/raw/maiac_gapfill/station_calibration_raw.csv
+      hash: md5
+      md5: 81a433ccf12fa2e62ab9425abe44a96d
+      size: 7543
+      isexec: true
+    - path: data/stations/cpcb_stations_delhi_status.csv
+      hash: md5
+      md5: 4d2c634b6bdf8d8e9cf3de6d517f6776
+      size: 14245
+      isexec: true
+    - path: scripts/datasets/maiac_gapfill/05_apply_gapfill.py
+      hash: md5
+      md5: 2a04d0f8e8be0f5de474e028805b65c5
+      size: 8082
+      isexec: true
+    params:
+      params.yaml:
+        maiac_gapfill.fill:
+          aod_column: aod_055
+          merra2_column: totexttau
+    outs:
+    - path: data/processed/maiac_gapfill/fill_summary.csv
+      hash: md5
+      md5: 666eed965c22228625ea6577fb1c64d0
+      size: 1075
+      isexec: true
+    - path: data/processed/maiac_gapfill/maiac_aod_gapfilled.csv
+      hash: md5
+      md5: 0fb5e66cac917618ee299c9140cd9e4b
+      size: 1882536
+      isexec: true
+  maiac_gapfill_score_confidence:
+    cmd: python scripts/datasets/maiac_gapfill/04_score_confidence.py --input 
+      data/raw/maiac_gapfill/calibration_dataset.csv --residuals_output 
+      data/interim/maiac_gapfill/loocv_residuals.csv --output 
+      data/processed/maiac_gapfill/confidence_scores.csv --params params.yaml
+    deps:
+    - path: data/interim/maiac_gapfill/calibration_qc_summary.csv
+      hash: md5
+      md5: 6252a370fa36c57dd47bc6e2f9e1a431
+      size: 126
+      isexec: true
+    - path: data/raw/maiac_gapfill/calibration_dataset.csv
+      hash: md5
+      md5: 52fce99a7fc56fcd8a4f307675a9a10a
+      size: 807488
+      isexec: true
+    - path: scripts/datasets/maiac_gapfill/04_score_confidence.py
+      hash: md5
+      md5: f164ffcf872727df51a1ca448a68b94c
+      size: 6754
+      isexec: true
+    params:
+      params.yaml:
+        maiac_gapfill.calibration:
+          aod_column: aod_055
+          merra2_column: totexttau
+        maiac_gapfill.confidence:
+          rmse_low_threshold: 0.211
+          rmse_high_threshold: 0.292
+    outs:
+    - path: data/interim/maiac_gapfill/loocv_residuals.csv
+      hash: md5
+      md5: 8958aacdf5e13f243f42800f3726ceb3
+      size: 561171
+      isexec: true
+    - path: data/processed/maiac_gapfill/confidence_scores.csv
+      hash: md5
+      md5: 48e0d530ebee72f353e5499545d922e7
+      size: 10339
+      isexec: true

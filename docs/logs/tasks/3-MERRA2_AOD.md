@@ -1,5 +1,5 @@
 # Task Log: MERRA-2
-_Last updated: 2026-08-21_
+_Last updated: 2026-09-09_
 
 ## Scope
 Extract MERRA-2 hourly aerosol optical thickness (TOTEXTTAU) as the calibrated gap-fill source for MAIAC AOD gaps, for the Delhi Phase 1 study window (2025-03-01 to 2026-02-28), matched to the 42 finalized CPCB stations.
@@ -33,6 +33,8 @@ Extract MERRA-2 hourly aerosol optical thickness (TOTEXTTAU) as the calibrated g
 - Output: `data/processed/merra2_aod/merra2_aod_daily.csv` — station-level daily TOTEXTTAU for all 42 stations, DVC stages `window_qc_merra2` and `aggregate_merra2`.
 - Tagged `delhi-phase1-v7`: MERRA-2 pipeline complete end-to-end (map → raw extract → window/QC → daily aggregation).
 
+**Fed into the MAIAC↔MERRA-2 calibration regression** (2026-09-09) — done as its own module, `scripts/datasets/maiac_gapfill/`. Per-station (not per-airshed), season-intercept form promoted after comparison testing. See `docs/logs/tasks/7-MAIAC_Gapfill.md`.
+
 ## Key decisions
 - 2026-08-20: Group stations by shared MERRA-2 grid cell instead of extracting per station — Delhi's full station spread (~40km) is smaller than one MERRA-2 cell (~62km), so 42 point extractions would have been redundant. Cut GEE calls from 42 to 3.
 - 2026-08-20: Determine cell membership via GEE's own `pixelLonLat()`, reprojected to MERRA-2's native projection — not manual lat/lon rounding against the documented grid spacing, since getting the grid origin wrong would silently misassign stations with no error thrown.
@@ -53,8 +55,7 @@ Extract MERRA-2 hourly aerosol optical thickness (TOTEXTTAU) as the calibrated g
 - `getRegion(geometry, scale)` does not echo back the exact query point's coordinates — at `scale=1000` it reprojects to a 1km grid first and reports that pixel's center, producing up to ~1km of drift in the returned `longitude`/`latitude` columns (but not in the sampled band value itself, which still reflects the correct native ~62km cell). Same underlying category of issue as the `pixelLonLat()` scale bug above, but shows up differently since `getRegion` samples a real image with its own native projection rather than a synthetic coordinate image.
 
 ## Pending
-- Sanity-check `merra2_aod_daily.csv` output ranges and station coverage (row counts per station, TOTEXTTAU distribution, dropped-day counts) — not yet explicitly reviewed, only confirmed the pipeline ran without error.
-- Feed into the MAIAC↔MERRA-2 calibration regression per airshed (`MAIAC ≈ a + b · MERRA2`) — next real milestone for this data, blocked on the temporal-alignment/gap-fill-ordering decision currently open in the AOD preprocessing task log.
+- Sanity-check `merra2_aod_daily.csv` output ranges and station coverage (row counts per station, TOTEXTTAU distribution, dropped-day counts) — not yet explicitly reviewed as a standalone check, though the gap-fill calibration work (2026-09-09) implicitly exercised the data (per-station overlap counts, slope/R² sanity) without a dedicated review.
 
 ## Ideas / under consideration
 - None raised yet for this module.

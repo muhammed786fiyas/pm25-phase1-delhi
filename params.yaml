@@ -66,6 +66,29 @@ merra2_aggregation:
   min_hours_required: 2
 
 # ============================================================
+# MAIAC gap-fill calibration (per-station MAIAC ~ a + b*MERRA2)
+# ============================================================
+
+maiac_gapfill:
+  calibration:
+    aod_column: "aod_055"
+    merra2_column: "totexttau"
+
+  qc:
+    min_obs_for_fit: 20
+    min_slope: 0.0
+    r_squared_warn_threshold: 0.1
+
+  fill:
+    aod_column: "aod_055"
+    merra2_column: "totexttau"
+
+  confidence:
+    rmse_low_threshold: 0.211
+    rmse_high_threshold: 0.292
+
+
+# ============================================================
 # ERA5-Land meteorology 
 # ============================================================
 

@@ -1,5 +1,5 @@
 # Task Log: MAIAC AOD
-_Last updated: 2026-08-21_
+_Last updated: 2026-09-09_
 
 ## Scope
 Google Earth Engine extraction and preprocessing of MAIAC (MCD19A2) AOD at 550nm for all
@@ -29,6 +29,8 @@ dataset ready for temporal alignment with CPCB.
 
 **Git** — tagged `delhi-phase1-v8` (QA decode+filter) and `delhi-phase1-v9` (full AOD preprocessing complete).
 
+**MAIAC-MERRA2 gap-fill calibration** (2026-09-09) — done as its own module, `scripts/datasets/maiac_gapfill/`. Ended up per-station (not per-airshed, per the scope-change decision), and the gap-fill/temporal-alignment order question resolved itself: gap-fill ran directly off `maiac_aod_daily.csv` + `merra2_aod_daily.csv`, independent of the CPCB join. See `docs/logs/tasks/7-MAIAC_Gapfill.md` for full detail.
+
 ## Key decisions
 - **2026-08-17** — Use AOD at 550nm (`Optical_Depth_055`), not 470nm — matches MERRA-2's reporting wavelength, AERONET convention, and both literature anchors.
 - **2026-08-17** — Raw overpass level (no Terra/Aqua averaging), single-pixel (no 3x3 buffer) for the first working version — both deliberate, deferred design choices.
@@ -49,10 +51,7 @@ dataset ready for temporal alignment with CPCB.
 - `image_id` structure: `MCD19A2_A{YYYYDDD}_h{HH}v{VV}_{version}_{production timestamp}_{overpass index}` — e.g. acquisition date is Julian day format, production timestamp shows processing delay (~2 days after acquisition typically), overpass index distinguishes multiple same-day passes.
 
 ## Pending
-- Decide order: gap-fill calibration before or after CPCB↔AOD temporal alignment join — open question.
-- Temporal alignment script: left join `maiac_aod_daily.csv` with CPCB daily PM2.5 on `[location_id, date]`.
-- MAIAC-MERRA2 gap-fill calibration: fit `MAIAC_AOD ~= a + b*MERRA2_AOD` per airshed, apply to fill AOD gaps (mostly monsoon).
-- Confirm MERRA-2's final output file path/name (pipeline reported complete, exact path not yet in this session's context) before referencing it in the join/gap-fill script.
+- Temporal alignment script: left join `maiac_aod_daily.csv` with CPCB daily PM2.5 on `[location_id, date]` — now unblocked, gap-fill calibration order question resolved 2026-09-09.
 - Externalize `extract_gee_covariates.py`'s hardcoded constants (`GEE_PROJECT`, `MAIAC_COLLECTION`, `BANDS_TO_PULL`, `STUDY_START`, `STUDY_END`) into `params.yaml` — planned, not yet done.
 - Decide on and implement Terra vs Aqua overpass identification — still open, not blocking.
 

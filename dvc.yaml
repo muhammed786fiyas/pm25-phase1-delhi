@@ -213,6 +213,96 @@ stages:
       - merra2_aggregation
     outs:
       - data/processed/merra2_aod/merra2_aod_daily.csv
+
+  # ============================================================
+  # MAIAC gap-fill calibration (per-station MAIAC ~ a + b*MERRA2)
+  # ============================================================
+  maiac_gapfill_build_dataset:
+    cmd: python scripts/datasets/maiac_gapfill/01_build_calibration_dataset.py
+      --maiac_input data/processed/maiac_aod/maiac_aod_daily.csv
+      --merra2_input data/processed/merra2_aod/merra2_aod_daily.csv
+      --station_file data/stations/cpcb_stations_delhi_status.csv
+      --output data/raw/maiac_gapfill/calibration_dataset.csv
+      --summary_output data/raw/maiac_gapfill/overlap_summary.csv
+    deps:
+      - scripts/datasets/maiac_gapfill/01_build_calibration_dataset.py
+      - data/processed/maiac_aod/maiac_aod_daily.csv
+      - data/processed/merra2_aod/merra2_aod_daily.csv
+      - data/stations/cpcb_stations_delhi_status.csv
+    outs:
+      - data/raw/maiac_gapfill/calibration_dataset.csv
+      - data/raw/maiac_gapfill/overlap_summary.csv
+
+  maiac_gapfill_fit_calibration:
+    cmd: python scripts/datasets/maiac_gapfill/02_fit_station_calibration.py
+      --input data/raw/maiac_gapfill/calibration_dataset.csv
+      --station_file data/stations/cpcb_stations_delhi_status.csv
+      --output data/raw/maiac_gapfill/station_calibration_raw.csv
+      --params params.yaml
+    deps:
+      - scripts/datasets/maiac_gapfill/02_fit_station_calibration.py
+      - data/raw/maiac_gapfill/calibration_dataset.csv
+      - data/stations/cpcb_stations_delhi_status.csv
+    params:
+      - maiac_gapfill.calibration
+    outs:
+      - data/raw/maiac_gapfill/station_calibration_raw.csv
+
+  maiac_gapfill_qc_calibration:
+    cmd: python scripts/datasets/maiac_gapfill/03_qc_calibration.py
+      --input data/raw/maiac_gapfill/station_calibration_raw.csv
+      --station_file data/stations/cpcb_stations_delhi_status.csv
+      --output data/interim/maiac_gapfill/calibration_qc_summary.csv
+      --params params.yaml
+    deps:
+      - scripts/datasets/maiac_gapfill/03_qc_calibration.py
+      - data/raw/maiac_gapfill/station_calibration_raw.csv
+      - data/stations/cpcb_stations_delhi_status.csv
+    params:
+      - maiac_gapfill.qc
+    outs:
+      - data/interim/maiac_gapfill/calibration_qc_summary.csv
+
+  maiac_gapfill_score_confidence:
+    cmd: python scripts/datasets/maiac_gapfill/04_score_confidence.py
+      --input data/raw/maiac_gapfill/calibration_dataset.csv
+      --residuals_output data/interim/maiac_gapfill/loocv_residuals.csv
+      --output data/processed/maiac_gapfill/confidence_scores.csv
+      --params params.yaml
+    deps:
+      - scripts/datasets/maiac_gapfill/04_score_confidence.py
+      - data/raw/maiac_gapfill/calibration_dataset.csv
+      - data/interim/maiac_gapfill/calibration_qc_summary.csv
+    params:
+      - maiac_gapfill.calibration
+      - maiac_gapfill.confidence
+    outs:
+      - data/interim/maiac_gapfill/loocv_residuals.csv
+      - data/processed/maiac_gapfill/confidence_scores.csv
+
+  maiac_gapfill_apply_fill:
+    cmd: python scripts/datasets/maiac_gapfill/05_apply_gapfill.py
+      --maiac_input data/processed/maiac_aod/maiac_aod_daily.csv
+      --merra2_input data/processed/merra2_aod/merra2_aod_daily.csv
+      --calibration_input data/raw/maiac_gapfill/station_calibration_raw.csv
+      --confidence_input data/processed/maiac_gapfill/confidence_scores.csv
+      --station_file data/stations/cpcb_stations_delhi_status.csv
+      --output data/processed/maiac_gapfill/maiac_aod_gapfilled.csv
+      --summary_output data/processed/maiac_gapfill/fill_summary.csv
+      --params params.yaml
+    deps:
+      - scripts/datasets/maiac_gapfill/05_apply_gapfill.py
+      - data/processed/maiac_aod/maiac_aod_daily.csv
+      - data/processed/merra2_aod/merra2_aod_daily.csv
+      - data/raw/maiac_gapfill/station_calibration_raw.csv
+      - data/processed/maiac_gapfill/confidence_scores.csv
+      - data/stations/cpcb_stations_delhi_status.csv
+    params:
+      - maiac_gapfill.fill
+    outs:
+      - data/processed/maiac_gapfill/maiac_aod_gapfilled.csv
+      - data/processed/maiac_gapfill/fill_summary.csv
+
   # ============================================================
   # ERA5-Land meteorology 
   # ============================================================
