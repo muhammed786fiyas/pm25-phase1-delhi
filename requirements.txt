@@ -1,7 +1,30 @@
+# Data extraction / API access
 requests>=2.31.0
-pandas>=2.0.0
 pytz>=2023.3
 python-dotenv>=1.0.0
 earthengine-api==1.7.39
 geopandas>=0.14.0
 shapely>=2.0.0
+
+# Core data handling
+pandas>=2.0.0
+numpy>=1.24.0
+PyYAML>=6.0
+
+# Pipeline
+dvc>=3.50.0
+
+# EDA / stats
+scipy>=1.11.0
+statsmodels>=0.14.0
+matplotlib>=3.7.0
+seaborn>=0.13.0
+
+# Notebook build/execution (EDA notebook)
+nbformat>=5.9.0
+nbconvert>=7.0.0
+ipykernel>=6.25.0
+
+# Modeling (LME + LightGBM, MLflow experiment tracking)
+lightgbm>=4.0.0
+mlflow>=2.15.0
