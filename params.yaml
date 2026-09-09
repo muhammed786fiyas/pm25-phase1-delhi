@@ -224,3 +224,24 @@ osm_layers:
     qc:
       station_file: data/stations/cpcb_stations_delhi_status.csv
       edge_effect_distance_km_threshold: 110
+
+# ============================================================================
+# Modeling (master feature table + LME/LightGBM prep)
+# ============================================================================
+
+modeling:
+  master_table:
+    station_file: data/stations/cpcb_stations_delhi_status.csv
+
+  lme_prep:
+    reference_season: summer
+    worldcover_drop_cols: [snow_ice_pct, mangroves_pct, moss_lichen_pct, wetland_herbaceous_pct, water_pct]
+    scale_cols: [aod_055, temperature_c, relative_humidity, wind_speed, boundary_layer_height,
+                 ndvi_mean, elevation_m, slope_deg, road_density_km_per_km2,
+                 industrial_landuse_fraction, dist_to_nearest_powerplant_km,
+                 tree_cover_pct, shrubland_pct, grassland_pct, cropland_pct,
+                 built_up_pct, bare_sparse_veg_pct]
+
+  lightgbm_prep:
+    reference_season: summer
+    worldcover_drop_cols: [snow_ice_pct, mangroves_pct, moss_lichen_pct]

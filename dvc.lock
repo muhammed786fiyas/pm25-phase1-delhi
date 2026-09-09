@@ -1460,3 +1460,167 @@ stages:
       md5: 48e0d530ebee72f353e5499545d922e7
       size: 10339
       isexec: true
+  build_master_feature_table:
+    cmd: python scripts/modeling/01_build_master_table.py --station_file 
+      data/stations/cpcb_stations_delhi_status.csv --pm25 
+      data/processed/cpcb/pm25_daily_final/pm25_daily_final.csv --aod 
+      data/processed/maiac_gapfill/maiac_aod_gapfilled.csv --era5_land 
+      data/processed/era5_land/era5_land_daily.csv --era5_blh 
+      data/processed/era5_blh/era5_blh_daily.csv --ndvi 
+      data/processed/static_gee/ndvi_gapfilled.csv --worldcover 
+      data/processed/static_gee/worldcover_landuse.csv --srtm 
+      data/processed/static_gee/srtm_terrain.csv --roads 
+      data/processed/osm/road_density.csv --industrial 
+      data/processed/osm/industrial_fraction.csv --powerplants 
+      data/processed/osm/powerplant_distance.csv --output 
+      data/processed/modeling/master_feature_table.csv
+    deps:
+    - path: data/processed/cpcb/pm25_daily_final/pm25_daily_final.csv
+      hash: md5
+      md5: 1e03014716715faf40a0236dd8373894
+      size: 469270
+      isexec: true
+    - path: data/processed/era5_blh/era5_blh_daily.csv
+      hash: md5
+      md5: 88eb99aa9d274dcb7f64d9ebeb5820c2
+      size: 1029256
+      isexec: true
+    - path: data/processed/era5_land/era5_land_daily.csv
+      hash: md5
+      md5: 954ccc3d8e6ab1d9b206f765ad101304
+      size: 1879908
+      isexec: true
+    - path: data/processed/maiac_gapfill/maiac_aod_gapfilled.csv
+      hash: md5
+      md5: 0fb5e66cac917618ee299c9140cd9e4b
+      size: 1882536
+      isexec: true
+    - path: data/processed/osm/industrial_fraction.csv
+      hash: md5
+      md5: 4f242056ddc17a323ceb9ced5db7ee4a
+      size: 2911
+      isexec: true
+    - path: data/processed/osm/powerplant_distance.csv
+      hash: md5
+      md5: 583338339120a61e38b5cb58a16e73d5
+      size: 3480
+      isexec: true
+    - path: data/processed/osm/road_density.csv
+      hash: md5
+      md5: 63cdc762eda52fe12a610351e70254d7
+      size: 3150
+      isexec: true
+    - path: data/processed/static_gee/ndvi_gapfilled.csv
+      hash: md5
+      md5: 106182e8e37981596b4e9bcc5bfe1569
+      size: 318739
+      isexec: true
+    - path: data/processed/static_gee/srtm_terrain.csv
+      hash: md5
+      md5: 0b03765878b175b418f345cab1dfd9b2
+      size: 3964
+      isexec: true
+    - path: data/processed/static_gee/worldcover_landuse.csv
+      hash: md5
+      md5: 059f615204a5c5bf9b428f8c79945dbe
+      size: 8429
+      isexec: true
+    - path: data/stations/cpcb_stations_delhi_status.csv
+      hash: md5
+      md5: 4d2c634b6bdf8d8e9cf3de6d517f6776
+      size: 14245
+      isexec: true
+    - path: scripts/modeling/01_build_master_table.py
+      hash: md5
+      md5: aba7603fa2c1a3449c64988825dae3ae
+      size: 5935
+      isexec: true
+    outs:
+    - path: data/processed/modeling/master_feature_table.csv
+      hash: md5
+      md5: 45dc88a0c2cc3c64599799a83f7640cb
+      size: 6642873
+      isexec: true
+  prepare_lme_dataset:
+    cmd: python scripts/modeling/02_prepare_lme_dataset.py --input 
+      data/processed/modeling/master_feature_table.csv --output 
+      data/processed/modeling/lme_ready_dataset.csv
+    deps:
+    - path: data/processed/modeling/master_feature_table.csv
+      hash: md5
+      md5: 45dc88a0c2cc3c64599799a83f7640cb
+      size: 6642873
+      isexec: true
+    - path: scripts/modeling/02_prepare_lme_dataset.py
+      hash: md5
+      md5: e0140bba383ccddfcb232e9e1a0f238e
+      size: 4622
+      isexec: true
+    params:
+      params.yaml:
+        modeling.lme_prep:
+          reference_season: summer
+          worldcover_drop_cols:
+          - snow_ice_pct
+          - mangroves_pct
+          - moss_lichen_pct
+          - wetland_herbaceous_pct
+          - water_pct
+          scale_cols:
+          - aod_055
+          - temperature_c
+          - relative_humidity
+          - wind_speed
+          - boundary_layer_height
+          - ndvi_mean
+          - elevation_m
+          - slope_deg
+          - road_density_km_per_km2
+          - industrial_landuse_fraction
+          - dist_to_nearest_powerplant_km
+          - tree_cover_pct
+          - shrubland_pct
+          - grassland_pct
+          - cropland_pct
+          - built_up_pct
+          - bare_sparse_veg_pct
+    outs:
+    - path: data/processed/modeling/lme_ready_dataset.csv
+      hash: md5
+      md5: 7a75fd4a2999d85dec54c28a6f4bd079
+      size: 5899811
+      isexec: true
+    - path: data/processed/modeling/lme_scaling_params.csv
+      hash: md5
+      md5: bb62f1009384fc9b41cd45d0d06a7c6d
+      size: 926
+      isexec: true
+  prepare_lightgbm_dataset:
+    cmd: python scripts/modeling/03_prepare_lightgbm_dataset.py --input 
+      data/processed/modeling/master_feature_table.csv --output 
+      data/processed/modeling/lightgbm_ready_dataset.csv
+    deps:
+    - path: data/processed/modeling/master_feature_table.csv
+      hash: md5
+      md5: 45dc88a0c2cc3c64599799a83f7640cb
+      size: 6642873
+      isexec: true
+    - path: scripts/modeling/03_prepare_lightgbm_dataset.py
+      hash: md5
+      md5: d210933ba8fc19ddfa494071db0a483b
+      size: 2400
+      isexec: true
+    params:
+      params.yaml:
+        modeling.lightgbm_prep:
+          reference_season: summer
+          worldcover_drop_cols:
+          - snow_ice_pct
+          - mangroves_pct
+          - moss_lichen_pct
+    outs:
+    - path: data/processed/modeling/lightgbm_ready_dataset.csv
+      hash: md5
+      md5: a1a7eab0eca9e73d04419db99e695469
+      size: 5326225
+      isexec: true
