@@ -253,3 +253,8 @@ modeling:
     drop_zero_target_rows: true
     clip_negative_aod_to_zero: true
     worldcover_drop_cols: [snow_ice_pct, mangroves_pct, moss_lichen_pct]
+
+  lme_validation:
+    buffer_km: 2.0
+    n_random_folds: 42
+    random_seed: 42

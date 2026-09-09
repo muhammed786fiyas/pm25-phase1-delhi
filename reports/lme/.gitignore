@@ -1,0 +1,9 @@
+/lme_fixed_effects.csv
+/lme_model_summary.txt
+/station_buffer_exclusions.csv
+/cv_spatial_loso_folds.csv
+/cv_spatial_loso_aggregated.json
+/cv_random_folds.csv
+/cv_random_aggregated.json
+/cv_spatial_loso_excl_low_confidence_folds.csv
+/cv_spatial_loso_excl_low_confidence_aggregated.json

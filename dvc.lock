@@ -1636,3 +1636,129 @@ stages:
       md5: e82083c02036f7bac1280e62dbd87cc9
       size: 5307964
       isexec: true
+  fit_lme_model:
+    cmd: python scripts/modeling/lme/01_fit_lme_model.py --input 
+      data/processed/modeling_datasets/lme_ready_dataset.csv --model_output 
+      models/lme/lme_full_model.pkl --coef_output 
+      reports/lme/lme_fixed_effects.csv --summary_output 
+      reports/lme/lme_model_summary.txt
+    deps:
+    - path: data/processed/modeling_datasets/lme_ready_dataset.csv
+      hash: md5
+      md5: 0704a7334e908e619e81b759a0e0caf5
+      size: 6119824
+      isexec: true
+    - path: scripts/modeling/lme/01_fit_lme_model.py
+      hash: md5
+      md5: 9472e03ad9627a1967c22d05ae75c37b
+      size: 7817
+      isexec: true
+    outs:
+    - path: models/lme/lme_full_model.pkl
+      hash: md5
+      md5: 555513a7bcdc03ef92a4cc56baa648ad
+      size: 14395296
+      isexec: true
+    - path: reports/lme/lme_fixed_effects.csv
+      hash: md5
+      md5: 85a92316bd8398b5f747bb85c7af9125
+      size: 3300
+      isexec: true
+    - path: reports/lme/lme_model_summary.txt
+      hash: md5
+      md5: d9dc84df3ada706cf21bce952b465d35
+      size: 2893
+      isexec: true
+  validate_lme_cv:
+    cmd: python scripts/modeling/lme/02_validate_lme_cv.py --input 
+      data/processed/modeling_datasets/lme_ready_dataset.csv --station_file 
+      data/stations/cpcb_stations_delhi_status.csv --buffer_km 2.0 
+      --n_random_folds 42 --random_seed 42 --exclude_low_confidence false 
+      --output_dir reports/lme
+    deps:
+    - path: data/processed/modeling_datasets/lme_ready_dataset.csv
+      hash: md5
+      md5: 0704a7334e908e619e81b759a0e0caf5
+      size: 6119824
+      isexec: true
+    - path: data/stations/cpcb_stations_delhi_status.csv
+      hash: md5
+      md5: 4d2c634b6bdf8d8e9cf3de6d517f6776
+      size: 14245
+      isexec: true
+    - path: scripts/modeling/lme/02_validate_lme_cv.py
+      hash: md5
+      md5: 87ce06a5cd356f5e7f32d1f25cc24a26
+      size: 22015
+      isexec: true
+    params:
+      params.yaml:
+        modeling.lme_validation:
+          buffer_km: 2.0
+          n_random_folds: 42
+          random_seed: 42
+    outs:
+    - path: reports/lme/cv_random_aggregated.json
+      hash: md5
+      md5: 98ed732c4814acc9c0291ed3999a25a3
+      size: 227
+      isexec: true
+    - path: reports/lme/cv_random_folds.csv
+      hash: md5
+      md5: 3034271c9ad86537da1612f0a5deb2e9
+      size: 5404
+      isexec: true
+    - path: reports/lme/cv_spatial_loso_aggregated.json
+      hash: md5
+      md5: 1beda204390ff24ee2e92de5e1686679
+      size: 226
+      isexec: true
+    - path: reports/lme/cv_spatial_loso_folds.csv
+      hash: md5
+      md5: df13720c0fcd8533354865f95685c009
+      size: 5617
+      isexec: true
+    - path: reports/lme/station_buffer_exclusions.csv
+      hash: md5
+      md5: 0f7908e56b122fc3357ee4c5578f28c9
+      size: 1727
+      isexec: true
+  validate_lme_cv_gapfill_robustness:
+    cmd: python scripts/modeling/lme/02_validate_lme_cv.py --input 
+      data/processed/modeling_datasets/lme_ready_dataset.csv --station_file 
+      data/stations/cpcb_stations_delhi_status.csv --buffer_km 2.0 
+      --n_random_folds 42 --random_seed 42 --exclude_low_confidence true 
+      --output_dir reports/lme
+    deps:
+    - path: data/processed/modeling_datasets/lme_ready_dataset.csv
+      hash: md5
+      md5: 0704a7334e908e619e81b759a0e0caf5
+      size: 6119824
+      isexec: true
+    - path: data/stations/cpcb_stations_delhi_status.csv
+      hash: md5
+      md5: 4d2c634b6bdf8d8e9cf3de6d517f6776
+      size: 14245
+      isexec: true
+    - path: scripts/modeling/lme/02_validate_lme_cv.py
+      hash: md5
+      md5: 87ce06a5cd356f5e7f32d1f25cc24a26
+      size: 22015
+      isexec: true
+    params:
+      params.yaml:
+        modeling.lme_validation:
+          buffer_km: 2.0
+          n_random_folds: 42
+          random_seed: 42
+    outs:
+    - path: reports/lme/cv_spatial_loso_excl_low_confidence_aggregated.json
+      hash: md5
+      md5: 45867c8c8f5bf019ff097e55ca19d232
+      size: 228
+      isexec: true
+    - path: reports/lme/cv_spatial_loso_excl_low_confidence_folds.csv
+      hash: md5
+      md5: d2e97e34fcf9fa60b93665796c6fc550
+      size: 5622
+      isexec: true

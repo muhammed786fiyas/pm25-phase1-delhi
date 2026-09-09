@@ -646,6 +646,48 @@ stages:
     outs:
       - data/processed/modeling_datasets/lightgbm_ready_dataset.csv
 
+
+  # ============================================================
+  # Modeling: LME fit + validate (scripts/modeling/lme/)
+  # ============================================================
+
+  fit_lme_model:
+    cmd: python scripts/modeling/lme/01_fit_lme_model.py --input data/processed/modeling_datasets/lme_ready_dataset.csv --model_output models/lme/lme_full_model.pkl --coef_output reports/lme/lme_fixed_effects.csv --summary_output reports/lme/lme_model_summary.txt
+    deps:
+      - scripts/modeling/lme/01_fit_lme_model.py
+      - data/processed/modeling_datasets/lme_ready_dataset.csv
+    outs:
+      - models/lme/lme_full_model.pkl
+      - reports/lme/lme_fixed_effects.csv
+      - reports/lme/lme_model_summary.txt
+
+  validate_lme_cv:
+    cmd: python scripts/modeling/lme/02_validate_lme_cv.py --input data/processed/modeling_datasets/lme_ready_dataset.csv --station_file data/stations/cpcb_stations_delhi_status.csv --buffer_km 2.0 --n_random_folds 42 --random_seed 42 --exclude_low_confidence false --output_dir reports/lme
+    deps:
+      - scripts/modeling/lme/02_validate_lme_cv.py
+      - data/processed/modeling_datasets/lme_ready_dataset.csv
+      - data/stations/cpcb_stations_delhi_status.csv
+    params:
+      - modeling.lme_validation
+    outs:
+      - reports/lme/station_buffer_exclusions.csv
+      - reports/lme/cv_spatial_loso_folds.csv
+      - reports/lme/cv_spatial_loso_aggregated.json
+      - reports/lme/cv_random_folds.csv
+      - reports/lme/cv_random_aggregated.json
+
+  validate_lme_cv_gapfill_robustness:
+    cmd: python scripts/modeling/lme/02_validate_lme_cv.py --input data/processed/modeling_datasets/lme_ready_dataset.csv --station_file data/stations/cpcb_stations_delhi_status.csv --buffer_km 2.0 --n_random_folds 42 --random_seed 42 --exclude_low_confidence true --output_dir reports/lme
+    deps:
+      - scripts/modeling/lme/02_validate_lme_cv.py
+      - data/processed/modeling_datasets/lme_ready_dataset.csv
+      - data/stations/cpcb_stations_delhi_status.csv
+    params:
+      - modeling.lme_validation
+    outs:
+      - reports/lme/cv_spatial_loso_excl_low_confidence_folds.csv
+      - reports/lme/cv_spatial_loso_excl_low_confidence_aggregated.json
+
   # ============================================================
   # Validation — add stages here once scripts/validation/ has content
   # e.g. per-airshed out-of-site CV, depends on models/

@@ -33,3 +33,11 @@ env/
 .DS_Store
 Thumbs.db
 test.py
+
+
+# ---- MLflow local tracking store ----
+# MLFLOW_TRACKING_URI (.env) points here. This is MLflow's own run/artifact
+# store (grows with every run -- metrics, params, and copies of logged
+# artifacts like the model pickle for each run), not a versioned deliverable.
+# Separate from models/lme/ (the actual fitted-model output, DVC-tracked).
+models/mlflow_tracking/
