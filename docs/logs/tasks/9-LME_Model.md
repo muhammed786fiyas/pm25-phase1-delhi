@@ -62,6 +62,24 @@ Tracking URI: `MLFLOW_TRACKING_URI=file:./models/mlflow_tracking` (added to `.en
 - `dvc.yaml`: 3 new stages (`fit_lme_model`, `validate_lme_cv`, `validate_lme_cv_gapfill_robustness` -- 57 stages total). Ran all 3 via `dvc repro -s <stage>`.
 - No shared utils module introduced -- `FIXED_EFFECTS`/`build_formula()`/etc. are duplicated between `01_fit_lme_model.py` and `02_validate_lme_cv.py`, matching the repo's existing no-shared-module convention (every other multi-script module duplicates its own constants rather than importing from a sibling). Flagged here as a "must keep in sync" risk if the equation changes.
 
+### 5. AOD winsorizing + outlier-station exclusion comparison
+
+Built the two follow-up diagnostics from the 5598/6934 investigation.
+
+**`03_winsorize_aod.py`**: caps `aod_055` at +/-3 z-score (already standardized in `lme_ready_dataset.csv`), then recomputes `aod_x_monsoon`/`aod_x_post_monsoon`/`aod_x_winter` from the capped value (verified these are exactly `aod_055 * season_<name>` -- leaving them uncapped would let the extremes leak back in through the interaction terms). Writes a separate DVC-tracked `data/processed/modeling_datasets/lme_ready_dataset_aod_winsorized.csv`, not an in-script transform, so `01`/`02` need zero code changes -- just point `--input` at the new file. 174 of 13,494 rows (1.29%) capped. New `winsorize_aod_dataset` stage, `modeling.lme_winsorize.aod_zscore_cap: 3.0`.
+
+**`--exclude_stations`/`--run_tag` flags on `02_validate_lme_cv.py`**: `--exclude_stations` drops a comma-separated `location_id` list from the validation dataset entirely; `--run_tag` disambiguates MLflow run names and `reports/lme/` output filenames (including `station_buffer_exclusions*.csv`, moved to use the same suffix) so diagnostic variants coexist in the `delhi_phase1_lme` experiment without overwriting the primary run's files. New stages `validate_lme_cv_aod_winsorized` and `validate_lme_cv_excl_outlier_stations` (`modeling.lme_validation_excl_outlier_stations.exclude_stations: "5598,6934"`).
+
+**Results** (spatial LOSO, pooled):
+
+| Variant | R2 | within-R2 (Kawano) | RMSE | MAE |
+|---|---|---|---|---|
+| Primary (all 42 stations, raw AOD) | 0.423 | 0.211 | 0.638 | 0.453 |
+| AOD winsorized (+/-3 z) | 0.431 | 0.228 | 0.634 | 0.448 |
+| Excluding stations 5598, 6934 | 0.589 | 0.211 | 0.537 | 0.397 |
+
+Winsorizing gives a modest, uniform lift (trims noise across the whole dataset). Excluding the 2 outlier stations gives a much larger R2 jump (0.423 -> 0.589) while within-R2 is essentially unchanged (0.211 -> 0.211) -- confirms these two stations are specifically a *level*-calibration problem (land-use extrapolation, per the earlier investigation), not a day-to-day anomaly-tracking problem, and that AOD winsorizing does not address it. Random-CV moves by similarly small amounts in both variants (leakage mechanism itself is untouched by either change).
+
 ## Data notes & gotchas
 
 - `MixedLMResults.aic`/`.bic` are `NaN` in statsmodels 0.15.0 for this model class -- compute by hand (see Completed section 1).
@@ -72,9 +90,7 @@ Tracking URI: `MLFLOW_TRACKING_URI=file:./models/mlflow_tracking` (added to `.en
 
 ## Pending
 
-- ~~Investigate why stations 5598 and 6934 are severe spatial-LOSO R2 outliers~~ -- done, see Completed section 2. Follow-up items from that investigation, not yet implemented:
-  - Winsorize/cap extreme `aod_055` values before fitting -- plan: new script `scripts/modeling/lme/03_winsorize_aod.py` writing a separate DVC-tracked `data/processed/modeling_datasets/lme_ready_dataset_aod_winsorized.csv` (not an in-script transform), so `01_fit_lme_model.py`/`02_validate_lme_cv.py` need zero code changes -- just point `--input` at the new file for a with/without comparison.
-  - Spatial-LOSO run excluding stations 5598/6934 (`--exclude_stations` flag on `02_validate_lme_cv.py`, mirroring the existing `--exclude_low_confidence` pattern) for a direct with/without comparison against the full-42-station run.
+- ~~Investigate why stations 5598 and 6934 are severe spatial-LOSO R2 outliers~~ -- done, see Completed section 2. ~~Winsorize AOD + exclude-outlier-stations comparison~~ -- done, see Completed section 5. Open question from those results: whether the primary reported headline number for any writeup should be the full-42-station run (0.423) or should note the excl-outlier-stations run (0.589) alongside it -- not decided, a judgment call for Muhammed (both are legitimate; excluding isn't cherry-picking given the land-use-extrapolation explanation, but the full run is the honest worst-case).
 - Some spatial-LOSO CV folds triggered `ConvergenceWarning` during refit -- not identified which folds or investigated further.
 - Duan's smearing bias correction for back-transforming log-scale predictions to ug/m3 -- still pending (unchanged from the DAY8 log); the naive `exp()` back-transform reported here (RMSE 77.8 ug/m3 spatial-LOSO) is explicitly uncorrected and likely biased low.
 - LightGBM comparison model (`scripts/modeling/lightgbm/`, on `lightgbm_ready_dataset.csv`) using the same station-grouped, 2km-buffer spatial CV protocol -- separate future chat, not started.

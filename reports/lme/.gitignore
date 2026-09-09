@@ -7,3 +7,13 @@
 /cv_random_aggregated.json
 /cv_spatial_loso_excl_low_confidence_folds.csv
 /cv_spatial_loso_excl_low_confidence_aggregated.json
+/station_buffer_exclusions_aod_winsorized.csv
+/cv_spatial_loso_aod_winsorized_folds.csv
+/cv_spatial_loso_aod_winsorized_aggregated.json
+/cv_random_aod_winsorized_folds.csv
+/cv_random_aod_winsorized_aggregated.json
+/station_buffer_exclusions_excl_outlier_stations.csv
+/cv_spatial_loso_excl_outlier_stations_folds.csv
+/cv_spatial_loso_excl_outlier_stations_aggregated.json
+/cv_random_excl_outlier_stations_folds.csv
+/cv_random_excl_outlier_stations_aggregated.json

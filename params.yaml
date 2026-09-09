@@ -258,3 +258,7 @@ modeling:
     buffer_km: 2.0
     n_random_folds: 42
     random_seed: 42
+  lme_winsorize:
+    aod_zscore_cap: 3.0
+  lme_validation_excl_outlier_stations:
+    exclude_stations: "5598,6934"

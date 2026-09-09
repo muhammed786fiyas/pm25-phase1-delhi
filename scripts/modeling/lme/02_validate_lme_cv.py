@@ -379,6 +379,17 @@ def main():
                               "(excludes confidence_bucket == low), logged to a separate "
                               "MLflow experiment. false runs the primary spatial-LOSO and "
                               "random-CV comparison on all data.")
+    parser.add_argument("--exclude_stations", default="",
+                         help="Comma-separated location_ids to drop entirely from this "
+                              "validation run (e.g. for a with/without outlier-station "
+                              "comparison). Default: none excluded.")
+    parser.add_argument("--run_tag", default="",
+                         help="Optional tag appended to MLflow run names and output "
+                              "filenames, so a diagnostic variant (e.g. an "
+                              "--exclude_stations run, or a run against a different "
+                              "--input dataset) doesn't collide with the primary run in "
+                              "the same MLflow experiment / reports/lme/ directory. "
+                              "Default: no tag.")
     parser.add_argument("--output_dir", required=True)
     args = parser.parse_args()
 
@@ -398,6 +409,14 @@ def main():
     df = pd.read_csv(args.input)
     print(f"Loaded {args.input}: {len(df)} rows, {df[GROUP_COL].nunique()} stations")
 
+    exclude_station_ids = set()
+    if args.exclude_stations:
+        exclude_station_ids = {int(x.strip()) for x in args.exclude_stations.split(",") if x.strip()}
+        before = len(df)
+        df = df[~df[GROUP_COL].isin(exclude_station_ids)].reset_index(drop=True)
+        print(f"Excluded stations {sorted(exclude_station_ids)}: {before} -> {len(df)} rows, "
+              f"{df[GROUP_COL].nunique()} stations remaining")
+
     exclude_low_confidence = args.exclude_low_confidence == "true"
     if exclude_low_confidence:
         before = len(df)
@@ -408,7 +427,18 @@ def main():
     else:
         mlflow.set_experiment(MLFLOW_EXPERIMENT_FULL)
         suffix = ""
-        exclusion_path = os.path.join(args.output_dir, "station_buffer_exclusions.csv")
+
+    if args.run_tag:
+        suffix += "_" + args.run_tag
+
+    if not exclude_low_confidence:
+        # Named with the same suffix as everything else in this run so a
+        # diagnostic variant (aod_winsorized, excl_outlier_stations, ...)
+        # never overwrites another variant'''s buffer-exclusion report -- the
+        # report'''s content only depends on station_file/buffer_km, not on
+        # which rows are in df, but each variant still gets its own file so
+        # DVC'''s declared outs never collide across stages.
+        exclusion_path = os.path.join(args.output_dir, f"station_buffer_exclusions{suffix}.csv")
         exclusion_report.to_csv(exclusion_path, index=False)
         print(f"Wrote {exclusion_path}")
 
@@ -437,6 +467,8 @@ def main():
             "buffer_km": args.buffer_km,
             "n_folds": spatial_folds_df.shape[0],
             "exclude_low_confidence": exclude_low_confidence,
+            "exclude_stations": sorted(exclude_station_ids) if exclude_station_ids else "none",
+            "run_tag": args.run_tag or "none",
             "n_rows": len(df),
         },
     )
@@ -448,10 +480,10 @@ def main():
 
     print("=== Random CV (comparison, ignores station grouping) ===")
     random_folds_df, random_aggregated = run_random_cv(df, args.n_random_folds, args.random_seed, true_group_means)
-    random_folds_path = os.path.join(args.output_dir, "cv_random_folds.csv")
+    random_folds_path = os.path.join(args.output_dir, f"cv_random{suffix}_folds.csv")
     random_folds_df.to_csv(random_folds_path, index=False)
     print(f"Wrote {random_folds_path}")
-    random_agg_path = os.path.join(args.output_dir, "cv_random_aggregated.json")
+    random_agg_path = os.path.join(args.output_dir, f"cv_random{suffix}_aggregated.json")
     with open(random_agg_path, "w") as f:
         json.dump(random_aggregated, f, indent=2)
     print(f"Wrote {random_agg_path}")
@@ -460,7 +492,7 @@ def main():
           f"RMSE={random_aggregated['rmse']:.3f} MAE={random_aggregated['mae']:.3f}")
 
     log_cv_run_to_mlflow(
-        run_name="random_cv",
+        run_name="random_cv" + suffix,
         cv_scheme="random_cv",
         folds_df=random_folds_df,
         aggregated=random_aggregated,
@@ -469,6 +501,8 @@ def main():
             "n_folds": args.n_random_folds,
             "random_seed": args.random_seed,
             "exclude_low_confidence": exclude_low_confidence,
+            "exclude_stations": sorted(exclude_station_ids) if exclude_station_ids else "none",
+            "run_tag": args.run_tag or "none",
             "n_rows": len(df),
         },
     )

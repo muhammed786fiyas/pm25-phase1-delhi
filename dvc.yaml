@@ -688,6 +688,47 @@ stages:
       - reports/lme/cv_spatial_loso_excl_low_confidence_folds.csv
       - reports/lme/cv_spatial_loso_excl_low_confidence_aggregated.json
 
+  winsorize_aod_dataset:
+    cmd: python scripts/modeling/lme/03_winsorize_aod.py --input data/processed/modeling_datasets/lme_ready_dataset.csv --output data/processed/modeling_datasets/lme_ready_dataset_aod_winsorized.csv --zscore_cap 3.0
+    deps:
+      - scripts/modeling/lme/03_winsorize_aod.py
+      - data/processed/modeling_datasets/lme_ready_dataset.csv
+    params:
+      - modeling.lme_winsorize
+    outs:
+      - data/processed/modeling_datasets/lme_ready_dataset_aod_winsorized.csv
+
+  validate_lme_cv_aod_winsorized:
+    cmd: python scripts/modeling/lme/02_validate_lme_cv.py --input data/processed/modeling_datasets/lme_ready_dataset_aod_winsorized.csv --station_file data/stations/cpcb_stations_delhi_status.csv --buffer_km 2.0 --n_random_folds 42 --random_seed 42 --exclude_low_confidence false --run_tag aod_winsorized --output_dir reports/lme
+    deps:
+      - scripts/modeling/lme/02_validate_lme_cv.py
+      - data/processed/modeling_datasets/lme_ready_dataset_aod_winsorized.csv
+      - data/stations/cpcb_stations_delhi_status.csv
+    params:
+      - modeling.lme_validation
+    outs:
+      - reports/lme/station_buffer_exclusions_aod_winsorized.csv
+      - reports/lme/cv_spatial_loso_aod_winsorized_folds.csv
+      - reports/lme/cv_spatial_loso_aod_winsorized_aggregated.json
+      - reports/lme/cv_random_aod_winsorized_folds.csv
+      - reports/lme/cv_random_aod_winsorized_aggregated.json
+
+  validate_lme_cv_excl_outlier_stations:
+    cmd: python scripts/modeling/lme/02_validate_lme_cv.py --input data/processed/modeling_datasets/lme_ready_dataset.csv --station_file data/stations/cpcb_stations_delhi_status.csv --buffer_km 2.0 --n_random_folds 42 --random_seed 42 --exclude_low_confidence false --exclude_stations 5598,6934 --run_tag excl_outlier_stations --output_dir reports/lme
+    deps:
+      - scripts/modeling/lme/02_validate_lme_cv.py
+      - data/processed/modeling_datasets/lme_ready_dataset.csv
+      - data/stations/cpcb_stations_delhi_status.csv
+    params:
+      - modeling.lme_validation
+      - modeling.lme_validation_excl_outlier_stations
+    outs:
+      - reports/lme/station_buffer_exclusions_excl_outlier_stations.csv
+      - reports/lme/cv_spatial_loso_excl_outlier_stations_folds.csv
+      - reports/lme/cv_spatial_loso_excl_outlier_stations_aggregated.json
+      - reports/lme/cv_random_excl_outlier_stations_folds.csv
+      - reports/lme/cv_random_excl_outlier_stations_aggregated.json
+
   # ============================================================
   # Validation — add stages here once scripts/validation/ has content
   # e.g. per-airshed out-of-site CV, depends on models/
