@@ -32,6 +32,14 @@ FIXED_EFFECTS = AOD_COLS + SEASON_COLS + MET_COLS + LANDUSE_COLS
 TARGET_COL = "modeling_target"
 GROUP_COL = "location_id"
 
+# statsmodels re_formula for the random-slope-AOD variant: adds a per-station
+# random slope for aod_055 alongside the random intercept (correlated 2x2
+# covariance by default), matching the project blueprint's
+# (b0+u0i) + (b1+u1i)*AOD equation variant -- see docs/logs/tasks/9-LME_Model.md.
+# Only the base aod_055 term gets a random slope, not the season-interaction
+# AOD columns (aod_x_monsoon etc.) -- those stay pooled fixed effects.
+RE_FORMULA_RANDOM_SLOPE_AOD = "~ aod_055"
+
 # Same experiment split as scripts/modeling/lme/02_validate_lme_cv.py: the
 # gapfill-robustness variant (confidence_bucket == low excluded) always logs
 # to its own MLflow experiment, never mixed into the primary one.
@@ -42,11 +50,12 @@ MLFLOW_RUN_NAME_BASE = "full_data_reml_fit"
 # version of this same named model in the MLflow Model Registry, so the
 # fitted model can be referenced as "models:/delhi_phase1_lme/<version>" (or
 # "/latest") instead of only by run_id. Diagnostic variants (gapfill
-# robustness / AOD winsorized / excl outlier stations) are NOT registered --
-# they exist for comparison, not as a candidate "the" model, and mixing them
-# into the same version history as the primary fit would make the registry
-# ambiguous about which version is production-representative. Registry works
-# on this repo's plain file-store tracking URI in the installed MLflow
+# robustness / AOD winsorized / excl outlier stations / random-slope-AOD) are
+# NOT registered -- they exist for comparison, not as a candidate "the"
+# model, and mixing a genuinely different equation spec (random-slope-AOD)
+# into the same version history as the random-intercept-only primary fit
+# would make the registry actively misleading, not just ambiguous. Registry
+# works on this repo's plain file-store tracking URI in the installed MLflow
 # version (verified 2026-09-09) -- older MLflow versions required a
 # database-backed store for this.
 MLFLOW_REGISTERED_MODEL_NAME = "delhi_phase1_lme"
@@ -56,11 +65,13 @@ def build_formula():
     return TARGET_COL + " ~ " + " + ".join(FIXED_EFFECTS)
 
 
-def fit_lme(df, reml):
-    # No re_formula given -- statsmodels defaults to a random intercept only,
+def fit_lme(df, reml, re_formula=None):
+    # re_formula=None -- statsmodels defaults to a random intercept only,
     # grouped by whatever is passed to `groups` (location_id here).
+    # re_formula="~ aod_055" (RE_FORMULA_RANDOM_SLOPE_AOD) adds a random
+    # slope for aod_055 alongside the intercept instead.
     formula = build_formula()
-    model = smf.mixedlm(formula, data=df, groups=df[GROUP_COL])
+    model = smf.mixedlm(formula, data=df, groups=df[GROUP_COL], re_formula=re_formula)
     result = model.fit(reml=reml)
     return result
 
@@ -68,9 +79,12 @@ def fit_lme(df, reml):
 def compute_aic_bic(result):
     # MixedLMResults.aic / .bic come back as NaN in this statsmodels version
     # (df_modelwc isn't populated for this model class), so compute by hand:
-    # k = fixed-effect params + variance components. This model has one
-    # variance component (the random-intercept variance) plus the residual
-    # variance, so n_variance_components = 1 (cov_re, 1x1) + 1 (scale) = 2.
+    # k = fixed-effect params + variance components. n_variance_components
+    # generalizes to any number of random effects (n_re): n_re*(n_re+1)//2
+    # unique entries in the symmetric cov_re matrix, plus 1 for the residual
+    # variance. Random-intercept-only: n_re=1 -> 2 total. Random-intercept +
+    # random-slope-AOD: n_re=2 -> 4 total (2 variances + 1 covariance + 1
+    # residual).
     n_re = result.cov_re.shape[0]
     n_variance_components = n_re * (n_re + 1) // 2 + 1
     k_total = result.k_fe + n_variance_components
@@ -80,11 +94,35 @@ def compute_aic_bic(result):
     return aic, bic, k_total
 
 
+def variance_component_rows(cov_re):
+    # Flattens the random-effects covariance matrix (1x1 for random-intercept
+    # -only, 2x2 for random-intercept + random-slope-AOD) into (label, value)
+    # pairs: one row per variance (diagonal) and one row per covariance
+    # (off-diagonal, only present with more than one random effect). Keeps
+    # reporting/logging generic across both model variants instead of
+    # hardcoding "the one random-intercept variance".
+    rows = []
+    labels = list(cov_re.index)
+    for i, li in enumerate(labels):
+        for j, lj in enumerate(labels):
+            if j < i:
+                continue
+            if i == j:
+                rows.append((f"{li}_variance", cov_re.iloc[i, j]))
+            else:
+                rows.append((f"{li}_{lj}_covariance", cov_re.iloc[i, j]))
+    return rows
+
+
 def build_coef_table(result):
-    # result.params/.bse/.tvalues/.pvalues/.conf_int() all include the "Group
-    # Var" random-effect variance term alongside the fixed effects -- filter
-    # down to fe_params.index to report fixed effects only here. The random-
-    # intercept variance is reported separately (it isn't a fixed effect).
+    # result.params/.bse/.tvalues/.pvalues/.conf_int() all include the
+    # variance-component terms ("Group Var", and with a random slope also
+    # "aod_055 Var"/"Group x aod_055 Cov") alongside the fixed effects --
+    # filter down to fe_params.index to report fixed effects only here. The
+    # variance components are reported separately (they aren't fixed
+    # effects, and don't get p-values the same way -- see the project's
+    # M0/A/B/C summary doc on why BLUP-adjacent variance terms aren't
+    # ordinary fixed-effect estimates).
     fe_names = result.fe_params.index
     ci = result.conf_int()
     coef_table = pd.DataFrame({
@@ -121,6 +159,11 @@ def main():
                          help="Comma-separated location_ids to drop entirely before fitting "
                               "(e.g. for a with/without outlier-station comparison fit). "
                               "Default: none excluded.")
+    parser.add_argument("--random_slope_aod", default="false", choices=["true", "false"],
+                         help="true fits the random-slope-AOD equation variant: adds a "
+                              "per-station random slope for aod_055 alongside the random "
+                              "intercept (re_formula='~ aod_055'), instead of the primary "
+                              "random-intercept-only model. Default: false.")
     parser.add_argument("--run_tag", default="",
                          help="Optional tag appended to the MLflow run name, so a diagnostic "
                               "variant (e.g. a fit against a winsorized --input dataset) "
@@ -160,26 +203,36 @@ def main():
         mlflow.set_experiment(MLFLOW_EXPERIMENT_FULL)
         run_name_suffix = ""
 
+    random_slope_aod = args.random_slope_aod == "true"
+    re_formula = RE_FORMULA_RANDOM_SLOPE_AOD if random_slope_aod else None
+    if random_slope_aod:
+        run_name_suffix += "_random_slope_aod"
+
     if args.run_tag:
         run_name_suffix += "_" + args.run_tag
 
-    # Only the primary fit (no exclusions, no run_tag) is registered to the
-    # Model Registry -- see MLFLOW_REGISTERED_MODEL_NAME comment above.
-    is_primary = not exclude_low_confidence and not exclude_station_ids and not args.run_tag
+    # Only the primary fit (no exclusions, no run_tag, random-intercept-only)
+    # is registered to the Model Registry -- see MLFLOW_REGISTERED_MODEL_NAME
+    # comment above.
+    is_primary = (not exclude_low_confidence and not exclude_station_ids
+                  and not args.run_tag and not random_slope_aod)
 
-    print("Fitting MixedLM (REML=True, random intercept by station)...")
-    result = fit_lme(df, reml=True)
+    re_description = "random intercept + random AOD slope by station" if random_slope_aod \
+        else "random intercept only by station"
+    print(f"Fitting MixedLM (REML=True, {re_description})...")
+    result = fit_lme(df, reml=True, re_formula=re_formula)
     print(result.summary())
 
     aic, bic, k_total = compute_aic_bic(result)
-    group_var = result.cov_re.iloc[0, 0]
+    variance_rows = variance_component_rows(result.cov_re)
     residual_var = result.scale
 
     print("=== Model fit summary ===")
     print(f"logLik: {result.llf}")
     print(f"AIC: {aic}")
     print(f"BIC: {bic}")
-    print(f"Random-intercept variance (station): {group_var}")
+    for label, value in variance_rows:
+        print(f"{label}: {value}")
     print(f"Residual variance: {residual_var}")
     print(f"Total parameters (fixed effects + variance components): {k_total}")
 
@@ -201,22 +254,26 @@ def main():
         f.write(f"logLik: {result.llf}\n")
         f.write(f"AIC: {aic}\n")
         f.write(f"BIC: {bic}\n")
-        f.write(f"Random-intercept variance (station): {group_var}\n")
+        for label, value in variance_rows:
+            f.write(f"{label}: {value}\n")
         f.write(f"Residual variance: {residual_var}\n")
     print(f"Wrote {args.summary_output}")
 
     with mlflow.start_run(run_name=MLFLOW_RUN_NAME_BASE + run_name_suffix):
         mlflow.log_param("formula", build_formula())
+        mlflow.log_param("re_formula", re_formula or "none (random intercept only)")
         mlflow.log_param("reml", True)
         mlflow.log_param("n_rows", len(df))
         mlflow.log_param("n_stations", df[GROUP_COL].nunique())
         mlflow.log_param("exclude_low_confidence", exclude_low_confidence)
         mlflow.log_param("exclude_stations", sorted(exclude_station_ids) if exclude_station_ids else "none")
+        mlflow.log_param("random_slope_aod", random_slope_aod)
         mlflow.log_param("run_tag", args.run_tag or "none")
         mlflow.log_metric("log_likelihood", result.llf)
         mlflow.log_metric("aic", aic)
         mlflow.log_metric("bic", bic)
-        mlflow.log_metric("random_intercept_variance", group_var)
+        for label, value in variance_rows:
+            mlflow.log_metric(label, value)
         mlflow.log_metric("residual_variance", residual_var)
         log_coefficients_to_mlflow(coef_table)
         mlflow.log_artifact(args.coef_output)
@@ -229,7 +286,7 @@ def main():
             registered = mlflow.register_model(f"runs:/{run_id}/model", MLFLOW_REGISTERED_MODEL_NAME)
             print(f"Registered model '{MLFLOW_REGISTERED_MODEL_NAME}' version {registered.version}")
         else:
-            print("Diagnostic variant run -- not registered to the Model Registry")
+            print("Diagnostic/alternate-equation variant run -- not registered to the Model Registry")
 
         print("Logged run to MLflow experiment: " +
               (MLFLOW_EXPERIMENT_GAPFILL_ROBUSTNESS if exclude_low_confidence else MLFLOW_EXPERIMENT_FULL))

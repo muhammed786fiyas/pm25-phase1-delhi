@@ -693,6 +693,16 @@ stages:
       - reports/lme/excl_outlier_stations/lme_fixed_effects.csv
       - reports/lme/excl_outlier_stations/lme_model_summary.txt
 
+  fit_lme_model_random_slope_aod:
+    cmd: python scripts/modeling/lme/01_fit_lme_model.py --input data/processed/modeling_datasets/lme_ready_dataset.csv --model_output models/lme/lme_full_model_random_slope_aod.pkl --coef_output reports/lme/random_slope_aod/lme_fixed_effects.csv --summary_output reports/lme/random_slope_aod/lme_model_summary.txt --exclude_low_confidence false --random_slope_aod true
+    deps:
+      - scripts/modeling/lme/01_fit_lme_model.py
+      - data/processed/modeling_datasets/lme_ready_dataset.csv
+    outs:
+      - models/lme/lme_full_model_random_slope_aod.pkl
+      - reports/lme/random_slope_aod/lme_fixed_effects.csv
+      - reports/lme/random_slope_aod/lme_model_summary.txt
+
   validate_lme_cv:
     cmd: python scripts/modeling/lme/02_validate_lme_cv.py --input data/processed/modeling_datasets/lme_ready_dataset.csv --station_file data/stations/cpcb_stations_delhi_status.csv --buffer_km 2.0 --n_random_folds 42 --random_seed 42 --exclude_low_confidence false --output_dir reports/lme/primary
     deps:
@@ -760,6 +770,21 @@ stages:
       - reports/lme/excl_outlier_stations/cv_spatial_loso_aggregated.json
       - reports/lme/excl_outlier_stations/cv_random_folds.csv
       - reports/lme/excl_outlier_stations/cv_random_aggregated.json
+
+  validate_lme_cv_random_slope_aod:
+    cmd: python scripts/modeling/lme/02_validate_lme_cv.py --input data/processed/modeling_datasets/lme_ready_dataset.csv --station_file data/stations/cpcb_stations_delhi_status.csv --buffer_km 2.0 --n_random_folds 42 --random_seed 42 --exclude_low_confidence false --random_slope_aod true --output_dir reports/lme/random_slope_aod
+    deps:
+      - scripts/modeling/lme/02_validate_lme_cv.py
+      - data/processed/modeling_datasets/lme_ready_dataset.csv
+      - data/stations/cpcb_stations_delhi_status.csv
+    params:
+      - modeling.lme_validation
+    outs:
+      - reports/lme/random_slope_aod/station_buffer_exclusions.csv
+      - reports/lme/random_slope_aod/cv_spatial_loso_folds.csv
+      - reports/lme/random_slope_aod/cv_spatial_loso_aggregated.json
+      - reports/lme/random_slope_aod/cv_random_folds.csv
+      - reports/lme/random_slope_aod/cv_random_aggregated.json
 
   # ============================================================
   # Validation — add stages here once scripts/validation/ has content

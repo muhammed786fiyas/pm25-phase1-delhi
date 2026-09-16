@@ -33,6 +33,12 @@ EARTH_RADIUS_KM = 6371.0
 MLFLOW_EXPERIMENT_FULL = "delhi_phase1_lme"
 MLFLOW_EXPERIMENT_GAPFILL_ROBUSTNESS = "delhi_phase1_lme_gapfill_robustness"
 
+# Same re_formula as scripts/modeling/lme/01_fit_lme_model.py's
+# RE_FORMULA_RANDOM_SLOPE_AOD -- adds a per-station random slope for aod_055
+# alongside the random intercept, instead of the primary random-intercept-
+# only model.
+RE_FORMULA_RANDOM_SLOPE_AOD = "~ aod_055"
+
 # 2026-09-09: within-R2 switched from a shared-demeaning classic-R2 formula to
 # Kawano et al.'s literal formula (independent demeaning + corr^2). See
 # compute_within_r2_kawano() below. Historical MLflow runs logged before this
@@ -46,9 +52,9 @@ def build_formula():
     return TARGET_COL + " ~ " + " + ".join(FIXED_EFFECTS)
 
 
-def fit_lme(df, reml):
+def fit_lme(df, reml, re_formula=None):
     formula = build_formula()
-    model = smf.mixedlm(formula, data=df, groups=df[GROUP_COL])
+    model = smf.mixedlm(formula, data=df, groups=df[GROUP_COL], re_formula=re_formula)
     result = model.fit(reml=reml)
     return result
 
@@ -96,19 +102,27 @@ def predict_fixed_effects(result, df):
     return result.predict(exog=df[FIXED_EFFECTS])
 
 
-def predict_with_random_intercept(result, df):
+def predict_with_random_effects(result, df, random_slope_aod):
     # Used for the random-CV scheme: if a station's other days appear in the
-    # training fold, statsmodels has already fit a BLUP random intercept for
-    # it (result.random_effects), so add that in on top of the fixed-effect
+    # training fold, statsmodels has already fit a BLUP random intercept (and,
+    # for the random-slope-AOD variant, a BLUP random AOD slope too) for it
+    # (result.random_effects), so add that in on top of the fixed-effect
     # prediction. A station entirely absent from the training fold (should be
     # rare with a random row split) falls back to fixed-effects-only, same as
-    # the spatial-LOSO scheme.
+    # the spatial-LOSO scheme. With random_slope_aod=True, random_effects[loc]
+    # is a 2-entry Series indexed ["Group", "aod_055"] -- the station's own
+    # random slope multiplies that row's own aod_055 value (each row can have
+    # a different AOD reading, unlike the intercept term).
     fixed_pred = predict_fixed_effects(result, df)
     random_effects = result.random_effects
     re_values = []
-    for loc_id in df[GROUP_COL]:
+    for loc_id, aod_val in zip(df[GROUP_COL], df["aod_055"]):
         if loc_id in random_effects:
-            re_values.append(random_effects[loc_id].iloc[0])
+            re = random_effects[loc_id]
+            re_total = re.iloc[0]
+            if random_slope_aod:
+                re_total += re["aod_055"] * aod_val
+            re_values.append(re_total)
         else:
             re_values.append(0.0)
     return fixed_pred.values + np.array(re_values)
@@ -236,7 +250,15 @@ def compute_cv_results(folds_df, oof_true_list, oof_pred_list, oof_group_keys_li
     return folds_df, aggregated
 
 
-def run_spatial_loso_cv(df, exclusions, true_group_means):
+def run_spatial_loso_cv(df, exclusions, true_group_means, re_formula):
+    # Fixed-effects-only prediction here regardless of re_formula: a held-out
+    # station gets NO random-effect BLUP of any kind -- not an intercept, and
+    # not an AOD slope either -- since statsmodels has never seen that
+    # station's data. This is why the random-slope-AOD variant does not, by
+    # itself, fix the land-use-extrapolation outlier problem on stations
+    # 5598/6934 (see docs/logs/tasks/9-LME_Model.md "Ideas" section) -- it's
+    # a fixed-effects/land-use problem, and spatial LOSO prediction never
+    # touches random effects at all.
     station_ids = sorted(df[GROUP_COL].unique())
     fold_rows = []
     oof_true = []
@@ -250,7 +272,7 @@ def run_spatial_loso_cv(df, exclusions, true_group_means):
         train_df = df[~df[GROUP_COL].isin(drop_ids)]
         test_df = df[df[GROUP_COL] == held_out_id]
 
-        result = fit_lme(train_df, reml=True)
+        result = fit_lme(train_df, reml=True, re_formula=re_formula)
         y_pred = predict_fixed_effects(result, test_df).values
         y_true = test_df[TARGET_COL].values
 
@@ -287,7 +309,7 @@ def run_spatial_loso_cv(df, exclusions, true_group_means):
     return folds_df, aggregated
 
 
-def run_random_cv(df, n_folds, seed, true_group_means):
+def run_random_cv(df, n_folds, seed, true_group_means, re_formula, random_slope_aod):
     rng = np.random.RandomState(seed)
     shuffled_index = rng.permutation(df.index.values)
     fold_assignment = pd.Series(np.arange(len(df)) % n_folds, index=shuffled_index).sort_index()
@@ -303,8 +325,8 @@ def run_random_cv(df, n_folds, seed, true_group_means):
         train_df = df[~test_mask]
         test_df = df[test_mask]
 
-        result = fit_lme(train_df, reml=True)
-        y_pred = predict_with_random_intercept(result, test_df)
+        result = fit_lme(train_df, reml=True, re_formula=re_formula)
+        y_pred = predict_with_random_effects(result, test_df, random_slope_aod)
         y_true = test_df[TARGET_COL].values
 
         point_metrics = compute_point_metrics(y_true, y_pred)
@@ -383,6 +405,11 @@ def main():
                          help="Comma-separated location_ids to drop entirely from this "
                               "validation run (e.g. for a with/without outlier-station "
                               "comparison). Default: none excluded.")
+    parser.add_argument("--random_slope_aod", default="false", choices=["true", "false"],
+                         help="true validates the random-slope-AOD equation variant "
+                              "(re_formula='~ aod_055', matching 01_fit_lme_model.py), "
+                              "instead of the primary random-intercept-only model. "
+                              "Default: false.")
     parser.add_argument("--run_tag", default="",
                          help="Optional tag appended to MLflow run names, so a diagnostic "
                               "variant (e.g. an --exclude_stations run, or a run against a "
@@ -432,6 +459,11 @@ def main():
         mlflow.set_experiment(MLFLOW_EXPERIMENT_FULL)
         run_name_suffix = ""
 
+    random_slope_aod = args.random_slope_aod == "true"
+    re_formula = RE_FORMULA_RANDOM_SLOPE_AOD if random_slope_aod else None
+    if random_slope_aod:
+        run_name_suffix += "_random_slope_aod"
+
     if args.run_tag:
         run_name_suffix += "_" + args.run_tag
 
@@ -445,7 +477,7 @@ def main():
     true_group_means = compute_group_means(df)
 
     print("=== Spatial LOSO CV (primary, out-of-site, 2km buffer) ===")
-    spatial_folds_df, spatial_aggregated = run_spatial_loso_cv(df, exclusions, true_group_means)
+    spatial_folds_df, spatial_aggregated = run_spatial_loso_cv(df, exclusions, true_group_means, re_formula)
     spatial_folds_path = os.path.join(args.output_dir, "cv_spatial_loso_folds.csv")
     spatial_folds_df.to_csv(spatial_folds_path, index=False)
     print(f"Wrote {spatial_folds_path}")
@@ -468,6 +500,7 @@ def main():
             "n_folds": spatial_folds_df.shape[0],
             "exclude_low_confidence": exclude_low_confidence,
             "exclude_stations": sorted(exclude_station_ids) if exclude_station_ids else "none",
+            "random_slope_aod": random_slope_aod,
             "run_tag": args.run_tag or "none",
             "n_rows": len(df),
         },
@@ -479,7 +512,8 @@ def main():
         return
 
     print("=== Random CV (comparison, ignores station grouping) ===")
-    random_folds_df, random_aggregated = run_random_cv(df, args.n_random_folds, args.random_seed, true_group_means)
+    random_folds_df, random_aggregated = run_random_cv(
+        df, args.n_random_folds, args.random_seed, true_group_means, re_formula, random_slope_aod)
     random_folds_path = os.path.join(args.output_dir, "cv_random_folds.csv")
     random_folds_df.to_csv(random_folds_path, index=False)
     print(f"Wrote {random_folds_path}")
@@ -502,6 +536,7 @@ def main():
             "random_seed": args.random_seed,
             "exclude_low_confidence": exclude_low_confidence,
             "exclude_stations": sorted(exclude_station_ids) if exclude_station_ids else "none",
+            "random_slope_aod": random_slope_aod,
             "run_tag": args.run_tag or "none",
             "n_rows": len(df),
         },
