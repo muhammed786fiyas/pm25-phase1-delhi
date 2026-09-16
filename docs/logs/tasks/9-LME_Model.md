@@ -115,6 +115,47 @@ Tried the equation variant from the project blueprint / "Ideas" section: `(b0+u0
 
 **Verdict**: kept as a documented comparison, not adopted as the primary model. The primary random-intercept-only equation and its Model Registry entry are unchanged.
 
+### 9. Duan's smearing bias correction (back-transform to ug/m3)
+
+Implemented in `02_validate_lme_cv.py`: `compute_smearing_factor()` computes Duan's (1983) nonparametric smearing estimator `S = mean(exp(train_residuals))` from each fold's own TRAINING residuals (never the held-out rows, to avoid leaking test information into the correction), matched to the same prediction type used on that fold's test rows -- fixed-effects-only residuals for spatial LOSO (`predict_fixed_effects`), fixed+random-effects residuals for random CV (`predict_with_random_effects`), since a mismatched residual type would bias the correction. `duan_backtransform_metrics()` applies it as `y_raw_corrected = exp(y_log_pred) * S`. Both `rmse_ugm3_naive`/`mae_ugm3_naive` (old, uncorrected) and `rmse_ugm3_duan`/`mae_ugm3_duan` (new) are reported side by side -- in every per-fold row, the pooled aggregated JSON, and MLflow (`fold_smearing_factor`, `rmse_ugm3_duan_pooled`, `mae_ugm3_duan_pooled`, `smearing_factor_mean/min/max`) -- so the size of the correction stays visible rather than silently replacing the old number. Re-ran all 5 CV stages (script change touches every stage's dep hash).
+
+Smearing factor is consistently ~1.12-1.13 across every variant (spatial LOSO and random CV alike), meaning the naive `exp()` back-transform was underpredicting raw-scale PM2.5 by roughly 12-13% on average, as expected from Jensen's inequality.
+
+| | Spatial LOSO naive RMSE | Spatial LOSO Duan RMSE | Random CV naive RMSE | Random CV Duan RMSE | Smearing factor (mean) |
+|---|---|---|---|---|---|
+| Primary | 77.79 | **84.29** (worse) | 51.83 | **51.20** (better) | 1.132 |
+| Gap-fill robustness | 79.97 | 86.82 (worse) | n/a (spatial-LOSO only) | n/a | 1.122 |
+| AOD winsorized | 76.54 | 83.04 (worse) | -- | -- | 1.129 |
+| Excl. outlier stations | 53.54 | 53.05 (better) | 51.93 | 51.29 (better) | 1.129 |
+| Random-slope-AOD | 76.50 | 82.70 (worse) | 52.21 | 51.73 (better) | 1.132 |
+
+**Not a uniform improvement -- this is the noteworthy finding, not a formality.** Duan's correction removes systematic bias in the back-transformed *mean* (that's what it's designed to do), but that doesn't mechanically improve RMSE/MAE on a specific held-out set. On random CV, where held-out rows come from the same stations the smearing factor was estimated on, the correction reliably helps (RMSE drops in every variant). On spatial LOSO, where held-out stations are genuinely different (that's the point of the test), correcting the mean bias upward moves predictions further from the true values more often than not -- RMSE gets *worse* in 4 of 5 variants (all except excl-outlier-stations, where removing the two land-use-extrapolation stations apparently also removes whatever was making the naive back-transform look artificially good there). MAE shows the same pattern. The Duan-corrected number is the statistically correct one to report (it's the textbook bias correction, and RMSE getting worse doesn't make it wrong -- it makes the naive number optimistic in a way that happens to look better); report both naive and Duan-corrected in any writeup for transparency, and don't expect the corrected one to look better on spatial LOSO -- it doesn't, and that's itself informative about the outlier-station extrapolation problem (section 2).
+
+**Verdict**: implemented, re-run for all 5 variants, both naive and Duan-corrected numbers now reported side by side going forward. Resolves the pending item.
+
+### 10. LandUse fixed-effect grouping -- decided (documentation only, no model/code change)
+
+Decided 2026-09-16: the fitted model is unchanged -- the 12 non-AOD/non-season/non-met columns (`ndvi_mean`, 6 WorldCover fractions, `elevation_m`, `slope_deg`, `road_density_km_per_km2`, `industrial_landuse_fraction`, `dist_to_nearest_powerplant_km`) are already estimated as 12 separate fixed-effect coefficients in the code (`LANDUSE_COLS` in both scripts) -- "LandUse" has only ever been a documentation label, not a modeling choice. For any writeup, present the equation in both forms rather than picking one:
+
+**Simplified/grouped form** (compact, matches the current `claude/PROJECT_CONTEXT_pm25-phase1-delhi.md` framing):
+```
+PM2.5 = b0 + (b1 + b_int*Season)*AOD + b_met*Met + b_lu*LandUse + b_s*Season + u_i + eps
+```
+
+**Detailed form** (spells out the 4 sub-groups inside "LandUse", each with its own coefficient block):
+```
+PM2.5 = b0 + (b1 + b_int*Season)*AOD + b_met*Met
+      + b_wc*WorldCover + b_ndvi*NDVI + b_terrain*Terrain + b_osm*OSM
+      + b_s*Season + u_i + eps
+```
+where `WorldCover` = 6 land-cover fractions (tree/shrubland/grassland/cropland/built-up/bare-sparse-veg), `NDVI` = `ndvi_mean` alone, `Terrain` = `elevation_m` + `slope_deg` (SRTM), `OSM` = road density + industrial land-use fraction + distance to nearest power plant.
+
+Use the grouped form when equation compactness matters (e.g. a methods-section overview); use the detailed form whenever a reader needs to know exactly what's inside "LandUse", or that WorldCover/NDVI/terrain/OSM are estimated as genuinely separate covariate families, not one combined coefficient.
+
+### 11. Headline spatial-LOSO number for any writeup -- decided: report both
+
+Decided 2026-09-16: report both the full 42-station primary run (R2=0.423, the honest worst-case, includes the 2 known land-use-extrapolation outlier stations) and the excl-outlier-stations run (R2=0.589, see Completed section 5) side by side, each clearly labeled -- neither replaces the other. The full run is the number that should headline any abstract/summary (it's what the model actually does across all 42 stations); the excl-outlier-stations run is the companion sensitivity number showing how much those 2 stations specifically drag the pooled metric down, with the mechanism already documented (section 2: genuine land-use-covariate extrapolation, not a data-quality problem).
+
 ## Data notes & gotchas
 
 - `MixedLMResults.aic`/`.bic` are `NaN` in statsmodels 0.15.0 for this model class -- compute by hand (see Completed section 1).
@@ -127,11 +168,11 @@ Tried the equation variant from the project blueprint / "Ideas" section: `(b0+u0
 
 ## Pending
 
-- ~~Investigate why stations 5598 and 6934 are severe spatial-LOSO R2 outliers~~ -- done, see Completed section 2. ~~Winsorize AOD + exclude-outlier-stations comparison~~ -- done, see Completed section 5. ~~Each diagnostic variant needs its own fit report (coefficient table + AIC/BIC), not just CV metrics~~ -- done, see Completed section 7. Open question from those results: whether the primary reported headline number for any writeup should be the full-42-station run (0.423) or should note the excl-outlier-stations run (0.589) alongside it -- not decided, a judgment call for Muhammed (both are legitimate; excluding isn't cherry-picking given the land-use-extrapolation explanation, but the full run is the honest worst-case).
+- ~~Investigate why stations 5598 and 6934 are severe spatial-LOSO R2 outliers~~ -- done, see Completed section 2. ~~Winsorize AOD + exclude-outlier-stations comparison~~ -- done, see Completed section 5. ~~Each diagnostic variant needs its own fit report (coefficient table + AIC/BIC), not just CV metrics~~ -- done, see Completed section 7. ~~Open question: whether the headline number for any writeup should be the full-42-station run or the excl-outlier-stations run~~ -- **decided 2026-09-16, see Completed section 11: report both**, each clearly labeled.
 - ~~Some spatial-LOSO CV folds triggered `ConvergenceWarning` during refit~~ -- investigated and resolved (benign), see "Data notes & gotchas" above.
-- Duan's smearing bias correction for back-transforming log-scale predictions to ug/m3 -- still pending (unchanged from the DAY8 log); the naive `exp()` back-transform reported here (RMSE 77.8 ug/m3 spatial-LOSO) is explicitly uncorrected and likely biased low.
+- ~~Duan's smearing bias correction for back-transforming log-scale predictions to ug/m3~~ -- done, see Completed section 9. Both naive and Duan-corrected ug/m3 metrics are now reported side by side for every CV variant.
 - LightGBM comparison model (`scripts/modeling/lightgbm/`, on `lightgbm_ready_dataset.csv`) using the same station-grouped, 2km-buffer spatial CV protocol -- separate future chat, not started.
-- Whether the "LandUse" fixed-effect grouping (WorldCover + NDVI + terrain + OSM, since the equation doesn't split them further) should be split more finely -- a documented judgment call this session, not confirmed with Muhammed.
+- ~~Whether the "LandUse" fixed-effect grouping (WorldCover + NDVI + terrain + OSM, since the equation doesn't split them further) should be split more finely~~ -- **decided 2026-09-16, see Completed section 10**: no model change; present both a grouped and a detailed equation form in any writeup.
 - Whether the random-slope-AOD comparison (Completed section 8, a legitimate negative result) is worth including in any writeup -- not decided with Muhammed.
 
 ## Ideas / under consideration

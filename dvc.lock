@@ -1688,8 +1688,8 @@ stages:
       isexec: true
     - path: scripts/modeling/lme/02_validate_lme_cv.py
       hash: md5
-      md5: b298f26d5d1c38047466207453d687ce
-      size: 26519
+      md5: b5325d10485c5d4d3f7c0c4cf9c03f44
+      size: 31629
       isexec: true
     params:
       params.yaml:
@@ -1700,23 +1700,23 @@ stages:
     outs:
     - path: reports/lme/primary/cv_random_aggregated.json
       hash: md5
-      md5: 98ed732c4814acc9c0291ed3999a25a3
-      size: 227
+      md5: bb195976def1b69426e5d2318ec67c32
+      size: 440
       isexec: true
     - path: reports/lme/primary/cv_random_folds.csv
       hash: md5
-      md5: 3034271c9ad86537da1612f0a5deb2e9
-      size: 5404
+      md5: b0f29a646ea17cbdbac7cb5da4cb1827
+      size: 7777
       isexec: true
     - path: reports/lme/primary/cv_spatial_loso_aggregated.json
       hash: md5
-      md5: 1beda204390ff24ee2e92de5e1686679
-      size: 226
+      md5: 575edcd2cf48fadc11adba954ad31ad3
+      size: 440
       isexec: true
     - path: reports/lme/primary/cv_spatial_loso_folds.csv
       hash: md5
-      md5: df13720c0fcd8533354865f95685c009
-      size: 5617
+      md5: 7b12d29d3e48d59e482a9e7d839d018c
+      size: 7981
       isexec: true
     - path: reports/lme/primary/station_buffer_exclusions.csv
       hash: md5
@@ -1742,8 +1742,8 @@ stages:
       isexec: true
     - path: scripts/modeling/lme/02_validate_lme_cv.py
       hash: md5
-      md5: b298f26d5d1c38047466207453d687ce
-      size: 26519
+      md5: b5325d10485c5d4d3f7c0c4cf9c03f44
+      size: 31629
       isexec: true
     params:
       params.yaml:
@@ -1754,13 +1754,13 @@ stages:
     outs:
     - path: reports/lme/gapfill_robustness/cv_spatial_loso_aggregated.json
       hash: md5
-      md5: 45867c8c8f5bf019ff097e55ca19d232
-      size: 228
+      md5: fceb486497cfc1203ac9d9ca178d5244
+      size: 441
       isexec: true
     - path: reports/lme/gapfill_robustness/cv_spatial_loso_folds.csv
       hash: md5
-      md5: d2e97e34fcf9fa60b93665796c6fc550
-      size: 5622
+      md5: 88a7e90f3b2d0e4388a779274257871c
+      size: 8001
       isexec: true
   winsorize_aod_dataset:
     cmd: python scripts/modeling/lme/03_winsorize_aod.py --input 
@@ -1809,8 +1809,8 @@ stages:
       isexec: true
     - path: scripts/modeling/lme/02_validate_lme_cv.py
       hash: md5
-      md5: b298f26d5d1c38047466207453d687ce
-      size: 26519
+      md5: b5325d10485c5d4d3f7c0c4cf9c03f44
+      size: 31629
       isexec: true
     params:
       params.yaml:
@@ -1821,23 +1821,23 @@ stages:
     outs:
     - path: reports/lme/aod_winsorized/cv_random_aggregated.json
       hash: md5
-      md5: 07e676236212b293e0b036a63f193e13
-      size: 228
+      md5: a321e56bf28cae5605d48d6ae307f8f4
+      size: 440
       isexec: true
     - path: reports/lme/aod_winsorized/cv_random_folds.csv
       hash: md5
-      md5: ac0a7bb3207593e5188089921f84a5fa
-      size: 5392
+      md5: c2f9536cc692c249e43cf88cdfaa00c4
+      size: 7769
       isexec: true
     - path: reports/lme/aod_winsorized/cv_spatial_loso_aggregated.json
       hash: md5
-      md5: e0fadd6faa9af0da2437b3e389862b9d
-      size: 227
+      md5: d8ba82313af28baf451d53c84af46967
+      size: 440
       isexec: true
     - path: reports/lme/aod_winsorized/cv_spatial_loso_folds.csv
       hash: md5
-      md5: 3b46f98ca7a20cc4c7cd391fb01dd43d
-      size: 5614
+      md5: e9ffdfb24bdf26cc59d58ea56443b0c4
+      size: 7982
       isexec: true
     - path: reports/lme/aod_winsorized/station_buffer_exclusions.csv
       hash: md5
@@ -1864,8 +1864,8 @@ stages:
       isexec: true
     - path: scripts/modeling/lme/02_validate_lme_cv.py
       hash: md5
-      md5: b298f26d5d1c38047466207453d687ce
-      size: 26519
+      md5: b5325d10485c5d4d3f7c0c4cf9c03f44
+      size: 31629
       isexec: true
     params:
       params.yaml:
@@ -1878,23 +1878,23 @@ stages:
     outs:
     - path: reports/lme/excl_outlier_stations/cv_random_aggregated.json
       hash: md5
-      md5: 5e80416f808cb8694ed0e1cd6808bc9d
-      size: 228
+      md5: 8266571672ad6915dfacd9b0faafdd43
+      size: 439
       isexec: true
     - path: reports/lme/excl_outlier_stations/cv_random_folds.csv
       hash: md5
-      md5: 84f045ff845b7ba4d75844a6034ed296
-      size: 5412
+      md5: fc00650c5be4bd6c528a9521fa808a4d
+      size: 7781
       isexec: true
     - path: reports/lme/excl_outlier_stations/cv_spatial_loso_aggregated.json
       hash: md5
-      md5: 6471902b98c7c7d272506d01837ac7c3
-      size: 228
+      md5: 18786d5169daa379f255247489144b98
+      size: 441
       isexec: true
     - path: reports/lme/excl_outlier_stations/cv_spatial_loso_folds.csv
       hash: md5
-      md5: 781680d7cb7aa73f8c8c56d9870f5075
-      size: 5350
+      md5: 4d21b5596ae22d8fbdf0092e70ebdb7f
+      size: 7608
       isexec: true
     - path: reports/lme/excl_outlier_stations/station_buffer_exclusions.csv
       hash: md5
@@ -2062,8 +2062,8 @@ stages:
       isexec: true
     - path: scripts/modeling/lme/02_validate_lme_cv.py
       hash: md5
-      md5: b298f26d5d1c38047466207453d687ce
-      size: 26519
+      md5: b5325d10485c5d4d3f7c0c4cf9c03f44
+      size: 31629
       isexec: true
     params:
       params.yaml:
@@ -2074,23 +2074,23 @@ stages:
     outs:
     - path: reports/lme/random_slope_aod/cv_random_aggregated.json
       hash: md5
-      md5: 26d97fe800c5af0020d9bfeaf47e5719
-      size: 230
+      md5: 099eb3fbe519b36c97b4227becc2e267
+      size: 443
       isexec: true
     - path: reports/lme/random_slope_aod/cv_random_folds.csv
       hash: md5
-      md5: 6793c57a9b990758a7329189b480dd09
-      size: 5390
+      md5: 901305b206da4a3893d052179f84cc07
+      size: 7760
       isexec: true
     - path: reports/lme/random_slope_aod/cv_spatial_loso_aggregated.json
       hash: md5
-      md5: d707a0fb4a796f4dc48857a9148a0d5d
-      size: 226
+      md5: 59a766eb15af4ec69e8388a9b870beef
+      size: 439
       isexec: true
     - path: reports/lme/random_slope_aod/cv_spatial_loso_folds.csv
       hash: md5
-      md5: 3c095cc744e37cbdbb3bf5f366b5c754
-      size: 5614
+      md5: a7af35a2f5ce5f47ec88b6e63643fc5d
+      size: 7975
       isexec: true
     - path: reports/lme/random_slope_aod/station_buffer_exclusions.csv
       hash: md5
