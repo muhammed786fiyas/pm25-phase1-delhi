@@ -869,6 +869,52 @@ stages:
       - reports/lightgbm/primary/cv_random_folds.csv
       - reports/lightgbm/primary/cv_random_aggregated.json
 
+  diagnose_lightgbm_aod_coupling:
+    cmd: python scripts/modeling/lightgbm/03_diagnose_aod_coupling.py --input data/processed/modeling_datasets/lightgbm_ready_dataset.csv --folds reports/lightgbm/primary/cv_spatial_loso_folds.csv --n_exclude 4 --coupling_output reports/lightgbm/diagnostics/station_aod_coupling.csv --test_output reports/lightgbm/diagnostics/aod_coupling_hypothesis_test.json
+    deps:
+      - scripts/modeling/lightgbm/03_diagnose_aod_coupling.py
+      - data/processed/modeling_datasets/lightgbm_ready_dataset.csv
+      - reports/lightgbm/primary/cv_spatial_loso_folds.csv
+    params:
+      - modeling.lightgbm_diagnostics
+    outs:
+      - reports/lightgbm/diagnostics/station_aod_coupling.csv
+      - reports/lightgbm/diagnostics/aod_coupling_hypothesis_test.json
+
+  validate_lightgbm_cv_excl_weak_aod_coupling:
+    cmd: python scripts/modeling/lightgbm/02_validate_lightgbm_cv.py --input data/processed/modeling_datasets/lightgbm_ready_dataset.csv --station_file data/stations/cpcb_stations_delhi_status.csv --hyperparameters models/lightgbm/tuned_hyperparameters.json --buffer_km 2.0 --n_random_folds 42 --random_seed 42 --learning_rate 0.03 --max_boosting_rounds 3000 --early_stopping_rounds 100 --validation_station_fraction 0.15 --validation_row_fraction 0.15 --exclude_stations 5622,5630,6359,7005 --run_tag excl_weak_aod_coupling --output_dir reports/lightgbm/excl_weak_aod_coupling
+    deps:
+      - scripts/modeling/lightgbm/02_validate_lightgbm_cv.py
+      - data/processed/modeling_datasets/lightgbm_ready_dataset.csv
+      - data/stations/cpcb_stations_delhi_status.csv
+      - models/lightgbm/tuned_hyperparameters.json
+    params:
+      - modeling.lightgbm_validation
+      - modeling.lightgbm_validation_excl_weak_aod_coupling
+    outs:
+      - reports/lightgbm/excl_weak_aod_coupling/station_buffer_exclusions.csv
+      - reports/lightgbm/excl_weak_aod_coupling/cv_spatial_loso_folds.csv
+      - reports/lightgbm/excl_weak_aod_coupling/cv_spatial_loso_aggregated.json
+      - reports/lightgbm/excl_weak_aod_coupling/cv_random_folds.csv
+      - reports/lightgbm/excl_weak_aod_coupling/cv_random_aggregated.json
+
+  validate_lightgbm_cv_excl_weak_aod_from_training:
+    cmd: python scripts/modeling/lightgbm/02_validate_lightgbm_cv.py --input data/processed/modeling_datasets/lightgbm_ready_dataset.csv --station_file data/stations/cpcb_stations_delhi_status.csv --hyperparameters models/lightgbm/tuned_hyperparameters.json --buffer_km 2.0 --n_random_folds 42 --random_seed 42 --learning_rate 0.03 --max_boosting_rounds 3000 --early_stopping_rounds 100 --validation_station_fraction 0.15 --validation_row_fraction 0.15 --exclude_stations 5622,5630,6359,7005 --exclude_from_training_only true --run_tag excl_weak_aod_from_training --output_dir reports/lightgbm/excl_weak_aod_from_training
+    deps:
+      - scripts/modeling/lightgbm/02_validate_lightgbm_cv.py
+      - data/processed/modeling_datasets/lightgbm_ready_dataset.csv
+      - data/stations/cpcb_stations_delhi_status.csv
+      - models/lightgbm/tuned_hyperparameters.json
+    params:
+      - modeling.lightgbm_validation
+      - modeling.lightgbm_validation_excl_weak_aod_from_training
+    outs:
+      - reports/lightgbm/excl_weak_aod_from_training/station_buffer_exclusions.csv
+      - reports/lightgbm/excl_weak_aod_from_training/cv_spatial_loso_folds.csv
+      - reports/lightgbm/excl_weak_aod_from_training/cv_spatial_loso_aggregated.json
+      - reports/lightgbm/excl_weak_aod_from_training/cv_random_folds.csv
+      - reports/lightgbm/excl_weak_aod_from_training/cv_random_aggregated.json
+
   # ============================================================
   # Validation — add stages here once scripts/validation/ has content
   # e.g. per-airshed out-of-site CV, depends on models/

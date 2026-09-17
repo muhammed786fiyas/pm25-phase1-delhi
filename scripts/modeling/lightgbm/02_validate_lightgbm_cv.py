@@ -292,7 +292,7 @@ def compute_cv_results(folds_df, oof_true_list, oof_pred_list, oof_group_keys_li
 
 def run_spatial_loso_cv(df, exclusions, blocks_by_station, block_params, feature_cols,
                         true_group_means_raw, validation_station_fraction,
-                        early_stopping_rounds, seed):
+                        early_stopping_rounds, seed, training_only_exclusions):
     # Holds out each station in turn, and also drops any station within the
     # buffer from that fold's training set -- identical fold construction to
     # the LME's spatial LOSO. The hyperparameters for station i come from the
@@ -307,7 +307,9 @@ def run_spatial_loso_cv(df, exclusions, blocks_by_station, block_params, feature
 
     for i, held_out_id in enumerate(station_ids):
         excluded_ids = exclusions.get(held_out_id, set())
-        drop_ids = excluded_ids | {held_out_id}
+        # training_only_exclusions are dropped from training but NOT from the
+        # evaluation set -- they still get their own fold and are still scored.
+        drop_ids = excluded_ids | {held_out_id} | training_only_exclusions
         train_df = df[~df[GROUP_COL].isin(drop_ids)].reset_index(drop=True)
         test_df = df[df[GROUP_COL] == held_out_id]
 
@@ -330,6 +332,7 @@ def run_spatial_loso_cv(df, exclusions, blocks_by_station, block_params, feature
             "tuning_block": block_label,
             "n_excluded_buffer_stations": len(excluded_ids),
             "n_train_stations": train_df[GROUP_COL].nunique(),
+            "held_out_station_in_training_exclusions": held_out_id in training_only_exclusions,
             "n_test_rows": len(test_df),
             "best_iteration": best_iteration,
             "r2": point_metrics["r2"],
@@ -357,7 +360,8 @@ def run_spatial_loso_cv(df, exclusions, blocks_by_station, block_params, feature
 
 
 def run_random_cv(df, params, feature_cols, n_folds, true_group_means_raw,
-                  validation_row_fraction, early_stopping_rounds, seed):
+                  validation_row_fraction, early_stopping_rounds, seed,
+                  training_only_exclusions):
     # Row-level folds, ignoring station grouping -- the leakage comparison arm.
     # Every station is represented in every fold's training set, and 13 of the
     # 23 features are constant within a station, so the trees can recover a
@@ -384,7 +388,8 @@ def run_random_cv(df, params, feature_cols, n_folds, true_group_means_raw,
 
     for fold_id in range(n_folds):
         test_mask = fold_assignment == fold_id
-        train_df = df[~test_mask].reset_index(drop=True)
+        train_mask = (~test_mask) & (~df[GROUP_COL].isin(training_only_exclusions))
+        train_df = df[train_mask].reset_index(drop=True)
         test_df = df[test_mask]
 
         inner_train_df, inner_validation_df = split_validation_rows(
@@ -480,6 +485,27 @@ def main():
                          help="fraction of each random-CV fold's training rows held out "
                               "purely to early-stop on (rows, not stations -- random CV "
                               "needs every station represented in training)")
+    parser.add_argument("--exclude_stations", default="",
+                         help="Comma-separated location_ids to drop entirely from this "
+                              "validation run, mirroring the LME's 02_validate_lme_cv.py "
+                              "flag. Used for the weak-AOD-coupling sensitivity variant. "
+                              "Note the selection criterion matters: excluding stations "
+                              "because they SCORED badly is circular (removing the worst "
+                              "folds raises a pooled metric by arithmetic, whatever the "
+                              "cause), so the stations passed here are selected on AOD-PM2.5 "
+                              "coupling computed from observed data only, with no reference "
+                              "to model performance. Default: none excluded.")
+    parser.add_argument("--exclude_from_training_only", default="false",
+                         choices=["true", "false"],
+                         help="Changes what --exclude_stations means. false (default) drops "
+                              "those stations from the run entirely, so they are neither "
+                              "trained on nor scored -- a sensitivity variant, and note the "
+                              "reported metric then rises partly just because the scoring "
+                              "set got easier. true keeps ALL stations in the evaluation "
+                              "(every station still gets a fold) but removes the listed ones "
+                              "from every fold's TRAINING set -- so the scoring set is "
+                              "identical to the primary run and any change in the pooled "
+                              "metric is attributable purely to the training-set change.")
     parser.add_argument("--run_tag", default="",
                          help="Optional tag appended to MLflow run names, so a diagnostic "
                               "variant does not collide with the primary run's names in "
@@ -524,6 +550,22 @@ def main():
 
     check_boosting_settings_match(tuned, args)
 
+    exclude_station_ids = set()
+    training_only_exclusions = set()
+    exclude_from_training_only = args.exclude_from_training_only == "true"
+    if args.exclude_stations:
+        exclude_station_ids = {int(x.strip()) for x in args.exclude_stations.split(",") if x.strip()}
+        if exclude_from_training_only:
+            training_only_exclusions = exclude_station_ids
+            print(f"Excluding stations {sorted(exclude_station_ids)} from TRAINING only: "
+                  f"all {df[GROUP_COL].nunique()} stations still evaluated on all "
+                  f"{len(df)} rows, so the scoring set matches the primary run exactly")
+        else:
+            before = len(df)
+            df = df[~df[GROUP_COL].isin(exclude_station_ids)].reset_index(drop=True)
+            print(f"Excluded stations {sorted(exclude_station_ids)}: {before} -> {len(df)} rows, "
+                  f"{df[GROUP_COL].nunique()} stations remaining")
+
     blocks_by_station = block_lookup(tuned)
     missing = [s for s in sorted(int(x) for x in df[GROUP_COL].unique())
                if s not in blocks_by_station]
@@ -553,7 +595,7 @@ def main():
     spatial_folds_df, spatial_aggregated = run_spatial_loso_cv(
         df, exclusions, blocks_by_station, block_params, feature_cols,
         true_group_means_raw, args.validation_station_fraction,
-        args.early_stopping_rounds, args.random_seed)
+        args.early_stopping_rounds, args.random_seed, training_only_exclusions)
     spatial_folds_path = os.path.join(args.output_dir, "cv_spatial_loso_folds.csv")
     spatial_folds_df.to_csv(spatial_folds_path, index=False)
     print(f"Wrote {spatial_folds_path}")
@@ -577,6 +619,8 @@ def main():
             "learning_rate": args.learning_rate,
             "early_stopping_rounds": args.early_stopping_rounds,
             "validation_station_fraction": args.validation_station_fraction,
+            "exclude_stations": sorted(exclude_station_ids) if exclude_station_ids else "none",
+            "exclude_from_training_only": exclude_from_training_only,
             "run_tag": args.run_tag or "none",
             "n_rows": len(df),
         },
@@ -585,7 +629,8 @@ def main():
     print("=== Random CV (comparison, ignores station grouping) ===")
     random_folds_df, random_aggregated = run_random_cv(
         df, full_data_params, feature_cols, args.n_random_folds, true_group_means_raw,
-        args.validation_row_fraction, args.early_stopping_rounds, args.random_seed)
+        args.validation_row_fraction, args.early_stopping_rounds, args.random_seed,
+        training_only_exclusions)
     random_folds_path = os.path.join(args.output_dir, "cv_random_folds.csv")
     random_folds_df.to_csv(random_folds_path, index=False)
     print(f"Wrote {random_folds_path}")
@@ -608,6 +653,8 @@ def main():
             "learning_rate": args.learning_rate,
             "early_stopping_rounds": args.early_stopping_rounds,
             "validation_row_fraction": args.validation_row_fraction,
+            "exclude_stations": sorted(exclude_station_ids) if exclude_station_ids else "none",
+            "exclude_from_training_only": exclude_from_training_only,
             "run_tag": args.run_tag or "none",
             "n_rows": len(df),
         },

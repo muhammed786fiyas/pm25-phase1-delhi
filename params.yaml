@@ -304,6 +304,31 @@ modeling:
     validation_station_fraction: 0.15
     random_seed: 42
 
+  # Sensitivity variant: drop the 4 stations with the weakest AOD-PM2.5
+  # coupling. Selected on a criterion computed from observed data only (the
+  # within-station AOD vs PM2.5 correlation), never on model performance --
+  # excluding stations because they scored badly would be circular, since
+  # removing the worst folds raises a pooled metric by arithmetic whatever the
+  # cause. 7005 is the informative one: it couples weakly but scores a
+  # respectable 0.582, so it is a station the hypothesis can fail on.
+  lightgbm_diagnostics:
+    n_exclude: 4
+  lightgbm_validation_excl_weak_aod_coupling:
+    exclude_stations: "5622,5630,6359,7005"
+
+  # Same 4 stations, but removed from TRAINING only -- every station is still
+  # evaluated, so the scoring set is identical to the primary run and any
+  # change in the pooled metric is attributable purely to the training-set
+  # change. Deliberately reuses the existing block hyperparameters rather than
+  # re-tuning: re-tuning would change the training set AND the hyperparameters
+  # at once, making a difference against the 0.803 baseline unattributable.
+  # The known mismatch (those hyperparameters were searched on a 42-station
+  # distribution, applied here to a 38-station training set) is a
+  # suboptimality, not a leak -- each station's Hk still comes from a search
+  # its own block was held out of.
+  lightgbm_validation_excl_weak_aod_from_training:
+    exclude_stations: "5622,5630,6359,7005"
+
   lightgbm_validation:
     station_file: data/stations/cpcb_stations_delhi_status.csv
     buffer_km: 2.0

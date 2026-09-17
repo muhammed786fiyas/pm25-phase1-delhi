@@ -2143,8 +2143,8 @@ stages:
       size: 3825
     - path: scripts/modeling/lightgbm/02_validate_lightgbm_cv.py
       hash: md5
-      md5: 155aa6d0f93d10d6172629acd23f7192
-      size: 30356
+      md5: c129c4d802b91ccbfdc04a9bfde0617f
+      size: 33945
     params:
       params.yaml:
         modeling.lightgbm_validation:
@@ -2172,8 +2172,8 @@ stages:
       size: 162
     - path: reports/lightgbm/primary/cv_spatial_loso_folds.csv
       hash: md5
-      md5: 5b19271e4ac71b09ee97aca435e85356
-      size: 4552
+      md5: 55d357416581fec0f1edcc4af19d511b
+      size: 4844
     - path: reports/lightgbm/primary/station_buffer_exclusions.csv
       hash: md5
       md5: 024d4ad6fbdbbd2a2664a97183338995
@@ -2312,6 +2312,170 @@ stages:
       md5: ff89eb1c09fc5bb228873e0a1b1e8cdc
       size: 4190
     - path: reports/lme/primary_raw_target/station_buffer_exclusions.csv
+      hash: md5
+      md5: 024d4ad6fbdbbd2a2664a97183338995
+      size: 1770
+  diagnose_lightgbm_aod_coupling:
+    cmd: python scripts/modeling/lightgbm/03_diagnose_aod_coupling.py --input 
+      data/processed/modeling_datasets/lightgbm_ready_dataset.csv --folds 
+      reports/lightgbm/primary/cv_spatial_loso_folds.csv --n_exclude 4 
+      --coupling_output reports/lightgbm/diagnostics/station_aod_coupling.csv 
+      --test_output 
+      reports/lightgbm/diagnostics/aod_coupling_hypothesis_test.json
+    deps:
+    - path: data/processed/modeling_datasets/lightgbm_ready_dataset.csv
+      hash: md5
+      md5: e82083c02036f7bac1280e62dbd87cc9
+      size: 5307964
+    - path: reports/lightgbm/primary/cv_spatial_loso_folds.csv
+      hash: md5
+      md5: 55d357416581fec0f1edcc4af19d511b
+      size: 4844
+    - path: scripts/modeling/lightgbm/03_diagnose_aod_coupling.py
+      hash: md5
+      md5: 896b33d40a42ca564ce3d12babedd257
+      size: 7430
+    params:
+      params.yaml:
+        modeling.lightgbm_diagnostics:
+          n_exclude: 4
+    outs:
+    - path: reports/lightgbm/diagnostics/aod_coupling_hypothesis_test.json
+      hash: md5
+      md5: 311722607b3f080fe9ca80ea7ae30262
+      size: 1525
+    - path: reports/lightgbm/diagnostics/station_aod_coupling.csv
+      hash: md5
+      md5: 1944603da530b38dac8f9b1c6017e1e8
+      size: 9548
+  validate_lightgbm_cv_excl_weak_aod_coupling:
+    cmd: python scripts/modeling/lightgbm/02_validate_lightgbm_cv.py --input 
+      data/processed/modeling_datasets/lightgbm_ready_dataset.csv --station_file
+      data/stations/cpcb_stations_delhi_status.csv --hyperparameters 
+      models/lightgbm/tuned_hyperparameters.json --buffer_km 2.0 
+      --n_random_folds 42 --random_seed 42 --learning_rate 0.03 
+      --max_boosting_rounds 3000 --early_stopping_rounds 100 
+      --validation_station_fraction 0.15 --validation_row_fraction 0.15 
+      --exclude_stations 5622,5630,6359,7005 --run_tag excl_weak_aod_coupling 
+      --output_dir reports/lightgbm/excl_weak_aod_coupling
+    deps:
+    - path: data/processed/modeling_datasets/lightgbm_ready_dataset.csv
+      hash: md5
+      md5: e82083c02036f7bac1280e62dbd87cc9
+      size: 5307964
+    - path: data/stations/cpcb_stations_delhi_status.csv
+      hash: md5
+      md5: 4d2c634b6bdf8d8e9cf3de6d517f6776
+      size: 14245
+    - path: models/lightgbm/tuned_hyperparameters.json
+      hash: md5
+      md5: 5380d067c52aa4d7895b2973f79652f9
+      size: 3825
+    - path: scripts/modeling/lightgbm/02_validate_lightgbm_cv.py
+      hash: md5
+      md5: c129c4d802b91ccbfdc04a9bfde0617f
+      size: 33945
+    params:
+      params.yaml:
+        modeling.lightgbm_validation:
+          station_file: data/stations/cpcb_stations_delhi_status.csv
+          buffer_km: 2.0
+          n_random_folds: 42
+          random_seed: 42
+          learning_rate: 0.03
+          max_boosting_rounds: 3000
+          early_stopping_rounds: 100
+          validation_station_fraction: 0.15
+          validation_row_fraction: 0.15
+        modeling.lightgbm_validation_excl_weak_aod_coupling:
+          exclude_stations: 5622,5630,6359,7005
+    outs:
+    - path: reports/lightgbm/excl_weak_aod_coupling/cv_random_aggregated.json
+      hash: md5
+      md5: e0a974806f9f9f5d6d4ece1ffbb55251
+      size: 163
+    - path: reports/lightgbm/excl_weak_aod_coupling/cv_random_folds.csv
+      hash: md5
+      md5: 45d5d0162782ae17023ca193c4bdc953
+      size: 3978
+    - path: 
+        reports/lightgbm/excl_weak_aod_coupling/cv_spatial_loso_aggregated.json
+      hash: md5
+      md5: e8f3a9d34dae276090e0d3641e9ba22a
+      size: 163
+    - path: reports/lightgbm/excl_weak_aod_coupling/cv_spatial_loso_folds.csv
+      hash: md5
+      md5: 6442e9efad133787c0e5a7988af89e10
+      size: 4395
+    - path: 
+        reports/lightgbm/excl_weak_aod_coupling/station_buffer_exclusions.csv
+      hash: md5
+      md5: 024d4ad6fbdbbd2a2664a97183338995
+      size: 1770
+  validate_lightgbm_cv_excl_weak_aod_from_training:
+    cmd: python scripts/modeling/lightgbm/02_validate_lightgbm_cv.py --input 
+      data/processed/modeling_datasets/lightgbm_ready_dataset.csv --station_file
+      data/stations/cpcb_stations_delhi_status.csv --hyperparameters 
+      models/lightgbm/tuned_hyperparameters.json --buffer_km 2.0 
+      --n_random_folds 42 --random_seed 42 --learning_rate 0.03 
+      --max_boosting_rounds 3000 --early_stopping_rounds 100 
+      --validation_station_fraction 0.15 --validation_row_fraction 0.15 
+      --exclude_stations 5622,5630,6359,7005 --exclude_from_training_only true 
+      --run_tag excl_weak_aod_from_training --output_dir 
+      reports/lightgbm/excl_weak_aod_from_training
+    deps:
+    - path: data/processed/modeling_datasets/lightgbm_ready_dataset.csv
+      hash: md5
+      md5: e82083c02036f7bac1280e62dbd87cc9
+      size: 5307964
+    - path: data/stations/cpcb_stations_delhi_status.csv
+      hash: md5
+      md5: 4d2c634b6bdf8d8e9cf3de6d517f6776
+      size: 14245
+    - path: models/lightgbm/tuned_hyperparameters.json
+      hash: md5
+      md5: 5380d067c52aa4d7895b2973f79652f9
+      size: 3825
+    - path: scripts/modeling/lightgbm/02_validate_lightgbm_cv.py
+      hash: md5
+      md5: c129c4d802b91ccbfdc04a9bfde0617f
+      size: 33945
+    params:
+      params.yaml:
+        modeling.lightgbm_validation:
+          station_file: data/stations/cpcb_stations_delhi_status.csv
+          buffer_km: 2.0
+          n_random_folds: 42
+          random_seed: 42
+          learning_rate: 0.03
+          max_boosting_rounds: 3000
+          early_stopping_rounds: 100
+          validation_station_fraction: 0.15
+          validation_row_fraction: 0.15
+        modeling.lightgbm_validation_excl_weak_aod_from_training:
+          exclude_stations: 5622,5630,6359,7005
+    outs:
+    - path: 
+        reports/lightgbm/excl_weak_aod_from_training/cv_random_aggregated.json
+      hash: md5
+      md5: 25129448db662c5af265f92dc6f116a2
+      size: 162
+    - path: reports/lightgbm/excl_weak_aod_from_training/cv_random_folds.csv
+      hash: md5
+      md5: 4283b3bb55eff0edeb2cf46e217058ca
+      size: 3983
+    - path: 
+        reports/lightgbm/excl_weak_aod_from_training/cv_spatial_loso_aggregated.json
+      hash: md5
+      md5: 6626ce14248a72b50091c51b022c63ef
+      size: 162
+    - path: 
+        reports/lightgbm/excl_weak_aod_from_training/cv_spatial_loso_folds.csv
+      hash: md5
+      md5: d8316c4f301d537cbbffb2b29047e2be
+      size: 4842
+    - path: 
+        reports/lightgbm/excl_weak_aod_from_training/station_buffer_exclusions.csv
       hash: md5
       md5: 024d4ad6fbdbbd2a2664a97183338995
       size: 1770

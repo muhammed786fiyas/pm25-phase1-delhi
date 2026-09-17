@@ -143,6 +143,49 @@ Next step accordingly widened: the `buffer_km 0` re-run is still worth doing, bu
 - `requirements.txt`: added `optuna>=3.6.0` and `scikit-learn>=1.3.0` (the latter was already a de facto dependency of the LME validation script but had never been declared).
 - MLflow experiment `delhi_phase1_lightgbm`, 10 runs: `tune_block_1`..`tune_block_6`, `tune_full_data`, `full_data_fit`, `spatial_loso_cv`, `random_cv`.
 
+### 4. Why stations 5630 and 6359 fail -- diagnosed, and two exclusion experiments
+
+**Diagnosis: weak AOD-PM2.5 coupling.** Computed per station directly from observed data (`scripts/modeling/lightgbm/03_diagnose_aod_coupling.py` -> `reports/lightgbm/diagnostics/`), with no model output involved. The three weakest spatial-LOSO folds are all in the bottom four of the network on this measure:
+
+| Station | AOD-PM2.5 corr | rank | fold R2 | within-R2 |
+|---|---|---|---|---|
+| 5622 NSIT Dwarka | 0.225 | 1 (worst) | 0.399 | 0.204 |
+| 7005 Loni | 0.291 | 2 | 0.582 | 0.435 |
+| 6359 IHBAS | 0.300 | 3 | -0.037 | 0.203 |
+| 5630 Shadipur | 0.301 | 4 | -0.111 | 0.349 |
+| *network median* | *0.418* | | | |
+
+Across all 42 stations the relationship is strong, and stronger for within-R2 (anomaly tracking) than R2, which is what the mechanism predicts -- if AOD does not track PM2.5 at a site, there is nothing to predict its day-to-day variation from:
+
+```
+corr(coupling, within_R2) = 0.729  p = 4.4e-08     Spearman rho = 0.458  p = 2.3e-03
+corr(coupling, R2)        = 0.624  p = 1.0e-05     Spearman rho = 0.460  p = 2.2e-03
+```
+
+Guard against circularity -- the hypothesis was formed by looking at the 3 worst folds, so it is re-tested on the 39 stations that played no part in suggesting it: **within-R2 r = 0.507 (p = 0.001), R2 r = 0.407 (p = 0.010)**. It holds out-of-sample. Spearman is notably weaker than Pearson, so the relationship is partly carried by the tails rather than being a clean gradient through the middle -- both are reported.
+
+**Why 5630's R2 looks worst despite mid-pack error**: it has the lowest coefficient of variation in the network (sd 47.7 ug/m3 vs median 76.3). R2 = 1 - (RMSE/sd)^2, so once RMSE exceeds a station's own sd the value goes negative by arithmetic. 5630's RMSE (50.2) is *lower* than 6359's (58.4) and 5622's (60.6); its R2 is worse only because the flat-mean baseline it is judged against is unusually good. Reporting RMSE/sd alongside R2 makes this visible -- both are now columns in `station_aod_coupling.csv`.
+
+**Ruled out: gap-filled AOD.** These stations are weakly coupled on real MAIAC retrievals too (0.332 / 0.217 / 0.195 vs a 0.516 network median on observed days). Gap-filling *is* a real network-wide problem -- median coupling falls 0.516 observed -> 0.296 gap-filled, and ~48% of rows are gap-filled -- but it is not what makes these stations special.
+
+**Experiment A -- exclude from the run entirely** (`reports/lightgbm/excl_weak_aod_coupling/`, 38 stations). Spatial LOSO R2 0.803 -> 0.858. **This is mostly not a performance gain**: decomposed, +0.039 (71%) is simply the scoring set getting easier -- the same models making the same predictions, with the hardest stations no longer averaged in -- and only +0.016 (29%) comes from the models actually changing. Reported as a labelled sensitivity variant, never as the headline.
+
+The selection is defensible because it is made on the **cause** (coupling, from observed data) rather than the **symptom** (fold R2), which would be circular. A permutation test confirms it is not just "removed 4 hard stations": over 5,000 random 4-station removals the pooled R2 has mean 0.803 and a **maximum of 0.836**, while the coupling-selected removal gives 0.842 analytically -- p < 0.0002. It also beats removing the 4 *worst-scoring* stations (0.8385), because 7005 couples weakly and errs by 51.7 ug/m3 despite a respectable R2 of 0.582, so it contributes more pooled error than 11607 which ranks worse on R2. The coupling criterion caught what an R2 ranking missed.
+
+**Experiment B -- exclude from TRAINING only** (`reports/lightgbm/excl_weak_aod_from_training/`, all 42 still scored). The clean single-variable test: identical scoring set, only the training set changes.
+
+| Spatial LOSO, all 42 stations / 13,595 rows | Primary | Train-excl |
+|---|---|---|
+| R2 | 0.8031 | 0.8159 |
+| within-R2 | 0.7207 | 0.7377 |
+| RMSE ug/m3 | 33.73 | 32.61 |
+
+**Not adopted.** The +0.013 is real and attributable, but the per-fold paired evidence does not support it: Wilcoxon p = 0.079 on the 38 survivors and **p = 0.148 across all 42 folds**, with 23 improved against 15 worsened. The pooled gain comes from RMSE falling at a few high-error stations rather than a broad shift, and 5630 gets markedly *worse* (-0.224) having lost the other three weak stations from its training set. A +0.013 gain at p = 0.15 on a single unreplicated run is suggestive, not established. The all-42-station model remains the deliverable.
+
+Hyperparameters were deliberately **not** re-tuned for Experiment B: re-tuning would change the training set and the hyperparameters simultaneously, making any difference against the 0.803 baseline unattributable. Known and accepted mismatch -- those hyperparameters were searched on a 42-station distribution and applied here to a 38-station training set. That is a suboptimality, not a leak: each station's Hk still comes from a search its own block was held out of (verified per station). If this lever is ever revisited seriously, re-tune with the weak stations excluded from every search and confirm the gain survives.
+
+One confirmation worth keeping: random CV *drops* under Experiment B (0.882 -> 0.859), exactly as the leakage mechanism predicts -- the 4 stations are still scored but never trained on, so the model loses the memorized-baseline advantage for them.
+
 ## Key decisions
 
 - **Tuning split into its own script/stage** rather than folded into `01_fit_lightgbm_model.py` -- cleaner DVC dependency graph (see Completed section 1).
@@ -169,7 +212,7 @@ Next step accordingly widened: the `buffer_km 0` re-run is still worth doing, bu
 
 ## Pending
 
-- **Explain why stations 5630 and 6359 fail under LightGBM.** The original buffer-exclusion hypothesis is doubtful: three other stations share 5630's 2-neighbour buffer burden and score 0.524/0.850/0.905, and the apparent buffer gradient reverses once these two are removed (Fisher exact on negative-R2 vs buffer-affected: p = 0.077). Two checks worth running together: (a) re-run spatial LOSO with `buffer_km 0` to see whether they recover at all, (b) a covariate-space comparison of 5630/6359 against the other 40, mirroring the investigation that resolved 5598/6934 on the LME side.
+- ~~Explain why stations 5630 and 6359 fail under LightGBM~~ -- **done, see Completed section 4**: weak AOD-PM2.5 coupling, confirmed out-of-sample on the 39 stations that did not generate the hypothesis (within-R2 r=0.507, p=0.001). The earlier buffer-exclusion hypothesis was withdrawn. Two exclusion experiments run; neither changes the headline.
 - **Whether to add a matched-hyperparameter spatial-LOSO run** so the leakage-inflation comparison is exactly like-for-like with the LME's (see Key decisions).
 - **Whether the LME's excl-outlier-stations sensitivity run should still be reported** now that LightGBM handles those two stations without special treatment (see Results).
 - **Whether the LME's headline number should switch to the raw-fit figure.** The log-fit LME's 0.423 (log scale) has been its headline throughout the project; the raw-fit LME's 0.437 (raw ug/m3) is now the like-for-like comparator against LightGBM, and the log-fit model scored on raw is -0.226. Three defensible numbers for the same model family, not yet decided with Muhammed which headlines a writeup.
