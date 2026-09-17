@@ -664,14 +664,14 @@ stages:
   # ============================================================
 
   fit_lme_model:
-    cmd: python scripts/modeling/lme/01_fit_lme_model.py --input data/processed/modeling_datasets/lme_ready_dataset.csv --model_output models/lme/lme_full_model.pkl --coef_output reports/lme/primary/lme_fixed_effects.csv --summary_output reports/lme/primary/lme_model_summary.txt --exclude_low_confidence false
+    cmd: python scripts/modeling/lme/01_fit_lme_model.py --input data/processed/modeling_datasets/lme_ready_dataset.csv --model_output models/lme/lme_full_model.pkl --coef_output reports/lme/primary_log_target/lme_fixed_effects.csv --summary_output reports/lme/primary_log_target/lme_model_summary.txt --exclude_low_confidence false
     deps:
       - scripts/modeling/lme/01_fit_lme_model.py
       - data/processed/modeling_datasets/lme_ready_dataset.csv
     outs:
       - models/lme/lme_full_model.pkl
-      - reports/lme/primary/lme_fixed_effects.csv
-      - reports/lme/primary/lme_model_summary.txt
+      - reports/lme/primary_log_target/lme_fixed_effects.csv
+      - reports/lme/primary_log_target/lme_model_summary.txt
 
   fit_lme_model_gapfill_robustness:
     cmd: python scripts/modeling/lme/01_fit_lme_model.py --input data/processed/modeling_datasets/lme_ready_dataset.csv --model_output models/lme/lme_full_model_gapfill_robustness.pkl --coef_output reports/lme/gapfill_robustness/lme_fixed_effects.csv --summary_output reports/lme/gapfill_robustness/lme_model_summary.txt --exclude_low_confidence true
@@ -716,17 +716,17 @@ stages:
       - reports/lme/random_slope_aod/lme_model_summary.txt
 
   fit_lme_model_raw_target:
-    cmd: python scripts/modeling/lme/01_fit_lme_model.py --input data/processed/modeling_datasets/lme_ready_dataset_raw_target.csv --model_output models/lme/lme_full_model_raw_target.pkl --coef_output reports/lme/raw_target/lme_fixed_effects.csv --summary_output reports/lme/raw_target/lme_model_summary.txt --exclude_low_confidence false --target_transform raw --run_tag raw_target
+    cmd: python scripts/modeling/lme/01_fit_lme_model.py --input data/processed/modeling_datasets/lme_ready_dataset_raw_target.csv --model_output models/lme/lme_full_model_raw_target.pkl --coef_output reports/lme/primary_raw_target/lme_fixed_effects.csv --summary_output reports/lme/primary_raw_target/lme_model_summary.txt --exclude_low_confidence false --target_transform raw --run_tag raw_target
     deps:
       - scripts/modeling/lme/01_fit_lme_model.py
       - data/processed/modeling_datasets/lme_ready_dataset_raw_target.csv
     outs:
       - models/lme/lme_full_model_raw_target.pkl
-      - reports/lme/raw_target/lme_fixed_effects.csv
-      - reports/lme/raw_target/lme_model_summary.txt
+      - reports/lme/primary_raw_target/lme_fixed_effects.csv
+      - reports/lme/primary_raw_target/lme_model_summary.txt
 
   validate_lme_cv_raw_target:
-    cmd: python scripts/modeling/lme/02_validate_lme_cv.py --input data/processed/modeling_datasets/lme_ready_dataset_raw_target.csv --station_file data/stations/cpcb_stations_delhi_status.csv --buffer_km 2.0 --n_random_folds 42 --random_seed 42 --exclude_low_confidence false --target_transform raw --run_tag raw_target --output_dir reports/lme/raw_target
+    cmd: python scripts/modeling/lme/02_validate_lme_cv.py --input data/processed/modeling_datasets/lme_ready_dataset_raw_target.csv --station_file data/stations/cpcb_stations_delhi_status.csv --buffer_km 2.0 --n_random_folds 42 --random_seed 42 --exclude_low_confidence false --target_transform raw --run_tag raw_target --output_dir reports/lme/primary_raw_target
     deps:
       - scripts/modeling/lme/02_validate_lme_cv.py
       - data/processed/modeling_datasets/lme_ready_dataset_raw_target.csv
@@ -734,14 +734,14 @@ stages:
     params:
       - modeling.lme_validation
     outs:
-      - reports/lme/raw_target/station_buffer_exclusions.csv
-      - reports/lme/raw_target/cv_spatial_loso_folds.csv
-      - reports/lme/raw_target/cv_spatial_loso_aggregated.json
-      - reports/lme/raw_target/cv_random_folds.csv
-      - reports/lme/raw_target/cv_random_aggregated.json
+      - reports/lme/primary_raw_target/station_buffer_exclusions.csv
+      - reports/lme/primary_raw_target/cv_spatial_loso_folds.csv
+      - reports/lme/primary_raw_target/cv_spatial_loso_aggregated.json
+      - reports/lme/primary_raw_target/cv_random_folds.csv
+      - reports/lme/primary_raw_target/cv_random_aggregated.json
 
   validate_lme_cv:
-    cmd: python scripts/modeling/lme/02_validate_lme_cv.py --input data/processed/modeling_datasets/lme_ready_dataset.csv --station_file data/stations/cpcb_stations_delhi_status.csv --buffer_km 2.0 --n_random_folds 42 --random_seed 42 --exclude_low_confidence false --output_dir reports/lme/primary
+    cmd: python scripts/modeling/lme/02_validate_lme_cv.py --input data/processed/modeling_datasets/lme_ready_dataset.csv --station_file data/stations/cpcb_stations_delhi_status.csv --buffer_km 2.0 --n_random_folds 42 --random_seed 42 --exclude_low_confidence false --output_dir reports/lme/primary_log_target
     deps:
       - scripts/modeling/lme/02_validate_lme_cv.py
       - data/processed/modeling_datasets/lme_ready_dataset.csv
@@ -749,11 +749,11 @@ stages:
     params:
       - modeling.lme_validation
     outs:
-      - reports/lme/primary/station_buffer_exclusions.csv
-      - reports/lme/primary/cv_spatial_loso_folds.csv
-      - reports/lme/primary/cv_spatial_loso_aggregated.json
-      - reports/lme/primary/cv_random_folds.csv
-      - reports/lme/primary/cv_random_aggregated.json
+      - reports/lme/primary_log_target/station_buffer_exclusions.csv
+      - reports/lme/primary_log_target/cv_spatial_loso_folds.csv
+      - reports/lme/primary_log_target/cv_spatial_loso_aggregated.json
+      - reports/lme/primary_log_target/cv_random_folds.csv
+      - reports/lme/primary_log_target/cv_random_aggregated.json
 
   validate_lme_cv_gapfill_robustness:
     cmd: python scripts/modeling/lme/02_validate_lme_cv.py --input data/processed/modeling_datasets/lme_ready_dataset.csv --station_file data/stations/cpcb_stations_delhi_status.csv --buffer_km 2.0 --n_random_folds 42 --random_seed 42 --exclude_low_confidence true --output_dir reports/lme/gapfill_robustness

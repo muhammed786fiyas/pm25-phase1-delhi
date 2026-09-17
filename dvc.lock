@@ -1636,8 +1636,9 @@ stages:
     cmd: python scripts/modeling/lme/01_fit_lme_model.py --input 
       data/processed/modeling_datasets/lme_ready_dataset.csv --model_output 
       models/lme/lme_full_model.pkl --coef_output 
-      reports/lme/primary/lme_fixed_effects.csv --summary_output 
-      reports/lme/primary/lme_model_summary.txt --exclude_low_confidence false
+      reports/lme/primary_log_target/lme_fixed_effects.csv --summary_output 
+      reports/lme/primary_log_target/lme_model_summary.txt 
+      --exclude_low_confidence false
     deps:
     - path: data/processed/modeling_datasets/lme_ready_dataset.csv
       hash: md5
@@ -1652,11 +1653,11 @@ stages:
       hash: md5
       md5: 504e46713e68af167300fbd39a7d28dc
       size: 15474242
-    - path: reports/lme/primary/lme_fixed_effects.csv
+    - path: reports/lme/primary_log_target/lme_fixed_effects.csv
       hash: md5
       md5: 41bdd9bd81755f22ec1ac9dcbb77f28c
       size: 3324
-    - path: reports/lme/primary/lme_model_summary.txt
+    - path: reports/lme/primary_log_target/lme_model_summary.txt
       hash: md5
       md5: 5c20f950c53fc536699024c3f181df8d
       size: 3820
@@ -1665,7 +1666,7 @@ stages:
       data/processed/modeling_datasets/lme_ready_dataset.csv --station_file 
       data/stations/cpcb_stations_delhi_status.csv --buffer_km 2.0 
       --n_random_folds 42 --random_seed 42 --exclude_low_confidence false 
-      --output_dir reports/lme/primary
+      --output_dir reports/lme/primary_log_target
     deps:
     - path: data/processed/modeling_datasets/lme_ready_dataset.csv
       hash: md5
@@ -1686,23 +1687,23 @@ stages:
           n_random_folds: 42
           random_seed: 42
     outs:
-    - path: reports/lme/primary/cv_random_aggregated.json
+    - path: reports/lme/primary_log_target/cv_random_aggregated.json
       hash: md5
       md5: d69219dcf44647bf31807f77c4b3be05
       size: 705
-    - path: reports/lme/primary/cv_random_folds.csv
+    - path: reports/lme/primary_log_target/cv_random_folds.csv
       hash: md5
       md5: 884d7ba52d357dd6dd878c6a27e8a00e
       size: 9412
-    - path: reports/lme/primary/cv_spatial_loso_aggregated.json
+    - path: reports/lme/primary_log_target/cv_spatial_loso_aggregated.json
       hash: md5
       md5: 69191d3cf2229bbd643c5ac5c1f759a1
       size: 709
-    - path: reports/lme/primary/cv_spatial_loso_folds.csv
+    - path: reports/lme/primary_log_target/cv_spatial_loso_folds.csv
       hash: md5
       md5: 593d21a2f6b73eb8522de380ac79bb38
       size: 9657
-    - path: reports/lme/primary/station_buffer_exclusions.csv
+    - path: reports/lme/primary_log_target/station_buffer_exclusions.csv
       hash: md5
       md5: 024d4ad6fbdbbd2a2664a97183338995
       size: 1770
@@ -2242,9 +2243,9 @@ stages:
     cmd: python scripts/modeling/lme/01_fit_lme_model.py --input 
       data/processed/modeling_datasets/lme_ready_dataset_raw_target.csv 
       --model_output models/lme/lme_full_model_raw_target.pkl --coef_output 
-      reports/lme/raw_target/lme_fixed_effects.csv --summary_output 
-      reports/lme/raw_target/lme_model_summary.txt --exclude_low_confidence 
-      false --target_transform raw --run_tag raw_target
+      reports/lme/primary_raw_target/lme_fixed_effects.csv --summary_output 
+      reports/lme/primary_raw_target/lme_model_summary.txt 
+      --exclude_low_confidence false --target_transform raw --run_tag raw_target
     deps:
     - path: data/processed/modeling_datasets/lme_ready_dataset_raw_target.csv
       hash: md5
@@ -2259,11 +2260,11 @@ stages:
       hash: md5
       md5: 9e7db4b3eaa5885f450eaca5098379cb
       size: 15474242
-    - path: reports/lme/raw_target/lme_fixed_effects.csv
+    - path: reports/lme/primary_raw_target/lme_fixed_effects.csv
       hash: md5
       md5: 24ee5875cc308039d49602b289b60688
       size: 3211
-    - path: reports/lme/raw_target/lme_model_summary.txt
+    - path: reports/lme/primary_raw_target/lme_model_summary.txt
       hash: md5
       md5: d74e1129882c7465a74ad0133e7448fe
       size: 3934
@@ -2273,7 +2274,7 @@ stages:
       --station_file data/stations/cpcb_stations_delhi_status.csv --buffer_km 
       2.0 --n_random_folds 42 --random_seed 42 --exclude_low_confidence false 
       --target_transform raw --run_tag raw_target --output_dir 
-      reports/lme/raw_target
+      reports/lme/primary_raw_target
     deps:
     - path: data/processed/modeling_datasets/lme_ready_dataset_raw_target.csv
       hash: md5
@@ -2294,23 +2295,23 @@ stages:
           n_random_folds: 42
           random_seed: 42
     outs:
-    - path: reports/lme/raw_target/cv_random_aggregated.json
+    - path: reports/lme/primary_raw_target/cv_random_aggregated.json
       hash: md5
       md5: af86e1f212c14d4a92dccbdc3b81c755
       size: 327
-    - path: reports/lme/raw_target/cv_random_folds.csv
+    - path: reports/lme/primary_raw_target/cv_random_folds.csv
       hash: md5
       md5: e2a59c2e70665e058bc98308fa7fe8dd
       size: 3975
-    - path: reports/lme/raw_target/cv_spatial_loso_aggregated.json
+    - path: reports/lme/primary_raw_target/cv_spatial_loso_aggregated.json
       hash: md5
       md5: 6667219eac9b235208e55dc2b97026c9
       size: 329
-    - path: reports/lme/raw_target/cv_spatial_loso_folds.csv
+    - path: reports/lme/primary_raw_target/cv_spatial_loso_folds.csv
       hash: md5
       md5: ff89eb1c09fc5bb228873e0a1b1e8cdc
       size: 4190
-    - path: reports/lme/raw_target/station_buffer_exclusions.csv
+    - path: reports/lme/primary_raw_target/station_buffer_exclusions.csv
       hash: md5
       md5: 024d4ad6fbdbbd2a2664a97183338995
       size: 1770

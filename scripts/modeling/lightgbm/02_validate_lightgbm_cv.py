@@ -624,7 +624,7 @@ def main():
           "fingerprint -- the LightGBM analog of the LME's fitted random intercept. "
           "The gap between the two arms is the spatial-leakage inflation, the same "
           "effect the LME module measured. For a like-for-like comparison use the "
-          "raw-target LME (reports/lme/raw_target/, fit AND scored on ug/m3 exactly "
+          "raw-target LME (reports/lme/primary_raw_target/, fit AND scored on ug/m3 exactly "
           "as this model is): R2 0.437 spatial LOSO vs 0.567 random CV.")
 
 
