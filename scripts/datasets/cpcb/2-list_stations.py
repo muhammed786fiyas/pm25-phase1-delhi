@@ -41,7 +41,7 @@ def main():
 
     df = pd.DataFrame(stations)
     df.to_csv(output_path, index=False)
-    print(f"✅ Saved {len(df)} station records to {output_path}")
+    print(f"Saved {len(df)} station records to {output_path}")
 
     pm25_stations = df[df["parameters"].str.contains("pm25", case=False, na=False)]
     print(f"   Of which {len(pm25_stations)} report pm25.")

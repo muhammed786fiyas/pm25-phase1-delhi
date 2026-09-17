@@ -38,12 +38,12 @@ def _get_with_retry(url, params=None):
         response = requests.get(url, headers=HEADERS, params=params)
         if response.status_code == 429:
             wait = RETRY_BACKOFF_SECONDS * attempt
-            print(f"   ⏳ Rate limited (429). Waiting {wait}s before retry {attempt}/{MAX_RETRIES}...")
+            print(f"   Rate limited (429). Waiting {wait}s before retry {attempt}/{MAX_RETRIES}...")
             time.sleep(wait)
             continue
         if response.status_code >= 500:
             wait = RETRY_BACKOFF_SECONDS * attempt
-            print(f"   ⏳ Server error {response.status_code}. Waiting {wait}s before retry {attempt}/{MAX_RETRIES}...")
+            print(f"   Server error {response.status_code}. Waiting {wait}s before retry {attempt}/{MAX_RETRIES}...")
             time.sleep(wait)
             continue
         return response
@@ -145,9 +145,9 @@ def get_all_measurements(sensor_id, location_id, frequency="hourly", from_date=N
     all_data = []
     page = 1
     max_pages = 100
-    print(f"   🔎 Filtering data from {from_date} to {to_date}")
+    print(f"   Filtering data from {from_date} to {to_date}")
     if parameter:
-        print(f"   🔍 Filtering only for parameter: {parameter}")
+        print(f"   Filtering only for parameter: {parameter}")
 
     tz = pytz.timezone("Asia/Kolkata")
     from_dt = tz.localize(datetime.strptime(from_date, "%Y-%m-%d"))

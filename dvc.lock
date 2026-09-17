@@ -1,18 +1,22 @@
 schema: '2.0'
 stages:
   cpcb_list_stations:
-    cmd: python scripts/datasets/cpcb/2-list_stations.py
+    cmd: python scripts/datasets/cpcb/2-list_stations.py --region delhi --output
+      cpcb_stations_delhi.csv --output-dir data/stations
     deps:
     - path: scripts/datasets/cpcb/2-list_stations.py
       hash: md5
-      md5: 415981b0385f75828212a464b32eb80d
-      size: 2136
-    outs:
-    - path: data/stations
+      md5: f84add2480040eff073a7302ef77ff1a
+      size: 2082
+    - path: scripts/datasets/cpcb/cpcb_fetcher.py
       hash: md5
-      md5: 000b4f678110a2cf32ee75863562c265.dir
-      size: 40902
-      nfiles: 5
+      md5: dcf971f8054e569927d3dc896b44195c
+      size: 8680
+    outs:
+    - path: data/stations/cpcb_stations_delhi.csv
+      hash: md5
+      md5: 460a3cd141a6fe4cea8063ae80b6c865
+      size: 11370
   cpcb_download_pm25:
     cmd: python scripts/datasets/cpcb/3-download_pm25.py
     deps:
@@ -20,14 +24,14 @@ stages:
       hash: md5
       md5: 4d2c634b6bdf8d8e9cf3de6d517f6776
       size: 14245
-    - path: scripts/datasets/cpcb/1-cpcb_fetcher.py
-      hash: md5
-      md5: 59fce616c3f09f9bd1175f48a956b626
-      size: 8920
     - path: scripts/datasets/cpcb/3-download_pm25.py
       hash: md5
       md5: 3051c35c11470f62fbd98d29942c358e
       size: 11190
+    - path: scripts/datasets/cpcb/cpcb_fetcher.py
+      hash: md5
+      md5: dcf971f8054e569927d3dc896b44195c
+      size: 8680
     outs:
     - path: data/raw/cpcb
       hash: md5

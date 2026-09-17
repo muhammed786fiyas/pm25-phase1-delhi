@@ -3,18 +3,23 @@ stages:
   # CPCB ground-station pipeline (Phase 1: Delhi)
   # ============================================================
   cpcb_list_stations:
-    cmd: python scripts/datasets/cpcb/2-list_stations.py
+    cmd: python scripts/datasets/cpcb/2-list_stations.py --region delhi --output cpcb_stations_delhi.csv --output-dir data/stations
     deps:
       - scripts/datasets/cpcb/2-list_stations.py
+      - scripts/datasets/cpcb/cpcb_fetcher.py
     outs:
-      - data/stations:
+      # Only the file this stage actually writes. It previously claimed the
+      # whole data/stations/ directory, which also holds the hand-curated
+      # cpcb_stations_delhi_status.csv -- and DVC removes a stage's outputs
+      # before re-running it, so a repro would have deleted the curated roster.
+      - data/stations/cpcb_stations_delhi.csv:
           cache: false
 
   cpcb_download_pm25:
     cmd: python scripts/datasets/cpcb/3-download_pm25.py
     deps:
       - scripts/datasets/cpcb/3-download_pm25.py
-      - scripts/datasets/cpcb/1-cpcb_fetcher.py
+      - scripts/datasets/cpcb/cpcb_fetcher.py
       - data/stations/cpcb_stations_delhi_status.csv
     outs:
       - data/raw/cpcb
@@ -45,7 +50,6 @@ stages:
       - cpcb_qc.high_value_limit
       - cpcb_qc.stuck_run_limit
     outs:
-      - data/interim/cpcb/pm25_qc_hourly
       - data/interim/cpcb/pm25_qc_hourly
 
   
