@@ -42,3 +42,4 @@ claude_code_lightgbm_kickoff.md
 # artifacts like the model pickle for each run), not a versioned deliverable.
 # Separate from models/lme/ (the actual fitted-model output, DVC-tracked).
 models/mlflow_tracking/
+PROJECT_CONTEXT_pm25-phase1-delhi.md
