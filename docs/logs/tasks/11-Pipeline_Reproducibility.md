@@ -8,7 +8,7 @@ Two goals, in order:
 1. **Make the Delhi pipeline fully reproducible** -- `dvc repro` from a clean state must regenerate every documented result, experiments included. Nothing is deleted or moved out; the broken stages get fixed in place so the `delhi-phase1-complete` tag stays reproducible.
 2. **Make it portable** to Mumbai, Chennai and Kolkata with minimal manual intervention.
 
-**Status: planning and investigation only. No code has been changed.** This log records the audit, the feasibility probes, and the decisions pre-registered before any implementation starts.
+**Status: Step 1 done (commit e4c4c88); Step 2 rules prototyped and passing the acceptance test, not yet wired into stages.**
 
 ## Completed
 
@@ -80,7 +80,7 @@ Run before planning, because each answer reshapes the work.
 | Kolkata KMA | 88.20-88.55, 22.35-22.85 | 15 | 15 | **13** |
 | Chennai CMA | 79.95-80.35, 12.75-13.35 | 11 | 11 | **9** |
 
-Control validates the probe: 56 found vs 55 rows in the repo's status file, 42 KEEP after QC -- roughly 80% attrition from "alive" to "KEEP". **Widening Chennai from its existing tight box to the metro box changed nothing (11 either way)** -- the CPCB network there is genuinely that sparse, not a bbox artifact.
+Control validates the probe exactly: 56 found vs 56 rows in the repo's status file (an earlier draft of this log said 55 -- corrected after counting), 42 KEEP after QC -- roughly 80% attrition from "alive" to "KEEP". **Widening Chennai from its existing tight box to the metro box changed nothing (11 either way)** -- the CPCB network there is genuinely that sparse, not a bbox artifact.
 
 **Implication -- this is the finding that reshapes the plan.** Projecting Delhi's attrition: Mumbai ~35 KEEP, Kolkata ~11, Chennai ~8. Delhi and Mumbai are comparable; **Chennai and Kolkata are not**, and several Delhi methodology choices do not survive at that n:
 
@@ -90,6 +90,41 @@ Control validates the probe: 56 found vs 55 rows in the repo's status file, 42 K
 - Random CV "matched 1:1 with the LOSO fold count" has no natural counterpart.
 
 **Small-n fragility, quantified**: in Delhi with 42 stations, a single station (5598) swung pooled raw-scale R2 from +0.515 to -0.226. At 9 stations that fragility is roughly five times worse -- one bad site can dominate the headline. Sparse-city results must be reported with per-fold spread or a confidence interval, never a bare point estimate.
+
+### 3. Step 1 -- root stage made runnable (commit e4c4c88)
+
+`cpcb_list_stations` had three stacked breaks: missing required CLI args; an un-importable `1-cpcb_fetcher.py` (a library, never a stage -- renamed to `cpcb_fetcher.py` rather than adding a `sys.path` shim); and four emoji in print statements that crash on the Windows cp1252 console. The stage also claimed all of `data/stations/`, which DVC deletes before re-running -- fixing the cmd alone would have wiped the curated roster on the first successful repro. Outs narrowed to the one file the stage writes. Duplicate `outs` in `cpcb_qc_check` removed. Verified by hashing all five files in `data/stations/` before and after: only the raw list changed, the curated roster is byte-identical.
+
+After Step 1, `cpcb_stations_delhi_status.csv` is produced by **no** stage -- an explicit external input, like the OSM geojsons. So `dvc repro` works given that file exists, but does not generate it. Step 2 closes that.
+
+The raw list is inherently non-deterministic: `datetime_last` advanced for 47 of 56 stations in one re-run (live sensors). Contained today because nothing depends on it; Step 2's screening stage must therefore write *decisions* derived from `datetime_last`, never the timestamp itself, or every repro cascades into all 35 downstream stages.
+
+### 4. Step 2 -- roster rules prototyped: acceptance test PASSES (2026-09-17)
+
+**Only one station-file column matters to code.** Of the 16 columns, scripts read `location_id`, `name`, `latitude`, `longitude` and `status` -- and all 27 `status` consumers test only `== "KEEP"`. `coord_verified` (blank for 55 of 56 rows), `shares_maiac_pixel_risk`, `nn_km`, `nn_station`, `pct_2025_possible`, `region` and `qc_note` are read by nothing. Every column that needed human judgement is documentation, not input -- so automation only has to get `status` right, and reason labels are free to change.
+
+**Five rules reproduce the hand-curated roster exactly** (prototype read the regenerated raw OpenAQ list plus the downloaded hourly data, wrote nothing into the repo):
+
+| Rule | Stations | Margin |
+|---|---|---|
+| No datetimes -> `DROP_no_data` | 15, 16 | -- |
+| Last record before window start -> `DROP_ended_before_window` | 13, 103, 236, 431, 2503 | ended 2018, window starts 2025 |
+| First record after window end -> `DROP_started_after_window` | 3409496 | started 10 days after close |
+| Coordinates within 10 m of an eligible station -> `DROP_duplicate_site_of_<id>`, keeping the earliest `datetime_first` | 6356 (of 5404) | next-closest eligible pair ~590 m |
+| Daily completeness < 60% -> `DROP_low_completeness` | 301, 6936, 10820, 10825, 10900 | drops <= 44.1%, KEEP >= 72.9% |
+
+Result: 47 eligible == the 47 stations actually downloaded; **42 rule-based KEEP == the 42 hand-curated KEEP, identical sets.**
+
+Design details that matter:
+- **Duplicate detection must run after the alive filter.** Dead predecessor ids sit ~260 m from their live replacements (236/6358, 431/6359); checked first, those pairs would threaten live KEEP stations.
+- **Tie-break is earliest `datetime_first`** (longest-running instrument), with `location_id` as the final tie-break. "Most sensors" would have wrongly kept 6356. `datetime_first` is stable over time, unlike `datetime_last`.
+- **The four `DROP_qc_failed` stations are explained by completeness alone.** Their zero-value and stuck-sensor rates were corroborating, not decisive -- 10820 has only 1.0% zeros and 1.6% stuck hours (cleaner than several KEEP stations) and was always a completeness drop, while KEEP station 5613 sits at 8.4% zeros against 10825's 10.4%, so a zero-rate threshold would be a knife-edge fit. Completeness separates all five with ~16 points of margin either side of the threshold already in `params.yaml`.
+- **This makes the hardcoded `cpcb_filter_aggregate.drop_stations: [10820, 10900, 10825, 6936]` redundant** -- the same four stations fall out of a rule that transfers to any city.
+- Completeness must be computed on **all** eligible stations, before any drop. Today `8-filter_and_aggregate.py` drops the four hardcoded stations first, so `station_completeness.csv` has only 43 rows and never sees them.
+
+**Reason labels change** (safe, since no code reads them): `DROP_dead_since_2018` -> `DROP_ended_before_window` (the old label hardcodes a year that will not hold elsewhere), `DROP_no_2025_data` -> `DROP_started_after_window`, `DROP_no_sensors_confirmed` -> `DROP_no_data`, and `DROP_qc_failed` -> `DROP_low_completeness`.
+
+**New defect found**: `10-completeness_check.py` hardcodes `COMPLETENESS_THRESHOLD = 60` and the window dates, although `dvc.yaml` lists `cpcb_completeness.threshold` as a param dependency. Changing the param re-runs the stage but changes nothing.
 
 ## Key decisions (pre-registered 2026-09-17, before any other city is run)
 
