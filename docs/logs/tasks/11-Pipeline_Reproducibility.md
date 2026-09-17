@@ -160,7 +160,22 @@ Two things make it work: `station_overrides.csv` becomes a hand-curated **input*
 ## Pending
 
 - Everything in the Plan section -- no implementation has started.
-- Whether Chennai and Kolkata get their own models at all, or share a pooled multi-city model to sidestep small n. A genuine study-design decision, not yet made with Muhammed.
+- **Whether Chennai and Kolkata get their own models at all, or share a pooled multi-city model to sidestep small n.** A genuine study-design decision, not yet made with Muhammed. "Pooled" covers four meaningfully different designs, expanded 2026-09-17:
+
+  | # | Design | What it does |
+  |---|---|---|
+  | 1 | **Per-city models** (current plan) | Four separate models, each validated by its own spatial LOSO. Simple; small-n fragility is the whole problem. |
+  | 2 | **Fully pooled** | One model on all four cities combined (~96 stations, ~55k rows). Restores block-nested tuning and stabilises estimates, but *assumes* the AOD-PM2.5 relationship transfers -- Delhi is landlocked and dust-dominated, Mumbai and Chennai coastal and humid. If the assumption is wrong, pooling actively hurts. |
+  | 3 | **Pooled + city as a feature** | Same data, city identity or city-level covariates added as a predictor, so LightGBM can learn city-specific adjustments rather than assuming one shared relationship. |
+  | 4 | **Hierarchical / partial pooling** | LME with nested random effects, station within city -- `(1 \| city/station)` instead of station alone. |
+
+  **Option 4 is the textbook answer to this specific problem.** Sparse cities borrow strength from data-rich ones: Chennai's ~8 station intercepts get shrunk toward the global mean, stabilised by Delhi's 42 and Mumbai's ~35, with the amount of shrinkage estimated from the data so a genuinely different city is still allowed to differ. It is a natural extension of the existing equation rather than a new model family -- today's `u_i` for station gains a city level above it, and the blueprint equation survives with one extra random-effect term. It also directly fixes the fragility concern: under partial pooling a single bad station cannot swing a 9-station pooled R2 the way station 5598 swung Delhi's (+0.515 -> -0.226).
+
+- **Leave-one-city-out validation -- worth adding regardless of which pooling option is chosen.** Train on three cities, predict the fourth. This is arguably the most scientifically interesting question a four-city study can answer: *can a satellite-PM2.5 calibration trained in other cities predict an unseen city?* That is the practical question for extending this to cities with no ground network at all, which is the real-world use case for satellite calibration. It also turns Chennai's sparseness into an asset rather than a liability -- a city with few stations is exactly where a transferred model would be wanted, and 9 stations is still enough ground truth to check it against. The existing spatial-LOSO machinery generalises almost unchanged: swap the grouping variable from station to city.
+
+- **Whether pooling helps is an empirical question that cannot be answered yet** -- it depends on how similar the cities' AOD-PM2.5 relationships are, and data exists for exactly one city. Delhi hints at the scale involved (between-station variance 0.0233 vs residual 0.258 on the log scale, so station-to-station differences are small next to day-to-day variation), but between-*city* differences are likely much larger and are unmeasured until Mumbai exists. **Decided approach: do not commit now.** Once Mumbai is done, test it directly -- fit pooled Delhi+Mumbai and check whether each city's spatial LOSO improves or degrades against its own per-city model. That comparison is itself a reportable result ("does pooling across cities help?") and costs one extra fit. Per-city and pooled are not either/or.
+
+- **Structural consequence, already open in the project context doc**: sibling repos vs. one multi-city repo. **Pooling requires a single pipeline that ingests all four cities.** Committing to four sibling repos first and then wanting to pool would mean merging them afterwards -- so keep the multi-city repo option alive until pooling has been tested on Delhi+Mumbai.
 - Whether Chennai's existing tight `CITY_BBOX` entry should be widened to the metro box for consistency with the Delhi philosophy (it makes no difference to the station count -- 11 either way -- but matters for consistency).
 - The `notebooks/01_eda_master_feature_table.ipynb` dependency on `prepare_lme_dataset`: a notebook gating a pipeline stage. Not yet decided whether to keep, replace with a script, or drop.
 
