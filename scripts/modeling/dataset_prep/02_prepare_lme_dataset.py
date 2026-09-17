@@ -98,6 +98,12 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", required=True, help="master_feature_table.csv")
     parser.add_argument("--output", required=True)
+    parser.add_argument("--scaling_output", required=True,
+                         help="mean/std used to scale each column, for back-transforming "
+                              "coefficients. An explicit path rather than one derived from "
+                              "--output's directory: the raw-target dataset variant is built "
+                              "by a second dvc stage writing into the same folder, and two "
+                              "stages cannot declare the same out.")
     parser.add_argument("--target_transform", required=True, choices=["NOT_SET", "raw", "log"],
                          help="raw or log transform of pm25_daily -- set only after reviewing the EDA notebook")
     parser.add_argument("--drop_zero_target_rows", required=True, choices=["true", "false"],
@@ -151,9 +157,9 @@ def main():
     df.to_csv(args.output, index=False)
     print(f"Wrote {args.output}: {len(df)} rows, {len(df.columns)} columns")
 
-    scaling_path = os.path.join(outdir, "lme_scaling_params.csv")
-    scaling_stats.to_csv(scaling_path, index=False)
-    print(f"Wrote {scaling_path} (mean/std used to scale each column, for back-transforming coefficients)")
+    os.makedirs(os.path.dirname(args.scaling_output), exist_ok=True)
+    scaling_stats.to_csv(args.scaling_output, index=False)
+    print(f"Wrote {args.scaling_output} (mean/std used to scale each column, for back-transforming coefficients)")
 
     print("=== Rows per season (after complete-case filter) ===")
     for season in [REFERENCE_SEASON] + OTHER_SEASONS:

@@ -248,6 +248,24 @@ modeling:
                  tree_cover_pct, shrubland_pct, grassland_pct, cropland_pct,
                  built_up_pct, bare_sparse_veg_pct]
 
+  # Raw-target LME comparison variant. Identical to lme_prep except
+  # target_transform, so the raw-fit LME can be compared against LightGBM with
+  # both models fit AND scored on raw ug/m3 -- scoring a log-fit model on raw
+  # handicaps it with a back-transform artifact rather than any real modelling
+  # deficiency. The log fit stays the model whose coefficient table is
+  # interpreted (its residuals are homoscedastic; the raw fit's are not).
+  lme_prep_raw_target:
+    reference_season: summer
+    target_transform: raw
+    drop_zero_target_rows: true
+    clip_negative_aod_to_zero: true
+    worldcover_drop_cols: [snow_ice_pct, mangroves_pct, moss_lichen_pct, wetland_herbaceous_pct, water_pct]
+    scale_cols: [aod_055, temperature_c, relative_humidity, wind_speed, boundary_layer_height,
+                 ndvi_mean, elevation_m, slope_deg, road_density_km_per_km2,
+                 industrial_landuse_fraction, dist_to_nearest_powerplant_km,
+                 tree_cover_pct, shrubland_pct, grassland_pct, cropland_pct,
+                 built_up_pct, bare_sparse_veg_pct]
+
   lightgbm_prep:
     reference_season: summer
     drop_zero_target_rows: true
@@ -262,3 +280,37 @@ modeling:
     aod_zscore_cap: 3.0
   lme_validation_excl_outlier_stations:
     exclude_stations: "5598,6934"
+
+  # learning_rate / max_boosting_rounds / early_stopping_rounds are repeated in
+  # all three lightgbm blocks and must stay identical: a tuned hyperparameter
+  # set is only valid for the learning rate it was searched under. Both
+  # 01_fit_lightgbm_model.py and 02_validate_lightgbm_cv.py hard-fail on a
+  # mismatch against the values recorded in the tuning stage's output json.
+  lightgbm_tuning:
+    station_file: data/stations/cpcb_stations_delhi_status.csv
+    buffer_km: 2.0
+    n_blocks: 6
+    n_inner_folds: 5
+    n_trials: 100
+    learning_rate: 0.03
+    max_boosting_rounds: 3000
+    early_stopping_rounds: 100
+    random_seed: 42
+
+  lightgbm_fit:
+    learning_rate: 0.03
+    max_boosting_rounds: 3000
+    early_stopping_rounds: 100
+    validation_station_fraction: 0.15
+    random_seed: 42
+
+  lightgbm_validation:
+    station_file: data/stations/cpcb_stations_delhi_status.csv
+    buffer_km: 2.0
+    n_random_folds: 42
+    random_seed: 42
+    learning_rate: 0.03
+    max_boosting_rounds: 3000
+    early_stopping_rounds: 100
+    validation_station_fraction: 0.15
+    validation_row_fraction: 0.15

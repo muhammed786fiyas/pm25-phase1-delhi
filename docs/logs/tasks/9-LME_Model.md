@@ -1,5 +1,5 @@
 # Task Log: LME Model (fit + validation)
-_Last updated: 2026-09-16_
+_Last updated: 2026-09-17_
 
 ## Scope
 
@@ -155,6 +155,59 @@ Use the grouped form when equation compactness matters (e.g. a methods-section o
 ### 11. Headline spatial-LOSO number for any writeup -- decided: report both
 
 Decided 2026-09-16: report both the full 42-station primary run (R2=0.423, the honest worst-case, includes the 2 known land-use-extrapolation outlier stations) and the excl-outlier-stations run (R2=0.589, see Completed section 5) side by side, each clearly labeled -- neither replaces the other. The full run is the number that should headline any abstract/summary (it's what the model actually does across all 42 stations); the excl-outlier-stations run is the companion sensitivity number showing how much those 2 stations specifically drag the pooled metric down, with the mechanism already documented (section 2: genuine land-use-covariate extrapolation, not a data-quality problem).
+
+### 12. Raw ug/m3 metrics + a raw-target LME variant (added 2026-09-17, for the LightGBM head-to-head)
+
+Added because the LightGBM comparison is reported in physical units. Two separate pieces.
+
+**(a) Raw-scale metrics for the existing log-fit model.** `02_validate_lme_cv.py` now reports `r2_ugm3` / `within_r2_ugm3` / `rmse_ugm3` / `mae_ugm3` alongside the log-scale block, plus `r2_ugm3_naive` and `r2_ugm3_duan` next to the existing naive/Duan RMSE/MAE pair. Needed because **R2 is not invariant under a nonlinear transform** -- the log-scale R2 = 0.423 and a raw-scale R2 are different quantities with different denominators, so quoting 0.423 against LightGBM's raw 0.803 is not a valid comparison. Only `within_r2_ugm3_duan` is computed (no naive counterpart): Kawano's within-R2 is a squared Pearson correlation and therefore invariant to multiplying predictions by a positive constant, which is exactly what Duan's correction does, so the two flavours differ only via the small between-fold variation in the smearing factor.
+
+**The log-fit model's raw-scale spatial-LOSO R2 is negative:**
+
+| Variant (spatial LOSO) | R2 log | R2 ug/m3 naive | R2 ug/m3 Duan |
+|---|---|---|---|
+| Primary | 0.423 | -0.044 | **-0.226** |
+| Gap-fill robustness | 0.429 | -0.122 | -0.323 |
+| AOD winsorized | 0.431 | -0.011 | -0.190 |
+| Excl. outlier stations | 0.589 | 0.506 | **0.515** |
+| Random-slope-AOD | 0.412 | -0.010 | -0.180 |
+
+Not a bug: spatial-LOSO RMSE of 84.29 ug/m3 already exceeds the data's own sd of 76.12, so `R2 = 1 - RMSE^2/Var` is forced negative. In physical units the log-fit model's out-of-site predictions are worse than predicting the citywide mean. Raw-scale R2 is dominated by large absolute errors, and station 5598's 422.6 ug/m3 RMSE dominates everything -- which is why `excl_outlier_stations` flips to +0.515. Both the 0.423 and the -0.226 are true statements about the same model; the log scale flatters it because logging compresses exactly the errors that hurt most. Random CV is unaffected by this (raw R2 = 0.548) because it has no extrapolating held-out stations.
+
+**(b) A raw-target LME variant** (`reports/lme/raw_target/`, `models/lme/lme_full_model_raw_target.pkl`). Motivation is fairness, not flattery: scoring a log-fit model on raw compares LightGBM (fit raw, scored raw) against an LME handicapped by a back-transform artifact rather than by any real modelling deficiency. New `--target_transform {log,raw}` flag on both LME scripts; on `raw` the validation script skips the back-transform and Duan smearing entirely (mandatory -- `np.exp()` on a raw PM2.5 value overflows). New `prepare_lme_dataset_raw_target` stage via the prep script's already-supported `--target_transform raw`.
+
+**Result -- refitting on raw moves spatial-LOSO R2 from -0.226 to +0.437:**
+
+| Spatial LOSO, raw ug/m3 | log-fit (Duan back-transformed) | raw-fit |
+|---|---|---|
+| R2 | -0.226 | **0.437** |
+| within-R2 (Kawano) | 0.167 | **0.220** |
+| RMSE ug/m3 | 84.29 | **57.10** |
+| MAE ug/m3 | 42.14 | **38.34** |
+
+Random CV, raw ug/m3: R2 0.548 -> 0.567, RMSE 51.20 -> 50.08.
+
+**But refitting on raw does NOT fix the two outlier stations** -- it only removes the `exp()` amplification on top of them:
+
+| Station | log-fit R2 | raw-fit R2 | log-fit RMSE | raw-fit RMSE |
+|---|---|---|---|---|
+| 5598 | -3.428 | -2.340 | 422.6 ug/m3 | 138.8 ug/m3 |
+| 6934 | -1.444 | -0.966 | 87.3 ug/m3 | 103.3 ug/m3 |
+
+Both stay badly negative. Expected, and it sharpens the DAY9 diagnosis: the failure is **linear extrapolation into unseen land-use covariate space**, which is a property of the model class, not of the target scale. No choice of transform can fix it.
+
+**Which model to use for what** (decided 2026-09-17):
+- **Prediction / the LightGBM head-to-head**: the **raw-fit** LME. Both models then fit and scored on ug/m3, so the comparison is like-for-like.
+- **Inference / the coefficient table**: the **log-fit** LME, and only that one. Newly measured from the actual fitted models, residual variance across fitted-value quintiles grows **1.77x** on the log fit but **12.79x** on the raw fit -- confirming DAY8 section 9's exploratory ~12.8x estimate almost exactly. That heteroscedasticity invalidates the raw fit's standard errors, p-values and confidence intervals. It does **not** invalidate its point predictions or CV metrics, which is why the split works: the raw fit is a legitimate predictor with an untrustworthy coefficient table, and the log fit supplies the coefficients.
+- `logLik`/`AIC`/`BIC` are **not comparable across target transforms** (different response variable, different likelihood scale). The raw fit's AIC of 143927.3 must never be tabled against the log fit's 20320.9. Both scripts now print and write this warning.
+
+The raw-target fit is **not** registered to the Model Registry -- diagnostic/alternate-specification variant, same treatment as the other four.
+
+### 13. Environment note -- dataset regenerated with 1e-15 float drift
+
+Re-running `prepare_lme_dataset` under the currently-installed numpy 2.5.3 / pandas 3.0.5 produced `lme_ready_dataset.csv` with a **different DVC hash** (`0704a733...` -> `1e472e12...`, size 6,119,824 -> 6,138,496 bytes) despite identical row counts and zero non-numeric differences. Cause is floating-point last-bit noise in the standardization arithmetic: max absolute difference across all columns is **1.8e-15**, i.e. agreement to ~15 significant figures, with the size change coming from marginally longer float reprs.
+
+Harmless numerically -- every log-scale CV metric and every AIC/BIC reproduced its previously documented value to 3+ decimals across all 5 variants. But it does invalidate every downstream DVC stage hash, so "bit-for-bit identical" is no longer an achievable verification standard on this machine; verify to a tolerance instead.
 
 ## Data notes & gotchas
 

@@ -140,7 +140,7 @@ def group_key(df):
     return df[GROUP_COL].astype(str) + "_" + df[SEASON_COL]
 
 
-def compute_group_means(df):
+def compute_group_means(df, values):
     # Station x season group means of the TRUE target, computed once from the
     # full dataset being validated (not from a single fold's test rows). A
     # single random-CV fold has only ~321 rows spread across up to 168
@@ -152,8 +152,13 @@ def compute_group_means(df):
     # definition -- "that location's own seasonal average" -- rather than an
     # arbitrary CV split's average. Used as the TRUE-side reference for
     # compute_within_r2_kawano() below.
+    #
+    # Takes `values` rather than reading TARGET_COL directly so the same
+    # helper can build both the modelling-scale means (log target) and the
+    # raw ug/m3 means needed for the raw-scale within-R2 that the LightGBM
+    # head-to-head compares against.
     keys = group_key(df)
-    return df.groupby(keys)[TARGET_COL].mean()
+    return pd.Series(values, index=keys.index).groupby(keys).mean()
 
 
 def compute_pred_group_means(y_pred, group_keys):
@@ -202,12 +207,18 @@ def naive_backtransform_metrics(y_true_log, y_pred_log):
     # correction -- kept alongside the Duan-corrected metrics below purely so
     # the size of the correction is visible; not the recommended number to
     # report as-is (see duan_backtransform_metrics()).
+    #
+    # r2_ugm3_naive is reported alongside RMSE/MAE because R2 is NOT invariant
+    # under a nonlinear transform: the log-scale r2 this script also reports is
+    # a different quantity from the raw-scale one, computed against a different
+    # denominator, and only the raw-scale one is comparable to LightGBM's.
     y_true_raw = np.exp(y_true_log)
     y_pred_raw = np.exp(y_pred_log)
     residuals = y_true_raw - y_pred_raw
     rmse = np.sqrt(np.mean(residuals ** 2))
     mae = mean_absolute_error(y_true_raw, y_pred_raw)
-    return {"rmse_ugm3_naive": rmse, "mae_ugm3_naive": mae}
+    r2 = r2_score(y_true_raw, y_pred_raw)
+    return {"rmse_ugm3_naive": rmse, "mae_ugm3_naive": mae, "r2_ugm3_naive": r2}
 
 
 def compute_smearing_factor(y_true_log, y_pred_log):
@@ -232,11 +243,30 @@ def duan_backtransform_metrics(y_true_log, y_pred_log, smearing_factor):
     residuals = y_true_raw - y_pred_raw
     rmse = np.sqrt(np.mean(residuals ** 2))
     mae = mean_absolute_error(y_true_raw, y_pred_raw)
-    return {"rmse_ugm3_duan": rmse, "mae_ugm3_duan": mae}
+    r2 = r2_score(y_true_raw, y_pred_raw)
+    return {"rmse_ugm3_duan": rmse, "mae_ugm3_duan": mae, "r2_ugm3_duan": r2}
+
+
+def raw_scale_predictions(y_pred_log, smearing_factor, target_transform):
+    # The prediction vector in ug/m3, whichever scale the model was fit on.
+    # For a log-target fit that is the Duan-corrected back-transform (the
+    # statistically correct one of the two, per 9-LME_Model.md section 9);
+    # for a raw-target fit the predictions are already in ug/m3 and must be
+    # left alone -- np.exp() on a raw PM2.5 value would overflow.
+    if target_transform == "raw":
+        return y_pred_log
+    return np.exp(y_pred_log) * smearing_factor
+
+
+def raw_scale_truth(y_true, target_transform):
+    if target_transform == "raw":
+        return y_true
+    return np.exp(y_true)
 
 
 def compute_cv_results(folds_df, oof_true_list, oof_pred_list, oof_group_keys_list,
-                        oof_fold_id_list, oof_smearing_list, true_group_means):
+                        oof_fold_id_list, oof_smearing_list, true_group_means,
+                        true_group_means_ugm3, target_transform):
     # Pools every fold's out-of-fold rows together, then computes the
     # within-R2 (Kawano) reference means and metrics from that pooled set --
     # both per-fold (sliced back out of the pooled set) and for the headline
@@ -266,27 +296,75 @@ def compute_cv_results(folds_df, oof_true_list, oof_pred_list, oof_group_keys_li
     point_metrics = compute_point_metrics(y_true, y_pred)
     within_r2_pooled = compute_within_r2_kawano(
         y_true, y_pred, group_keys, true_group_means, pred_group_means)
-    backtransform = naive_backtransform_metrics(y_true, y_pred)
-    duan_backtransform = duan_backtransform_metrics(y_true, y_pred, smearing_arr)
+
+    # Raw ug/m3 within-R2 -- the one comparable to LightGBM's. Computed from
+    # the raw-scale predictions (Duan-corrected for a log fit, as-is for a raw
+    # fit) against raw-scale group means. Only the Duan flavour is computed:
+    # Kawano's within-R2 is a squared Pearson correlation, so it is invariant
+    # to multiplying the predictions by a positive constant, and Duan's
+    # correction is exactly that -- a naive-flavoured version would differ
+    # only through the small between-fold variation in the smearing factor
+    # (~1.12-1.13), i.e. in about the 4th decimal.
+    y_true_ugm3 = raw_scale_truth(y_true, target_transform)
+    y_pred_ugm3 = raw_scale_predictions(y_pred, smearing_arr, target_transform)
+    pred_group_means_ugm3 = compute_pred_group_means(y_pred_ugm3, group_keys)
+    within_r2_ugm3 = compute_within_r2_kawano(
+        y_true_ugm3, y_pred_ugm3, group_keys, true_group_means_ugm3, pred_group_means_ugm3)
 
     aggregated = {
+        "target_transform": target_transform,
         "n_oof_rows": len(y_true),
         "r2": point_metrics["r2"],
         "within_r2": within_r2_pooled,
         "rmse": point_metrics["rmse"],
         "mae": point_metrics["mae"],
-        "rmse_ugm3_naive": backtransform["rmse_ugm3_naive"],
-        "mae_ugm3_naive": backtransform["mae_ugm3_naive"],
-        "rmse_ugm3_duan": duan_backtransform["rmse_ugm3_duan"],
-        "mae_ugm3_duan": duan_backtransform["mae_ugm3_duan"],
-        "smearing_factor_mean": float(np.mean(smearing_arr)),
-        "smearing_factor_min": float(np.min(smearing_arr)),
-        "smearing_factor_max": float(np.max(smearing_arr)),
+        "within_r2_ugm3": within_r2_ugm3,
     }
+
+    if target_transform == "raw":
+        # Already in ug/m3 -- no back-transform, no smearing. The *_ugm3 keys
+        # are what the cross-model comparison reads, so mirror the native
+        # metrics into them rather than leaving them absent.
+        aggregated["r2_ugm3"] = point_metrics["r2"]
+        aggregated["rmse_ugm3"] = point_metrics["rmse"]
+        aggregated["mae_ugm3"] = point_metrics["mae"]
+    else:
+        backtransform = naive_backtransform_metrics(y_true, y_pred)
+        duan_backtransform = duan_backtransform_metrics(y_true, y_pred, smearing_arr)
+        aggregated.update({
+            "r2_ugm3": duan_backtransform["r2_ugm3_duan"],
+            "rmse_ugm3": duan_backtransform["rmse_ugm3_duan"],
+            "mae_ugm3": duan_backtransform["mae_ugm3_duan"],
+            "rmse_ugm3_naive": backtransform["rmse_ugm3_naive"],
+            "mae_ugm3_naive": backtransform["mae_ugm3_naive"],
+            "r2_ugm3_naive": backtransform["r2_ugm3_naive"],
+            "rmse_ugm3_duan": duan_backtransform["rmse_ugm3_duan"],
+            "mae_ugm3_duan": duan_backtransform["mae_ugm3_duan"],
+            "r2_ugm3_duan": duan_backtransform["r2_ugm3_duan"],
+            "smearing_factor_mean": float(np.mean(smearing_arr)),
+            "smearing_factor_min": float(np.min(smearing_arr)),
+            "smearing_factor_max": float(np.max(smearing_arr)),
+        })
     return folds_df, aggregated
 
 
-def run_spatial_loso_cv(df, exclusions, true_group_means, re_formula):
+def fold_backtransform_rows(y_true, y_pred, train_true, train_pred, target_transform):
+    # Per-fold raw-scale reporting. For a log-target fit this is the smearing
+    # factor plus the naive and Duan back-transform metrics. For a raw-target
+    # fit there is nothing to back-transform -- the fold's own r2/rmse/mae are
+    # already ug/m3 -- so the smearing factor is reported as a neutral 1.0 and
+    # no back-transform columns are emitted.
+    if target_transform == "raw":
+        return {"smearing_factor": 1.0}, 1.0
+    smearing_factor = compute_smearing_factor(train_true, train_pred)
+    rows = {"smearing_factor": smearing_factor}
+    rows.update(naive_backtransform_metrics(y_true, y_pred))
+    rows.update(duan_backtransform_metrics(y_true, y_pred, smearing_factor))
+    return rows, smearing_factor
+
+
+def run_spatial_loso_cv(df, exclusions, true_group_means, true_group_means_ugm3,
+                        re_formula, target_transform):
     # Fixed-effects-only prediction here regardless of re_formula: a held-out
     # station gets NO random-effect BLUP of any kind -- not an intercept, and
     # not an AOD slope either -- since statsmodels has never seen that
@@ -319,16 +397,15 @@ def run_spatial_loso_cv(df, exclusions, true_group_means, re_formula):
         result = fit_lme(train_df, reml=True, re_formula=re_formula)
 
         train_pred_log = predict_fixed_effects(result, train_df).values
-        smearing_factor = compute_smearing_factor(train_df[TARGET_COL].values, train_pred_log)
 
         y_pred = predict_fixed_effects(result, test_df).values
         y_true = test_df[TARGET_COL].values
 
         point_metrics = compute_point_metrics(y_true, y_pred)
-        backtransform = naive_backtransform_metrics(y_true, y_pred)
-        duan_backtransform = duan_backtransform_metrics(y_true, y_pred, smearing_factor)
+        backtransform_rows, smearing_factor = fold_backtransform_rows(
+            y_true, y_pred, train_df[TARGET_COL].values, train_pred_log, target_transform)
 
-        fold_rows.append({
+        fold_row = {
             "fold": i + 1,
             "held_out_station": held_out_id,
             "n_excluded_buffer_stations": len(excluded_ids),
@@ -337,12 +414,9 @@ def run_spatial_loso_cv(df, exclusions, true_group_means, re_formula):
             "r2": point_metrics["r2"],
             "rmse": point_metrics["rmse"],
             "mae": point_metrics["mae"],
-            "rmse_ugm3_naive": backtransform["rmse_ugm3_naive"],
-            "mae_ugm3_naive": backtransform["mae_ugm3_naive"],
-            "smearing_factor": smearing_factor,
-            "rmse_ugm3_duan": duan_backtransform["rmse_ugm3_duan"],
-            "mae_ugm3_duan": duan_backtransform["mae_ugm3_duan"],
-        })
+        }
+        fold_row.update(backtransform_rows)
+        fold_rows.append(fold_row)
         oof_true.append(y_true)
         oof_pred.append(y_pred)
         oof_group_keys.append(group_key(test_df))
@@ -355,14 +429,16 @@ def run_spatial_loso_cv(df, exclusions, true_group_means, re_formula):
 
     folds_df = pd.DataFrame(fold_rows)
     folds_df, aggregated = compute_cv_results(
-        folds_df, oof_true, oof_pred, oof_group_keys, oof_fold_id, oof_smearing, true_group_means)
+        folds_df, oof_true, oof_pred, oof_group_keys, oof_fold_id, oof_smearing,
+        true_group_means, true_group_means_ugm3, target_transform)
     print("Spatial LOSO within_R2 (Kawano) by fold:")
     for row in folds_df.itertuples(index=False):
         print(f"  fold {row.fold} (station {row.held_out_station}): within_R2={row.within_r2}")
     return folds_df, aggregated
 
 
-def run_random_cv(df, n_folds, seed, true_group_means, re_formula, random_slope_aod):
+def run_random_cv(df, n_folds, seed, true_group_means, true_group_means_ugm3,
+                  re_formula, random_slope_aod, target_transform):
     # Duan smearing factor here is computed from the TRAIN split's own
     # predict_with_random_effects residuals (fixed effects + BLUP), to match
     # exactly what predict_with_random_effects produces on the held-out rows
@@ -387,28 +463,24 @@ def run_random_cv(df, n_folds, seed, true_group_means, re_formula, random_slope_
         result = fit_lme(train_df, reml=True, re_formula=re_formula)
 
         train_pred_log = predict_with_random_effects(result, train_df, random_slope_aod)
-        smearing_factor = compute_smearing_factor(train_df[TARGET_COL].values, train_pred_log)
 
         y_pred = predict_with_random_effects(result, test_df, random_slope_aod)
         y_true = test_df[TARGET_COL].values
 
         point_metrics = compute_point_metrics(y_true, y_pred)
-        backtransform = naive_backtransform_metrics(y_true, y_pred)
-        duan_backtransform = duan_backtransform_metrics(y_true, y_pred, smearing_factor)
+        backtransform_rows, smearing_factor = fold_backtransform_rows(
+            y_true, y_pred, train_df[TARGET_COL].values, train_pred_log, target_transform)
 
-        fold_rows.append({
+        fold_row = {
             "fold": fold_id + 1,
             "n_train_rows": len(train_df),
             "n_test_rows": len(test_df),
             "r2": point_metrics["r2"],
             "rmse": point_metrics["rmse"],
             "mae": point_metrics["mae"],
-            "rmse_ugm3_naive": backtransform["rmse_ugm3_naive"],
-            "mae_ugm3_naive": backtransform["mae_ugm3_naive"],
-            "smearing_factor": smearing_factor,
-            "rmse_ugm3_duan": duan_backtransform["rmse_ugm3_duan"],
-            "mae_ugm3_duan": duan_backtransform["mae_ugm3_duan"],
-        })
+        }
+        fold_row.update(backtransform_rows)
+        fold_rows.append(fold_row)
         oof_true.append(y_true)
         oof_pred.append(y_pred)
         oof_group_keys.append(group_key(test_df))
@@ -421,7 +493,8 @@ def run_random_cv(df, n_folds, seed, true_group_means, re_formula, random_slope_
 
     folds_df = pd.DataFrame(fold_rows)
     folds_df, aggregated = compute_cv_results(
-        folds_df, oof_true, oof_pred, oof_group_keys, oof_fold_id, oof_smearing, true_group_means)
+        folds_df, oof_true, oof_pred, oof_group_keys, oof_fold_id, oof_smearing,
+        true_group_means, true_group_means_ugm3, target_transform)
     print("Random CV within_R2 (Kawano) by fold:")
     for row in folds_df.itertuples(index=False):
         print(f"  fold {row.fold}: within_R2={row.within_r2}")
@@ -449,18 +522,46 @@ def log_cv_run_to_mlflow(run_name, cv_scheme, folds_df, aggregated, folds_csv_pa
         mlflow.log_metric("within_r2_pooled", aggregated["within_r2"])
         mlflow.log_metric("rmse_pooled", aggregated["rmse"])
         mlflow.log_metric("mae_pooled", aggregated["mae"])
-        mlflow.log_metric("rmse_ugm3_naive_pooled", aggregated["rmse_ugm3_naive"])
-        mlflow.log_metric("mae_ugm3_naive_pooled", aggregated["mae_ugm3_naive"])
-        mlflow.log_metric("rmse_ugm3_duan_pooled", aggregated["rmse_ugm3_duan"])
-        mlflow.log_metric("mae_ugm3_duan_pooled", aggregated["mae_ugm3_duan"])
-        mlflow.log_metric("smearing_factor_mean", aggregated["smearing_factor_mean"])
-        mlflow.log_metric("smearing_factor_min", aggregated["smearing_factor_min"])
-        mlflow.log_metric("smearing_factor_max", aggregated["smearing_factor_max"])
+        # The raw ug/m3 block -- what the LightGBM head-to-head compares
+        # against, present for both target transforms.
+        mlflow.log_metric("r2_ugm3_pooled", aggregated["r2_ugm3"])
+        mlflow.log_metric("within_r2_ugm3_pooled", aggregated["within_r2_ugm3"])
+        mlflow.log_metric("rmse_ugm3_pooled", aggregated["rmse_ugm3"])
+        mlflow.log_metric("mae_ugm3_pooled", aggregated["mae_ugm3"])
+        if "smearing_factor_mean" in aggregated:
+            mlflow.log_metric("rmse_ugm3_naive_pooled", aggregated["rmse_ugm3_naive"])
+            mlflow.log_metric("mae_ugm3_naive_pooled", aggregated["mae_ugm3_naive"])
+            mlflow.log_metric("r2_ugm3_naive_pooled", aggregated["r2_ugm3_naive"])
+            mlflow.log_metric("rmse_ugm3_duan_pooled", aggregated["rmse_ugm3_duan"])
+            mlflow.log_metric("mae_ugm3_duan_pooled", aggregated["mae_ugm3_duan"])
+            mlflow.log_metric("r2_ugm3_duan_pooled", aggregated["r2_ugm3_duan"])
+            mlflow.log_metric("smearing_factor_mean", aggregated["smearing_factor_mean"])
+            mlflow.log_metric("smearing_factor_min", aggregated["smearing_factor_min"])
+            mlflow.log_metric("smearing_factor_max", aggregated["smearing_factor_max"])
         mlflow.log_metric("r2_fold_mean", folds_df["r2"].mean())
         mlflow.log_metric("r2_fold_std", folds_df["r2"].std())
         mlflow.log_artifact(folds_csv_path)
 
         print(f"Logged MLflow run '{run_name}' (cv_scheme={cv_scheme})")
+
+
+def print_aggregated(label, aggregated):
+    # The native-scale block is whatever modeling_target is on; the ug/m3
+    # block is always present and is the one comparable to LightGBM.
+    print(f"{label} aggregated ({aggregated['target_transform']} target): "
+          f"R2={aggregated['r2']:.3f} within_R2={aggregated['within_r2']:.3f} "
+          f"RMSE={aggregated['rmse']:.3f} MAE={aggregated['mae']:.3f}")
+    print(f"  Raw ug/m3 (comparable to LightGBM): R2={aggregated['r2_ugm3']:.3f} "
+          f"within_R2={aggregated['within_r2_ugm3']:.3f} "
+          f"RMSE={aggregated['rmse_ugm3']:.3f} MAE={aggregated['mae_ugm3']:.3f}")
+    if "smearing_factor_mean" in aggregated:
+        print(f"  Back-transform detail: naive R2={aggregated['r2_ugm3_naive']:.3f} "
+              f"RMSE={aggregated['rmse_ugm3_naive']:.3f} "
+              f"MAE={aggregated['mae_ugm3_naive']:.3f} | Duan-corrected "
+              f"R2={aggregated['r2_ugm3_duan']:.3f} "
+              f"RMSE={aggregated['rmse_ugm3_duan']:.3f} "
+              f"MAE={aggregated['mae_ugm3_duan']:.3f} "
+              f"(mean smearing factor={aggregated['smearing_factor_mean']:.4f})")
 
 
 def main():
@@ -484,6 +585,14 @@ def main():
                               "(re_formula='~ aod_055', matching 01_fit_lme_model.py), "
                               "instead of the primary random-intercept-only model. "
                               "Default: false.")
+    parser.add_argument("--target_transform", default="log", choices=["log", "raw"],
+                         help="Which scale modeling_target is on in --input. 'log' is the "
+                              "primary dataset and reports both the log-scale metrics and a "
+                              "back-transformed ug/m3 block (naive + Duan). 'raw' is the "
+                              "raw-target comparison variant: predictions are already in "
+                              "ug/m3, so the back-transform and Duan smearing are skipped "
+                              "entirely (np.exp() on a raw PM2.5 value would overflow). "
+                              "Default: log.")
     parser.add_argument("--run_tag", default="",
                          help="Optional tag appended to MLflow run names, so a diagnostic "
                               "variant (e.g. an --exclude_stations run, or a run against a "
@@ -548,10 +657,16 @@ def main():
         exclusion_report.to_csv(exclusion_path, index=False)
         print(f"Wrote {exclusion_path}")
 
-    true_group_means = compute_group_means(df)
+    true_group_means = compute_group_means(df, df[TARGET_COL].values)
+    # Raw ug/m3 group means for the raw-scale within-R2. pm25_daily is carried
+    # in every lme_ready dataset variant regardless of what modeling_target
+    # holds, so this is the same reference for both transforms.
+    true_group_means_ugm3 = compute_group_means(df, df[RAW_TARGET_COL].values)
 
     print("=== Spatial LOSO CV (primary, out-of-site, 2km buffer) ===")
-    spatial_folds_df, spatial_aggregated = run_spatial_loso_cv(df, exclusions, true_group_means, re_formula)
+    spatial_folds_df, spatial_aggregated = run_spatial_loso_cv(
+        df, exclusions, true_group_means, true_group_means_ugm3, re_formula,
+        args.target_transform)
     spatial_folds_path = os.path.join(args.output_dir, "cv_spatial_loso_folds.csv")
     spatial_folds_df.to_csv(spatial_folds_path, index=False)
     print(f"Wrote {spatial_folds_path}")
@@ -559,13 +674,7 @@ def main():
     with open(spatial_agg_path, "w") as f:
         json.dump(spatial_aggregated, f, indent=2)
     print(f"Wrote {spatial_agg_path}")
-    print(f"Spatial LOSO aggregated: R2={spatial_aggregated['r2']:.3f} "
-          f"within_R2={spatial_aggregated['within_r2']:.3f} "
-          f"RMSE={spatial_aggregated['rmse']:.3f} MAE={spatial_aggregated['mae']:.3f}")
-    print(f"  Back-transform (ug/m3): naive RMSE={spatial_aggregated['rmse_ugm3_naive']:.3f} "
-          f"MAE={spatial_aggregated['mae_ugm3_naive']:.3f} | Duan-corrected "
-          f"RMSE={spatial_aggregated['rmse_ugm3_duan']:.3f} MAE={spatial_aggregated['mae_ugm3_duan']:.3f} "
-          f"(mean smearing factor={spatial_aggregated['smearing_factor_mean']:.4f})")
+    print_aggregated("Spatial LOSO", spatial_aggregated)
 
     log_cv_run_to_mlflow(
         run_name="spatial_loso_cv" + run_name_suffix,
@@ -579,6 +688,7 @@ def main():
             "exclude_low_confidence": exclude_low_confidence,
             "exclude_stations": sorted(exclude_station_ids) if exclude_station_ids else "none",
             "random_slope_aod": random_slope_aod,
+            "target_transform": args.target_transform,
             "run_tag": args.run_tag or "none",
             "n_rows": len(df),
         },
@@ -591,7 +701,8 @@ def main():
 
     print("=== Random CV (comparison, ignores station grouping) ===")
     random_folds_df, random_aggregated = run_random_cv(
-        df, args.n_random_folds, args.random_seed, true_group_means, re_formula, random_slope_aod)
+        df, args.n_random_folds, args.random_seed, true_group_means, true_group_means_ugm3,
+        re_formula, random_slope_aod, args.target_transform)
     random_folds_path = os.path.join(args.output_dir, "cv_random_folds.csv")
     random_folds_df.to_csv(random_folds_path, index=False)
     print(f"Wrote {random_folds_path}")
@@ -599,13 +710,7 @@ def main():
     with open(random_agg_path, "w") as f:
         json.dump(random_aggregated, f, indent=2)
     print(f"Wrote {random_agg_path}")
-    print(f"Random CV aggregated: R2={random_aggregated['r2']:.3f} "
-          f"within_R2={random_aggregated['within_r2']:.3f} "
-          f"RMSE={random_aggregated['rmse']:.3f} MAE={random_aggregated['mae']:.3f}")
-    print(f"  Back-transform (ug/m3): naive RMSE={random_aggregated['rmse_ugm3_naive']:.3f} "
-          f"MAE={random_aggregated['mae_ugm3_naive']:.3f} | Duan-corrected "
-          f"RMSE={random_aggregated['rmse_ugm3_duan']:.3f} MAE={random_aggregated['mae_ugm3_duan']:.3f} "
-          f"(mean smearing factor={random_aggregated['smearing_factor_mean']:.4f})")
+    print_aggregated("Random CV", random_aggregated)
 
     log_cv_run_to_mlflow(
         run_name="random_cv" + run_name_suffix,
@@ -619,6 +724,7 @@ def main():
             "exclude_low_confidence": exclude_low_confidence,
             "exclude_stations": sorted(exclude_station_ids) if exclude_station_ids else "none",
             "random_slope_aod": random_slope_aod,
+            "target_transform": args.target_transform,
             "run_tag": args.run_tag or "none",
             "n_rows": len(df),
         },

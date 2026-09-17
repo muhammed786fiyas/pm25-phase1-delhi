@@ -114,6 +114,34 @@ def variance_component_rows(cov_re):
     return rows
 
 
+def residual_heteroscedasticity_table(result, n_quintiles=5):
+    # Residual variance across fitted-value quintiles. The LME needs roughly
+    # constant residual variance for its standard errors / p-values / CIs to
+    # be valid, and docs/logs/tasks/8-Modeling_Data_Prep.md section 9 measured
+    # a ~12.8x growth across this range on the RAW target (vs a flat profile
+    # on the log target) -- which is exactly why target_transform=log was
+    # chosen. That measurement was made on an exploratory pre-fit, so this
+    # recomputes it from the actual fitted model, for whichever target the fit
+    # used. A large ratio does NOT invalidate the point predictions or the
+    # predictive CV metrics -- only the inference (SEs, p-values, CIs).
+    fitted = result.fittedvalues
+    residuals = result.resid
+    quintile = pd.qcut(fitted, n_quintiles, labels=False, duplicates="drop")
+    rows = []
+    for q in sorted(pd.unique(quintile)):
+        mask = quintile == q
+        rows.append({
+            "fitted_quintile": int(q) + 1,
+            "n": int(mask.sum()),
+            "fitted_min": fitted[mask].min(),
+            "fitted_max": fitted[mask].max(),
+            "residual_variance": residuals[mask].var(),
+        })
+    table = pd.DataFrame(rows)
+    ratio = table["residual_variance"].max() / table["residual_variance"].min()
+    return table, ratio
+
+
 def build_coef_table(result):
     # result.params/.bse/.tvalues/.pvalues/.conf_int() all include the
     # variance-component terms ("Group Var", and with a random slope also
@@ -164,6 +192,13 @@ def main():
                               "per-station random slope for aod_055 alongside the random "
                               "intercept (re_formula='~ aod_055'), instead of the primary "
                               "random-intercept-only model. Default: false.")
+    parser.add_argument("--target_transform", default="log", choices=["log", "raw"],
+                         help="Which scale modeling_target is on in --input. 'log' is the "
+                              "primary dataset (modeling_target = log(pm25_daily)); 'raw' is "
+                              "the raw-target comparison variant built by the "
+                              "prepare_lme_dataset_raw_target stage. Only affects reporting "
+                              "and the AIC/BIC comparability warning -- the fit itself just "
+                              "uses whatever modeling_target holds. Default: log.")
     parser.add_argument("--run_tag", default="",
                          help="Optional tag appended to the MLflow run name, so a diagnostic "
                               "variant (e.g. a fit against a winsorized --input dataset) "
@@ -215,7 +250,8 @@ def main():
     # is registered to the Model Registry -- see MLFLOW_REGISTERED_MODEL_NAME
     # comment above.
     is_primary = (not exclude_low_confidence and not exclude_station_ids
-                  and not args.run_tag and not random_slope_aod)
+                  and not args.run_tag and not random_slope_aod
+                  and args.target_transform == "log")
 
     re_description = "random intercept + random AOD slope by station" if random_slope_aod \
         else "random intercept only by station"
@@ -228,6 +264,7 @@ def main():
     residual_var = result.scale
 
     print("=== Model fit summary ===")
+    print(f"target_transform: {args.target_transform}")
     print(f"logLik: {result.llf}")
     print(f"AIC: {aic}")
     print(f"BIC: {bic}")
@@ -235,6 +272,21 @@ def main():
         print(f"{label}: {value}")
     print(f"Residual variance: {residual_var}")
     print(f"Total parameters (fixed effects + variance components): {k_total}")
+    print("NOTE: logLik/AIC/BIC are only comparable between fits on the SAME "
+          "target_transform -- a log-target and a raw-target fit have different "
+          "response variables and so different likelihood scales. Never table "
+          "this AIC against one from the other transform.")
+
+    hetero_table, hetero_ratio = residual_heteroscedasticity_table(result)
+    print("=== Residual variance by fitted-value quintile (heteroscedasticity check) ===")
+    for row in hetero_table.itertuples(index=False):
+        print(f"quintile {row.fitted_quintile} (n={row.n}, fitted "
+              f"{row.fitted_min:.3f} to {row.fitted_max:.3f}): "
+              f"residual variance {row.residual_variance:.4f}")
+    print(f"Max/min residual variance ratio: {hetero_ratio:.2f} "
+          f"(near 1 is homoscedastic; a large ratio invalidates the standard "
+          f"errors/p-values in the coefficient table, but NOT the point "
+          f"predictions or the CV metrics)")
 
     coef_table = build_coef_table(result)
 
@@ -251,12 +303,24 @@ def main():
     with open(args.summary_output, "w") as f:
         f.write(str(result.summary()))
         f.write("\n\n")
+        f.write(f"target_transform: {args.target_transform}\n")
         f.write(f"logLik: {result.llf}\n")
         f.write(f"AIC: {aic}\n")
         f.write(f"BIC: {bic}\n")
         for label, value in variance_rows:
             f.write(f"{label}: {value}\n")
         f.write(f"Residual variance: {residual_var}\n")
+        f.write("\nNOTE: logLik/AIC/BIC are only comparable between fits on the same\n")
+        f.write("target_transform -- a log-target and a raw-target fit have different\n")
+        f.write("response variables and so different likelihood scales.\n")
+        f.write("\nResidual variance by fitted-value quintile (heteroscedasticity check):\n")
+        for row in hetero_table.itertuples(index=False):
+            f.write(f"  quintile {row.fitted_quintile} (n={row.n}, fitted "
+                    f"{row.fitted_min:.4f} to {row.fitted_max:.4f}): "
+                    f"residual variance {row.residual_variance}\n")
+        f.write(f"  max/min ratio: {hetero_ratio}\n")
+        f.write("  A large ratio invalidates the standard errors/p-values in the\n")
+        f.write("  coefficient table above, but not the point predictions or the CV metrics.\n")
     print(f"Wrote {args.summary_output}")
 
     with mlflow.start_run(run_name=MLFLOW_RUN_NAME_BASE + run_name_suffix):
@@ -268,6 +332,7 @@ def main():
         mlflow.log_param("exclude_low_confidence", exclude_low_confidence)
         mlflow.log_param("exclude_stations", sorted(exclude_station_ids) if exclude_station_ids else "none")
         mlflow.log_param("random_slope_aod", random_slope_aod)
+        mlflow.log_param("target_transform", args.target_transform)
         mlflow.log_param("run_tag", args.run_tag or "none")
         mlflow.log_metric("log_likelihood", result.llf)
         mlflow.log_metric("aic", aic)
@@ -275,6 +340,7 @@ def main():
         for label, value in variance_rows:
             mlflow.log_metric(label, value)
         mlflow.log_metric("residual_variance", residual_var)
+        mlflow.log_metric("residual_variance_quintile_ratio", hetero_ratio)
         log_coefficients_to_mlflow(coef_table)
         mlflow.log_artifact(args.coef_output)
         mlflow.log_artifact(args.summary_output)

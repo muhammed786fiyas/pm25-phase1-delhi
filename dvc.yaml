@@ -625,7 +625,7 @@ stages:
       - data/processed/modeling_datasets/master_feature_table.csv
 
   prepare_lme_dataset:
-    cmd: python scripts/modeling/dataset_prep/02_prepare_lme_dataset.py --input data/processed/modeling_datasets/master_feature_table.csv --output data/processed/modeling_datasets/lme_ready_dataset.csv --target_transform log --drop_zero_target_rows true --clip_negative_aod_to_zero true
+    cmd: python scripts/modeling/dataset_prep/02_prepare_lme_dataset.py --input data/processed/modeling_datasets/master_feature_table.csv --output data/processed/modeling_datasets/lme_ready_dataset.csv --scaling_output data/processed/modeling_datasets/lme_scaling_params.csv --target_transform log --drop_zero_target_rows true --clip_negative_aod_to_zero true
     deps:
       - scripts/modeling/dataset_prep/02_prepare_lme_dataset.py
       - data/processed/modeling_datasets/master_feature_table.csv
@@ -635,6 +635,18 @@ stages:
     outs:
       - data/processed/modeling_datasets/lme_ready_dataset.csv
       - data/processed/modeling_datasets/lme_scaling_params.csv
+
+  prepare_lme_dataset_raw_target:
+    cmd: python scripts/modeling/dataset_prep/02_prepare_lme_dataset.py --input data/processed/modeling_datasets/master_feature_table.csv --output data/processed/modeling_datasets/lme_ready_dataset_raw_target.csv --scaling_output data/processed/modeling_datasets/lme_scaling_params_raw_target.csv --target_transform raw --drop_zero_target_rows true --clip_negative_aod_to_zero true
+    deps:
+      - scripts/modeling/dataset_prep/02_prepare_lme_dataset.py
+      - data/processed/modeling_datasets/master_feature_table.csv
+      - notebooks/01_eda_master_feature_table.ipynb
+    params:
+      - modeling.lme_prep_raw_target
+    outs:
+      - data/processed/modeling_datasets/lme_ready_dataset_raw_target.csv
+      - data/processed/modeling_datasets/lme_scaling_params_raw_target.csv
 
   prepare_lightgbm_dataset:
     cmd: python scripts/modeling/dataset_prep/03_prepare_lightgbm_dataset.py --input data/processed/modeling_datasets/master_feature_table.csv --output data/processed/modeling_datasets/lightgbm_ready_dataset.csv --drop_zero_target_rows true --clip_negative_aod_to_zero true
@@ -702,6 +714,31 @@ stages:
       - models/lme/lme_full_model_random_slope_aod.pkl
       - reports/lme/random_slope_aod/lme_fixed_effects.csv
       - reports/lme/random_slope_aod/lme_model_summary.txt
+
+  fit_lme_model_raw_target:
+    cmd: python scripts/modeling/lme/01_fit_lme_model.py --input data/processed/modeling_datasets/lme_ready_dataset_raw_target.csv --model_output models/lme/lme_full_model_raw_target.pkl --coef_output reports/lme/raw_target/lme_fixed_effects.csv --summary_output reports/lme/raw_target/lme_model_summary.txt --exclude_low_confidence false --target_transform raw --run_tag raw_target
+    deps:
+      - scripts/modeling/lme/01_fit_lme_model.py
+      - data/processed/modeling_datasets/lme_ready_dataset_raw_target.csv
+    outs:
+      - models/lme/lme_full_model_raw_target.pkl
+      - reports/lme/raw_target/lme_fixed_effects.csv
+      - reports/lme/raw_target/lme_model_summary.txt
+
+  validate_lme_cv_raw_target:
+    cmd: python scripts/modeling/lme/02_validate_lme_cv.py --input data/processed/modeling_datasets/lme_ready_dataset_raw_target.csv --station_file data/stations/cpcb_stations_delhi_status.csv --buffer_km 2.0 --n_random_folds 42 --random_seed 42 --exclude_low_confidence false --target_transform raw --run_tag raw_target --output_dir reports/lme/raw_target
+    deps:
+      - scripts/modeling/lme/02_validate_lme_cv.py
+      - data/processed/modeling_datasets/lme_ready_dataset_raw_target.csv
+      - data/stations/cpcb_stations_delhi_status.csv
+    params:
+      - modeling.lme_validation
+    outs:
+      - reports/lme/raw_target/station_buffer_exclusions.csv
+      - reports/lme/raw_target/cv_spatial_loso_folds.csv
+      - reports/lme/raw_target/cv_spatial_loso_aggregated.json
+      - reports/lme/raw_target/cv_random_folds.csv
+      - reports/lme/raw_target/cv_random_aggregated.json
 
   validate_lme_cv:
     cmd: python scripts/modeling/lme/02_validate_lme_cv.py --input data/processed/modeling_datasets/lme_ready_dataset.csv --station_file data/stations/cpcb_stations_delhi_status.csv --buffer_km 2.0 --n_random_folds 42 --random_seed 42 --exclude_low_confidence false --output_dir reports/lme/primary
@@ -785,6 +822,52 @@ stages:
       - reports/lme/random_slope_aod/cv_spatial_loso_aggregated.json
       - reports/lme/random_slope_aod/cv_random_folds.csv
       - reports/lme/random_slope_aod/cv_random_aggregated.json
+
+  # ============================================================
+  # Modeling: LightGBM tune + fit + validate (scripts/modeling/lightgbm/)
+  # ============================================================
+
+  tune_lightgbm_hyperparameters:
+    cmd: python scripts/modeling/lightgbm/00_tune_lightgbm_hyperparameters.py --input data/processed/modeling_datasets/lightgbm_ready_dataset.csv --station_file data/stations/cpcb_stations_delhi_status.csv --buffer_km 2.0 --n_blocks 6 --n_inner_folds 5 --n_trials 100 --learning_rate 0.03 --max_boosting_rounds 3000 --early_stopping_rounds 100 --random_seed 42 --output models/lightgbm/tuned_hyperparameters.json --block_output reports/lightgbm/tuning/station_tuning_blocks.csv --trials_output reports/lightgbm/tuning/optuna_trials.csv
+    deps:
+      - scripts/modeling/lightgbm/00_tune_lightgbm_hyperparameters.py
+      - data/processed/modeling_datasets/lightgbm_ready_dataset.csv
+      - data/stations/cpcb_stations_delhi_status.csv
+    params:
+      - modeling.lightgbm_tuning
+    outs:
+      - models/lightgbm/tuned_hyperparameters.json
+      - reports/lightgbm/tuning/station_tuning_blocks.csv
+      - reports/lightgbm/tuning/optuna_trials.csv
+
+  fit_lightgbm_model:
+    cmd: python scripts/modeling/lightgbm/01_fit_lightgbm_model.py --input data/processed/modeling_datasets/lightgbm_ready_dataset.csv --hyperparameters models/lightgbm/tuned_hyperparameters.json --model_output models/lightgbm/lightgbm_full_model.txt --importance_output reports/lightgbm/primary/lightgbm_feature_importance.csv --summary_output reports/lightgbm/primary/lightgbm_model_summary.txt --learning_rate 0.03 --max_boosting_rounds 3000 --early_stopping_rounds 100 --validation_station_fraction 0.15 --random_seed 42
+    deps:
+      - scripts/modeling/lightgbm/01_fit_lightgbm_model.py
+      - data/processed/modeling_datasets/lightgbm_ready_dataset.csv
+      - models/lightgbm/tuned_hyperparameters.json
+    params:
+      - modeling.lightgbm_fit
+    outs:
+      - models/lightgbm/lightgbm_full_model.txt
+      - reports/lightgbm/primary/lightgbm_feature_importance.csv
+      - reports/lightgbm/primary/lightgbm_model_summary.txt
+
+  validate_lightgbm_cv:
+    cmd: python scripts/modeling/lightgbm/02_validate_lightgbm_cv.py --input data/processed/modeling_datasets/lightgbm_ready_dataset.csv --station_file data/stations/cpcb_stations_delhi_status.csv --hyperparameters models/lightgbm/tuned_hyperparameters.json --buffer_km 2.0 --n_random_folds 42 --random_seed 42 --learning_rate 0.03 --max_boosting_rounds 3000 --early_stopping_rounds 100 --validation_station_fraction 0.15 --validation_row_fraction 0.15 --output_dir reports/lightgbm/primary
+    deps:
+      - scripts/modeling/lightgbm/02_validate_lightgbm_cv.py
+      - data/processed/modeling_datasets/lightgbm_ready_dataset.csv
+      - data/stations/cpcb_stations_delhi_status.csv
+      - models/lightgbm/tuned_hyperparameters.json
+    params:
+      - modeling.lightgbm_validation
+    outs:
+      - reports/lightgbm/primary/station_buffer_exclusions.csv
+      - reports/lightgbm/primary/cv_spatial_loso_folds.csv
+      - reports/lightgbm/primary/cv_spatial_loso_aggregated.json
+      - reports/lightgbm/primary/cv_random_folds.csv
+      - reports/lightgbm/primary/cv_random_aggregated.json
 
   # ============================================================
   # Validation — add stages here once scripts/validation/ has content
