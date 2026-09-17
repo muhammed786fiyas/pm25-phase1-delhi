@@ -33,6 +33,7 @@ env/
 .DS_Store
 Thumbs.db
 test.py
+claude_code_lightgbm_kickoff.md
 
 
 # ---- MLflow local tracking store ----
