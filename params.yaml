@@ -5,12 +5,22 @@ cpcb_qc:
   high_value_limit: 1000
   stuck_run_limit: 3
 
+# Pre-download screening (2b-screen_stations.py). Uses only station metadata.
+cpcb_screen_stations:
+  study_start: "2025-03-01"
+  study_end: "2026-02-28"
+  duplicate_tolerance_km: 0.01   # "same coordinates" -- the one Delhi duplicate pair is ~0.1 m apart,
+                                 # the next-closest eligible pair ~590 m, so 10 m is safely in between
+
 cpcb_filter_aggregate:
-  drop_stations: [10820, 10900, 10825, 6936]
+  # drop_stations removed 2026-09-17: the four stations it listed (10820, 10900,
+  # 10825, 6936) all fail the completeness threshold below, so the rule now drops them.
   min_hours: 2
 
 cpcb_completeness:
-  threshold: 60
+  window_start: "2025-03-01"
+  window_end: "2026-02-28"
+  threshold: 60   # Delhi: all drops <= 44.1%, all KEEP >= 72.9%
 
 
 # ============================================================

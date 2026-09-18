@@ -169,10 +169,13 @@ def load_location_ids(args):
     df = pd.read_csv(args.stations)
     if "location_id" not in df.columns:
         sys.exit(f"{args.stations} has no 'location_id' column.")
+    # Filter on the screening decision (ELIGIBLE), not the final roster (KEEP).
+    # KEEP depends on completeness, which can only be known after downloading,
+    # so filtering on it here made the pipeline circular.
     if "status" in df.columns:
         before = len(df)
-        df = df[df["status"] == "KEEP"]
-        print(f"Station list: kept {len(df)} of {before} rows (status == KEEP)")
+        df = df[df["status"] == args.status_value]
+        print(f"Station list: kept {len(df)} of {before} rows (status == {args.status_value})")
     return df["location_id"].astype(int).tolist()
 
 
@@ -186,6 +189,8 @@ def main():
     p.add_argument("--outdir", required=True, help="Directory for per-station CSVs")
     p.add_argument("--api-key", default=os.environ.get("OPENAQ_API_KEY"),
                    help="OpenAQ API key (or set OPENAQ_API_KEY)")
+    p.add_argument("--status-value", default="ELIGIBLE",
+                   help="Download only rows whose status equals this (default: ELIGIBLE)")
     p.add_argument("--combined", default=None,
                    help="Optional path for the merged CSV (default: <outdir>/ALL_COMBINED.csv)")
     args = p.parse_args()

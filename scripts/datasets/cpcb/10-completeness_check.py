@@ -1,10 +1,17 @@
 import argparse
 import os
+import yaml
 import pandas as pd
 
-WINDOW_START = "2025-03-01"
-WINDOW_END = "2026-02-28"
-COMPLETENESS_THRESHOLD = 60
+# Read from params.yaml so that changing the threshold or window actually
+# changes the result. These were hardcoded before, even though dvc.yaml
+# already listed the threshold as a parameter of this stage.
+with open("params.yaml") as f:
+    params = yaml.safe_load(f)
+
+WINDOW_START = params["cpcb_completeness"]["window_start"]
+WINDOW_END = params["cpcb_completeness"]["window_end"]
+COMPLETENESS_THRESHOLD = params["cpcb_completeness"]["threshold"]
 
 def main():
     parser = argparse.ArgumentParser()
@@ -25,7 +32,7 @@ def main():
 
     actual_days["possible_days"] = possible_days
     actual_days["completeness_pct"] = (actual_days["actual_days"] / possible_days * 100).round(1)
-    actual_days["passes_60pct"] = actual_days["completeness_pct"] >= COMPLETENESS_THRESHOLD
+    actual_days["passes_threshold"] = actual_days["completeness_pct"] >= COMPLETENESS_THRESHOLD
 
     actual_days = actual_days.sort_values("completeness_pct")
 
@@ -34,7 +41,7 @@ def main():
     print(f"Wrote {out_path}")
 
     print(f"\n=== Stations below {COMPLETENESS_THRESHOLD}% ===")
-    failed = actual_days[actual_days["passes_60pct"] == False]
+    failed = actual_days[actual_days["passes_threshold"] == False]
     if len(failed) == 0:
         print("None")
     else:

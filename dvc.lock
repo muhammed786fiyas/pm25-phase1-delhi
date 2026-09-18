@@ -18,20 +18,22 @@ stages:
       md5: 460a3cd141a6fe4cea8063ae80b6c865
       size: 11370
   cpcb_download_pm25:
-    cmd: python scripts/datasets/cpcb/3-download_pm25.py
+    cmd:
+    - python scripts/datasets/cpcb/3-download_pm25.py --stations 
+      data/stations/cpcb_stations_delhi_screened.csv --from-date 2025-01-01 
+      --to-date 2025-12-31 --outdir data/raw/cpcb/pm25_delhi_2025
+    - python scripts/datasets/cpcb/3-download_pm25.py --stations 
+      data/stations/cpcb_stations_delhi_screened.csv --from-date 2026-01-01 
+      --to-date 2026-03-31 --outdir data/raw/cpcb/pm25_delhi_2026_q1
     deps:
-    - path: data/stations/cpcb_stations_delhi_status.csv
+    - path: data/stations/cpcb_stations_delhi_screened.csv
       hash: md5
-      md5: 4d2c634b6bdf8d8e9cf3de6d517f6776
-      size: 14245
+      md5: 90646948377c71d734d104a820e0d421
+      size: 3723
     - path: scripts/datasets/cpcb/3-download_pm25.py
       hash: md5
-      md5: 3051c35c11470f62fbd98d29942c358e
-      size: 11190
-    - path: scripts/datasets/cpcb/cpcb_fetcher.py
-      hash: md5
-      md5: dcf971f8054e569927d3dc896b44195c
-      size: 8680
+      md5: 9110b3ae6964b92d7300dae279c8414c
+      size: 11305
     outs:
     - path: data/raw/cpcb
       hash: md5
@@ -149,21 +151,16 @@ stages:
       nfiles: 2
     - path: scripts/datasets/cpcb/8-filter_and_aggregate.py
       hash: md5
-      md5: e51084367df5a8df22de48ba0d4075a4
-      size: 3248
+      md5: 5b20be5ca00fe9cc939dd165933c0629
+      size: 3091
     params:
       params.yaml:
-        cpcb_filter_aggregate.drop_stations:
-        - 10820
-        - 10900
-        - 10825
-        - 6936
         cpcb_filter_aggregate.min_hours: 2
     outs:
     - path: data/processed/cpcb/pm25_daily
       hash: md5
-      md5: 8df91414889addbc424b12fdef17d59f.dir
-      size: 481569
+      md5: d72a8e40fe517f71de9534cb6fe9cafe.dir
+      size: 498070
       nfiles: 2
   cpcb_find_clusters:
     cmd: python scripts/datasets/cpcb/9-find_station_clusters.py --stations 
@@ -172,8 +169,8 @@ stages:
     deps:
     - path: data/stations/cpcb_stations_delhi_status.csv
       hash: md5
-      md5: 4d2c634b6bdf8d8e9cf3de6d517f6776
-      size: 14245
+      md5: 9b34b7eaffcea41420f1b8b402eff13a
+      size: 4175
     - path: scripts/datasets/cpcb/9-find_station_clusters.py
       hash: md5
       md5: d5a6acb59407ca5ffc6b3a4d7003d756
@@ -190,21 +187,24 @@ stages:
     deps:
     - path: data/processed/cpcb/pm25_daily
       hash: md5
-      md5: 8df91414889addbc424b12fdef17d59f.dir
-      size: 481569
+      md5: d72a8e40fe517f71de9534cb6fe9cafe.dir
+      size: 498070
       nfiles: 2
     - path: scripts/datasets/cpcb/10-completeness_check.py
       hash: md5
-      md5: aea7b16997fc22cb054ac414b8972a9c
-      size: 1586
+      md5: f20b95f02972cb62aac3f977a3c57e56
+      size: 1928
     params:
       params.yaml:
-        cpcb_completeness.threshold: 60
+        cpcb_completeness:
+          window_start: '2025-03-01'
+          window_end: '2026-02-28'
+          threshold: 60
     outs:
     - path: data/interim/cpcb/pm25_qc_daily/station_completeness.csv
       hash: md5
-      md5: 258e5dc78f081be3378de2d50652e7be
-      size: 1104
+      md5: 7a4253cad9a69a265760266e2e3b9244
+      size: 1210
   cpcb_correlation_check:
     cmd: python scripts/datasets/cpcb/11-correlation_check.py --daily 
       data/processed/cpcb/pm25_daily/pm25_daily.csv --clusters 
@@ -217,8 +217,8 @@ stages:
       size: 460
     - path: data/processed/cpcb/pm25_daily
       hash: md5
-      md5: 8df91414889addbc424b12fdef17d59f.dir
-      size: 481569
+      md5: d72a8e40fe517f71de9534cb6fe9cafe.dir
+      size: 498070
       nfiles: 2
     - path: scripts/datasets/cpcb/11-correlation_check.py
       hash: md5
@@ -237,13 +237,13 @@ stages:
     deps:
     - path: data/processed/cpcb/pm25_daily
       hash: md5
-      md5: 8df91414889addbc424b12fdef17d59f.dir
-      size: 481569
+      md5: d72a8e40fe517f71de9534cb6fe9cafe.dir
+      size: 498070
       nfiles: 2
     - path: data/stations/cpcb_stations_delhi_status.csv
       hash: md5
-      md5: 4d2c634b6bdf8d8e9cf3de6d517f6776
-      size: 14245
+      md5: 9b34b7eaffcea41420f1b8b402eff13a
+      size: 4175
     - path: scripts/datasets/cpcb/12-final_filter.py
       hash: md5
       md5: e99f1e8e5d9ad899df4887f77363cfd6
@@ -381,8 +381,8 @@ stages:
       size: 1374106
     - path: data/stations/cpcb_stations_delhi_status.csv
       hash: md5
-      md5: 4d2c634b6bdf8d8e9cf3de6d517f6776
-      size: 14245
+      md5: 9b34b7eaffcea41420f1b8b402eff13a
+      size: 4175
     - path: scripts/datasets/maiac_aod/2-filter_and_scale_aod.py
       hash: md5
       md5: 6154eec33f96232b84acd8f944541b2a
@@ -737,8 +737,8 @@ stages:
       size: 8115
     - path: data/stations/cpcb_stations_delhi_status.csv
       hash: md5
-      md5: 4d2c634b6bdf8d8e9cf3de6d517f6776
-      size: 14245
+      md5: 9b34b7eaffcea41420f1b8b402eff13a
+      size: 4175
     - path: scripts/datasets/static_gee/02_qc_worldcover.py
       hash: md5
       md5: 2628a53484add739bbd51276293a9566
@@ -824,8 +824,8 @@ stages:
       size: 301583
     - path: data/stations/cpcb_stations_delhi_status.csv
       hash: md5
-      md5: 4d2c634b6bdf8d8e9cf3de6d517f6776
-      size: 14245
+      md5: 9b34b7eaffcea41420f1b8b402eff13a
+      size: 4175
     - path: scripts/datasets/static_gee/05_qc_ndvi.py
       hash: md5
       md5: 6311e04bfb041b2116e372e2b887d661
@@ -932,8 +932,8 @@ stages:
       size: 3981
     - path: data/stations/cpcb_stations_delhi_status.csv
       hash: md5
-      md5: 4d2c634b6bdf8d8e9cf3de6d517f6776
-      size: 14245
+      md5: 9b34b7eaffcea41420f1b8b402eff13a
+      size: 4175
     - path: scripts/datasets/static_gee/09_qc_srtm.py
       hash: md5
       md5: ec4488f0c7f56605a6aad9f88d0bf209
@@ -984,17 +984,14 @@ stages:
       hash: md5
       md5: 17a81d0915a0fdf9b24ded8af32c1ea9
       size: 159353725
-      isexec: true
     - path: data/stations/cpcb_stations_delhi_status.csv
       hash: md5
-      md5: 4d2c634b6bdf8d8e9cf3de6d517f6776
-      size: 14245
-      isexec: true
+      md5: 9b34b7eaffcea41420f1b8b402eff13a
+      size: 4175
     - path: scripts/datasets/osm/01_extract_road_lengths.py
       hash: md5
       md5: abbbbad62a2529e4735b43450b416b56
       size: 3904
-      isexec: true
     params:
       params.yaml:
         osm_layers.roads.extract:
@@ -1004,14 +1001,12 @@ stages:
     outs:
     - path: data/raw/osm/road_lengths_extraction_summary.csv
       hash: md5
-      md5: d81c52033c6b47d2e70d6482ab45b5c1
-      size: 154
-      isexec: true
+      md5: 9e711ced8c65181ddab02e38753853b7
+      size: 156
     - path: data/raw/osm/road_lengths_raw.csv
       hash: md5
-      md5: a33ccb6524ec8789a3775579b1c57a4a
-      size: 3627
-      isexec: true
+      md5: 80e2c554f046b5a8f198c7c55d032a8e
+      size: 3674
   qc_roads:
     cmd: python scripts/datasets/osm/02_qc_roads.py --input 
       data/raw/osm/road_lengths_raw.csv --station_file 
@@ -1021,19 +1016,16 @@ stages:
     deps:
     - path: data/raw/osm/road_lengths_raw.csv
       hash: md5
-      md5: a33ccb6524ec8789a3775579b1c57a4a
-      size: 3627
-      isexec: true
+      md5: 80e2c554f046b5a8f198c7c55d032a8e
+      size: 3674
     - path: data/stations/cpcb_stations_delhi_status.csv
       hash: md5
-      md5: 4d2c634b6bdf8d8e9cf3de6d517f6776
-      size: 14245
-      isexec: true
+      md5: 9b34b7eaffcea41420f1b8b402eff13a
+      size: 4175
     - path: scripts/datasets/osm/02_qc_roads.py
       hash: md5
       md5: ad14dacf9074e54d20cc97aadc07eb3e
       size: 2379
-      isexec: true
     params:
       params.yaml:
         osm_layers.roads.qc:
@@ -1042,9 +1034,8 @@ stages:
     outs:
     - path: data/interim/osm/road_qc_summary.csv
       hash: md5
-      md5: 4a44e85dc08a5002a5a1ae30fdfa5c13
-      size: 96
-      isexec: true
+      md5: d386de04af90bce3a5c7e84b9a95d316
+      size: 98
   compute_road_density:
     cmd: python scripts/datasets/osm/03_compute_road_density.py --input 
       data/raw/osm/road_lengths_raw.csv --output 
@@ -1052,25 +1043,21 @@ stages:
     deps:
     - path: data/interim/osm/road_qc_summary.csv
       hash: md5
-      md5: 4a44e85dc08a5002a5a1ae30fdfa5c13
-      size: 96
-      isexec: true
+      md5: d386de04af90bce3a5c7e84b9a95d316
+      size: 98
     - path: data/raw/osm/road_lengths_raw.csv
       hash: md5
-      md5: a33ccb6524ec8789a3775579b1c57a4a
-      size: 3627
-      isexec: true
+      md5: 80e2c554f046b5a8f198c7c55d032a8e
+      size: 3674
     - path: scripts/datasets/osm/03_compute_road_density.py
       hash: md5
       md5: a8bc6ac7abba21bf4ad77c66229a51c0
       size: 1320
-      isexec: true
     outs:
     - path: data/processed/osm/road_density.csv
       hash: md5
-      md5: 63cdc762eda52fe12a610351e70254d7
-      size: 3150
-      isexec: true
+      md5: 23aa827dbee6bea985f0aa7df06f3b80
+      size: 3196
   extract_industrial_area:
     cmd: python scripts/datasets/osm/04_extract_industrial_area.py 
       --station_file data/stations/cpcb_stations_delhi_status.csv 
@@ -1082,17 +1069,14 @@ stages:
       hash: md5
       md5: 40a83af1c7503a19499df9e172f4fabf
       size: 475189
-      isexec: true
     - path: data/stations/cpcb_stations_delhi_status.csv
       hash: md5
-      md5: 4d2c634b6bdf8d8e9cf3de6d517f6776
-      size: 14245
-      isexec: true
+      md5: 9b34b7eaffcea41420f1b8b402eff13a
+      size: 4175
     - path: scripts/datasets/osm/04_extract_industrial_area.py
       hash: md5
       md5: 9e126691f28f7e68e360d27d37a26ed1
       size: 3817
-      isexec: true
     params:
       params.yaml:
         osm_layers.industrial.extract:
@@ -1102,14 +1086,12 @@ stages:
     outs:
     - path: data/raw/osm/industrial_area_extraction_summary.csv
       hash: md5
-      md5: df0ee592e4e9972a9692e34bf3405a72
-      size: 87
-      isexec: true
+      md5: e819a35bef76adb0835f311d5e6fd169
+      size: 89
     - path: data/raw/osm/industrial_area_raw.csv
       hash: md5
-      md5: 6653d8ff82462400dc5020d9a33ce749
-      size: 4101
-      isexec: true
+      md5: fdd2671ef21a938b98ad20c17980fb58
+      size: 4141
   qc_industrial:
     cmd: python scripts/datasets/osm/05_qc_industrial.py --input 
       data/raw/osm/industrial_area_raw.csv --station_file 
@@ -1118,19 +1100,16 @@ stages:
     deps:
     - path: data/raw/osm/industrial_area_raw.csv
       hash: md5
-      md5: 6653d8ff82462400dc5020d9a33ce749
-      size: 4101
-      isexec: true
+      md5: fdd2671ef21a938b98ad20c17980fb58
+      size: 4141
     - path: data/stations/cpcb_stations_delhi_status.csv
       hash: md5
-      md5: 4d2c634b6bdf8d8e9cf3de6d517f6776
-      size: 14245
-      isexec: true
+      md5: 9b34b7eaffcea41420f1b8b402eff13a
+      size: 4175
     - path: scripts/datasets/osm/05_qc_industrial.py
       hash: md5
       md5: cabe5570846b5909abd7666fc5c51a62
       size: 1975
-      isexec: true
     params:
       params.yaml:
         osm_layers.industrial.qc:
@@ -1138,9 +1117,8 @@ stages:
     outs:
     - path: data/interim/osm/industrial_qc_summary.csv
       hash: md5
-      md5: 93ab4cbc4566efaa2e335ac777075d52
-      size: 94
-      isexec: true
+      md5: 6a861b838c2f4ef2071c05324a89ebc2
+      size: 96
   compute_industrial_fraction:
     cmd: python scripts/datasets/osm/06_compute_industrial_fraction.py --input 
       data/raw/osm/industrial_area_raw.csv --output 
@@ -1148,25 +1126,21 @@ stages:
     deps:
     - path: data/interim/osm/industrial_qc_summary.csv
       hash: md5
-      md5: 93ab4cbc4566efaa2e335ac777075d52
-      size: 94
-      isexec: true
+      md5: 6a861b838c2f4ef2071c05324a89ebc2
+      size: 96
     - path: data/raw/osm/industrial_area_raw.csv
       hash: md5
-      md5: 6653d8ff82462400dc5020d9a33ce749
-      size: 4101
-      isexec: true
+      md5: fdd2671ef21a938b98ad20c17980fb58
+      size: 4141
     - path: scripts/datasets/osm/06_compute_industrial_fraction.py
       hash: md5
       md5: 5346612ea9ac5719889973c862d83d1f
       size: 1157
-      isexec: true
     outs:
     - path: data/processed/osm/industrial_fraction.csv
       hash: md5
-      md5: 4f242056ddc17a323ceb9ced5db7ee4a
-      size: 2911
-      isexec: true
+      md5: b397dd3098da5d5bdcd1d16d10e7cf16
+      size: 2958
   extract_powerplant_distances:
     cmd: python scripts/datasets/osm/07_extract_powerplant_distances.py 
       --station_file data/stations/cpcb_stations_delhi_status.csv 
@@ -1178,17 +1152,14 @@ stages:
       hash: md5
       md5: 0b654649c9f270c422fc0d8ca64fc2c4
       size: 85807
-      isexec: true
     - path: data/stations/cpcb_stations_delhi_status.csv
       hash: md5
-      md5: 4d2c634b6bdf8d8e9cf3de6d517f6776
-      size: 14245
-      isexec: true
+      md5: 9b34b7eaffcea41420f1b8b402eff13a
+      size: 4175
     - path: scripts/datasets/osm/07_extract_powerplant_distances.py
       hash: md5
       md5: bc925c7529895015f1c3e320888c5f49
       size: 3785
-      isexec: true
     params:
       params.yaml:
         osm_layers.powerplants.extract:
@@ -1197,14 +1168,12 @@ stages:
     outs:
     - path: data/raw/osm/powerplant_distances_extraction_summary.csv
       hash: md5
-      md5: b435e373e85e8a9d03a5eccee8caabb5
-      size: 144
-      isexec: true
+      md5: aaddbda896b155ddc369f65a8aebd54e
+      size: 146
     - path: data/raw/osm/powerplant_distances_raw.csv
       hash: md5
-      md5: f2bebe3b10addd3c404102c107581126
-      size: 3666
-      isexec: true
+      md5: 4996e41f7723de72ab74f05921a6107b
+      size: 3712
   qc_powerplants:
     cmd: python scripts/datasets/osm/08_qc_powerplants.py --input 
       data/raw/osm/powerplant_distances_raw.csv --station_file 
@@ -1214,19 +1183,16 @@ stages:
     deps:
     - path: data/raw/osm/powerplant_distances_raw.csv
       hash: md5
-      md5: f2bebe3b10addd3c404102c107581126
-      size: 3666
-      isexec: true
+      md5: 4996e41f7723de72ab74f05921a6107b
+      size: 3712
     - path: data/stations/cpcb_stations_delhi_status.csv
       hash: md5
-      md5: 4d2c634b6bdf8d8e9cf3de6d517f6776
-      size: 14245
-      isexec: true
+      md5: 9b34b7eaffcea41420f1b8b402eff13a
+      size: 4175
     - path: scripts/datasets/osm/08_qc_powerplants.py
       hash: md5
       md5: 1f87631e290d3d8820976d20e5691695
       size: 1875
-      isexec: true
     params:
       params.yaml:
         osm_layers.powerplants.qc:
@@ -1235,9 +1201,8 @@ stages:
     outs:
     - path: data/interim/osm/powerplant_qc_summary.csv
       hash: md5
-      md5: a9b707ce2cd5e1b3f250f658624a2eb6
-      size: 79
-      isexec: true
+      md5: 1e4ed0511c13d7791b9e38e962c4db08
+      size: 81
   finalize_powerplant_distance:
     cmd: python scripts/datasets/osm/09_finalize_powerplant_distance.py --input 
       data/raw/osm/powerplant_distances_raw.csv --output 
@@ -1245,25 +1210,21 @@ stages:
     deps:
     - path: data/interim/osm/powerplant_qc_summary.csv
       hash: md5
-      md5: a9b707ce2cd5e1b3f250f658624a2eb6
-      size: 79
-      isexec: true
+      md5: 1e4ed0511c13d7791b9e38e962c4db08
+      size: 81
     - path: data/raw/osm/powerplant_distances_raw.csv
       hash: md5
-      md5: f2bebe3b10addd3c404102c107581126
-      size: 3666
-      isexec: true
+      md5: 4996e41f7723de72ab74f05921a6107b
+      size: 3712
     - path: scripts/datasets/osm/09_finalize_powerplant_distance.py
       hash: md5
       md5: ff4baed64debb849da633ce36f14af1f
       size: 897
-      isexec: true
     outs:
     - path: data/processed/osm/powerplant_distance.csv
       hash: md5
-      md5: 583338339120a61e38b5cb58a16e73d5
-      size: 3480
-      isexec: true
+      md5: 95d2e01978112f7d2f64a96e0fffb2bf
+      size: 3521
   maiac_gapfill_build_dataset:
     cmd: python scripts/datasets/maiac_gapfill/01_build_calibration_dataset.py 
       --maiac_input data/processed/maiac_aod/maiac_aod_daily.csv --merra2_input 
@@ -1276,33 +1237,27 @@ stages:
       hash: md5
       md5: 5fa82874b97aa0c16c1fc3642f159fc6
       size: 422834
-      isexec: true
     - path: data/processed/merra2_aod/merra2_aod_daily.csv
       hash: md5
       md5: a52d3d12668f3cf7304da36eb4bc9fee
       size: 1572345
-      isexec: true
     - path: data/stations/cpcb_stations_delhi_status.csv
       hash: md5
-      md5: 4d2c634b6bdf8d8e9cf3de6d517f6776
-      size: 14245
-      isexec: true
+      md5: 9b34b7eaffcea41420f1b8b402eff13a
+      size: 4175
     - path: scripts/datasets/maiac_gapfill/01_build_calibration_dataset.py
       hash: md5
       md5: 5c6ea7422b62ce06476b179fc76cf7bb
       size: 3217
-      isexec: true
     outs:
     - path: data/raw/maiac_gapfill/calibration_dataset.csv
       hash: md5
-      md5: 52fce99a7fc56fcd8a4f307675a9a10a
-      size: 807488
-      isexec: true
+      md5: 4503b3f4abf8448792b5906e738ab635
+      size: 815136
     - path: data/raw/maiac_gapfill/overlap_summary.csv
       hash: md5
-      md5: a6714e8aa0c42e811cd142c9a5fd1e60
-      size: 408
-      isexec: true
+      md5: be9742ba8e365166b01dd38e58d09473
+      size: 451
   maiac_gapfill_fit_calibration:
     cmd: python scripts/datasets/maiac_gapfill/02_fit_station_calibration.py 
       --input data/raw/maiac_gapfill/calibration_dataset.csv --station_file 
@@ -1311,19 +1266,16 @@ stages:
     deps:
     - path: data/raw/maiac_gapfill/calibration_dataset.csv
       hash: md5
-      md5: 52fce99a7fc56fcd8a4f307675a9a10a
-      size: 807488
-      isexec: true
+      md5: 4503b3f4abf8448792b5906e738ab635
+      size: 815136
     - path: data/stations/cpcb_stations_delhi_status.csv
       hash: md5
-      md5: 4d2c634b6bdf8d8e9cf3de6d517f6776
-      size: 14245
-      isexec: true
+      md5: 9b34b7eaffcea41420f1b8b402eff13a
+      size: 4175
     - path: scripts/datasets/maiac_gapfill/02_fit_station_calibration.py
       hash: md5
       md5: 317d64fb13b9429ace4c1308c5e0c116
       size: 4932
-      isexec: true
     params:
       params.yaml:
         maiac_gapfill.calibration:
@@ -1332,9 +1284,8 @@ stages:
     outs:
     - path: data/raw/maiac_gapfill/station_calibration_raw.csv
       hash: md5
-      md5: 81a433ccf12fa2e62ab9425abe44a96d
-      size: 7543
-      isexec: true
+      md5: 14a28b5827180952b060cabbd3bf33f7
+      size: 7573
   maiac_gapfill_qc_calibration:
     cmd: python scripts/datasets/maiac_gapfill/03_qc_calibration.py --input 
       data/raw/maiac_gapfill/station_calibration_raw.csv --station_file 
@@ -1343,19 +1294,16 @@ stages:
     deps:
     - path: data/raw/maiac_gapfill/station_calibration_raw.csv
       hash: md5
-      md5: 81a433ccf12fa2e62ab9425abe44a96d
-      size: 7543
-      isexec: true
+      md5: 14a28b5827180952b060cabbd3bf33f7
+      size: 7573
     - path: data/stations/cpcb_stations_delhi_status.csv
       hash: md5
-      md5: 4d2c634b6bdf8d8e9cf3de6d517f6776
-      size: 14245
-      isexec: true
+      md5: 9b34b7eaffcea41420f1b8b402eff13a
+      size: 4175
     - path: scripts/datasets/maiac_gapfill/03_qc_calibration.py
       hash: md5
       md5: 78571335d5379942d42d8b751b01d8e9
       size: 3840
-      isexec: true
     params:
       params.yaml:
         maiac_gapfill.qc:
@@ -1365,9 +1313,8 @@ stages:
     outs:
     - path: data/interim/maiac_gapfill/calibration_qc_summary.csv
       hash: md5
-      md5: 6252a370fa36c57dd47bc6e2f9e1a431
-      size: 126
-      isexec: true
+      md5: 077aec5c65a8681e0d816614bf27f2e9
+      size: 128
   maiac_gapfill_apply_fill:
     cmd: python scripts/datasets/maiac_gapfill/05_apply_gapfill.py --maiac_input
       data/processed/maiac_aod/maiac_aod_daily.csv --merra2_input 
@@ -1382,32 +1329,26 @@ stages:
       hash: md5
       md5: 5fa82874b97aa0c16c1fc3642f159fc6
       size: 422834
-      isexec: true
     - path: data/processed/maiac_gapfill/confidence_scores.csv
       hash: md5
-      md5: 48e0d530ebee72f353e5499545d922e7
-      size: 10339
-      isexec: true
+      md5: 5842ffbafe418ff682c2a821c4955702
+      size: 10503
     - path: data/processed/merra2_aod/merra2_aod_daily.csv
       hash: md5
       md5: a52d3d12668f3cf7304da36eb4bc9fee
       size: 1572345
-      isexec: true
     - path: data/raw/maiac_gapfill/station_calibration_raw.csv
       hash: md5
-      md5: 81a433ccf12fa2e62ab9425abe44a96d
-      size: 7543
-      isexec: true
+      md5: 14a28b5827180952b060cabbd3bf33f7
+      size: 7573
     - path: data/stations/cpcb_stations_delhi_status.csv
       hash: md5
-      md5: 4d2c634b6bdf8d8e9cf3de6d517f6776
-      size: 14245
-      isexec: true
+      md5: 9b34b7eaffcea41420f1b8b402eff13a
+      size: 4175
     - path: scripts/datasets/maiac_gapfill/05_apply_gapfill.py
       hash: md5
       md5: 2a04d0f8e8be0f5de474e028805b65c5
       size: 8082
-      isexec: true
     params:
       params.yaml:
         maiac_gapfill.fill:
@@ -1416,14 +1357,12 @@ stages:
     outs:
     - path: data/processed/maiac_gapfill/fill_summary.csv
       hash: md5
-      md5: 666eed965c22228625ea6577fb1c64d0
-      size: 1075
-      isexec: true
+      md5: fe1662b7804fa67a49ba5b11b19c7aed
+      size: 1118
     - path: data/processed/maiac_gapfill/maiac_aod_gapfilled.csv
       hash: md5
-      md5: 0fb5e66cac917618ee299c9140cd9e4b
-      size: 1882536
-      isexec: true
+      md5: 42747fd8eb1fe1d6bf07d5c89084067e
+      size: 1897019
   maiac_gapfill_score_confidence:
     cmd: python scripts/datasets/maiac_gapfill/04_score_confidence.py --input 
       data/raw/maiac_gapfill/calibration_dataset.csv --residuals_output 
@@ -1432,19 +1371,16 @@ stages:
     deps:
     - path: data/interim/maiac_gapfill/calibration_qc_summary.csv
       hash: md5
-      md5: 6252a370fa36c57dd47bc6e2f9e1a431
-      size: 126
-      isexec: true
+      md5: 077aec5c65a8681e0d816614bf27f2e9
+      size: 128
     - path: data/raw/maiac_gapfill/calibration_dataset.csv
       hash: md5
-      md5: 52fce99a7fc56fcd8a4f307675a9a10a
-      size: 807488
-      isexec: true
+      md5: 4503b3f4abf8448792b5906e738ab635
+      size: 815136
     - path: scripts/datasets/maiac_gapfill/04_score_confidence.py
       hash: md5
       md5: f164ffcf872727df51a1ca448a68b94c
       size: 6754
-      isexec: true
     params:
       params.yaml:
         maiac_gapfill.calibration:
@@ -1456,14 +1392,12 @@ stages:
     outs:
     - path: data/interim/maiac_gapfill/loocv_residuals.csv
       hash: md5
-      md5: 8958aacdf5e13f243f42800f3726ceb3
-      size: 561171
-      isexec: true
+      md5: e97a68050ba5990f1a13de1b4bf09946
+      size: 569038
     - path: data/processed/maiac_gapfill/confidence_scores.csv
       hash: md5
-      md5: 48e0d530ebee72f353e5499545d922e7
-      size: 10339
-      isexec: true
+      md5: 5842ffbafe418ff682c2a821c4955702
+      size: 10503
   build_master_feature_table:
     cmd: python scripts/modeling/dataset_prep/01_build_master_table.py 
       --station_file data/stations/cpcb_stations_delhi_status.csv --pm25 
@@ -1483,68 +1417,55 @@ stages:
       hash: md5
       md5: 1e03014716715faf40a0236dd8373894
       size: 469270
-      isexec: true
     - path: data/processed/era5_blh/era5_blh_daily.csv
       hash: md5
       md5: 88eb99aa9d274dcb7f64d9ebeb5820c2
       size: 1029256
-      isexec: true
     - path: data/processed/era5_land/era5_land_daily.csv
       hash: md5
       md5: 954ccc3d8e6ab1d9b206f765ad101304
       size: 1879908
-      isexec: true
     - path: data/processed/maiac_gapfill/maiac_aod_gapfilled.csv
       hash: md5
-      md5: 0fb5e66cac917618ee299c9140cd9e4b
-      size: 1882536
-      isexec: true
+      md5: 42747fd8eb1fe1d6bf07d5c89084067e
+      size: 1897019
     - path: data/processed/osm/industrial_fraction.csv
       hash: md5
-      md5: 4f242056ddc17a323ceb9ced5db7ee4a
-      size: 2911
-      isexec: true
+      md5: b397dd3098da5d5bdcd1d16d10e7cf16
+      size: 2958
     - path: data/processed/osm/powerplant_distance.csv
       hash: md5
-      md5: 583338339120a61e38b5cb58a16e73d5
-      size: 3480
-      isexec: true
+      md5: 95d2e01978112f7d2f64a96e0fffb2bf
+      size: 3521
     - path: data/processed/osm/road_density.csv
       hash: md5
-      md5: 63cdc762eda52fe12a610351e70254d7
-      size: 3150
-      isexec: true
+      md5: 23aa827dbee6bea985f0aa7df06f3b80
+      size: 3196
     - path: data/processed/static_gee/ndvi_gapfilled.csv
       hash: md5
       md5: 106182e8e37981596b4e9bcc5bfe1569
       size: 318739
-      isexec: true
     - path: data/processed/static_gee/srtm_terrain.csv
       hash: md5
       md5: 0b03765878b175b418f345cab1dfd9b2
       size: 3964
-      isexec: true
     - path: data/processed/static_gee/worldcover_landuse.csv
       hash: md5
       md5: 059f615204a5c5bf9b428f8c79945dbe
       size: 8429
-      isexec: true
     - path: data/stations/cpcb_stations_delhi_status.csv
       hash: md5
-      md5: 4d2c634b6bdf8d8e9cf3de6d517f6776
-      size: 14245
-      isexec: true
+      md5: 9b34b7eaffcea41420f1b8b402eff13a
+      size: 4175
     - path: scripts/modeling/dataset_prep/01_build_master_table.py
       hash: md5
       md5: aba7603fa2c1a3449c64988825dae3ae
       size: 5935
-      isexec: true
     outs:
     - path: data/processed/modeling_datasets/master_feature_table.csv
       hash: md5
-      md5: 45dc88a0c2cc3c64599799a83f7640cb
-      size: 6642873
-      isexec: true
+      md5: b3fa1f03e1482c5ef1d6d5879e12c108
+      size: 6657899
   prepare_lme_dataset:
     cmd: python scripts/modeling/dataset_prep/02_prepare_lme_dataset.py --input 
       data/processed/modeling_datasets/master_feature_table.csv --output 
@@ -1554,8 +1475,8 @@ stages:
     deps:
     - path: data/processed/modeling_datasets/master_feature_table.csv
       hash: md5
-      md5: 45dc88a0c2cc3c64599799a83f7640cb
-      size: 6642873
+      md5: b3fa1f03e1482c5ef1d6d5879e12c108
+      size: 6657899
     - path: notebooks/01_eda_master_feature_table.ipynb
       hash: md5
       md5: 3b074e19616528c490e054e395a5dcce
@@ -1598,12 +1519,12 @@ stages:
     outs:
     - path: data/processed/modeling_datasets/lme_ready_dataset.csv
       hash: md5
-      md5: 1e472e1209bd83591a49aa3790129fe9
-      size: 6138496
+      md5: 9c243a3462ca97c9b7210998f96d6af0
+      size: 6139205
     - path: data/processed/modeling_datasets/lme_scaling_params.csv
       hash: md5
-      md5: e2e4b5ec5de69ea78b8815eb517526d1
-      size: 938
+      md5: 7d8a81cff0223d79ae5fc4dfc8ba2b89
+      size: 941
   prepare_lightgbm_dataset:
     cmd: python scripts/modeling/dataset_prep/03_prepare_lightgbm_dataset.py 
       --input data/processed/modeling_datasets/master_feature_table.csv --output
@@ -1612,14 +1533,12 @@ stages:
     deps:
     - path: data/processed/modeling_datasets/master_feature_table.csv
       hash: md5
-      md5: 45dc88a0c2cc3c64599799a83f7640cb
-      size: 6642873
-      isexec: true
+      md5: b3fa1f03e1482c5ef1d6d5879e12c108
+      size: 6657899
     - path: scripts/modeling/dataset_prep/03_prepare_lightgbm_dataset.py
       hash: md5
       md5: d6e45198aafcaf1f4bcdab698e9b9606
       size: 4070
-      isexec: true
     params:
       params.yaml:
         modeling.lightgbm_prep:
@@ -1633,9 +1552,8 @@ stages:
     outs:
     - path: data/processed/modeling_datasets/lightgbm_ready_dataset.csv
       hash: md5
-      md5: e82083c02036f7bac1280e62dbd87cc9
-      size: 5307964
-      isexec: true
+      md5: a5eeeda1eb4a2900b5dd45498ba6274a
+      size: 5322602
   fit_lme_model:
     cmd: python scripts/modeling/lme/01_fit_lme_model.py --input 
       data/processed/modeling_datasets/lme_ready_dataset.csv --model_output 
@@ -1646,8 +1564,8 @@ stages:
     deps:
     - path: data/processed/modeling_datasets/lme_ready_dataset.csv
       hash: md5
-      md5: 1e472e1209bd83591a49aa3790129fe9
-      size: 6138496
+      md5: 9c243a3462ca97c9b7210998f96d6af0
+      size: 6139205
     - path: scripts/modeling/lme/01_fit_lme_model.py
       hash: md5
       md5: ed43a75be3a83613a1bf06d8684ec986
@@ -1655,16 +1573,16 @@ stages:
     outs:
     - path: models/lme/lme_full_model.pkl
       hash: md5
-      md5: 504e46713e68af167300fbd39a7d28dc
-      size: 15474242
+      md5: c57557c9719ea04c532efb48f665e7dd
+      size: 15473911
     - path: reports/lme/primary_log_target/lme_fixed_effects.csv
       hash: md5
-      md5: 41bdd9bd81755f22ec1ac9dcbb77f28c
-      size: 3324
+      md5: 3f49c60741471c4cc1f30cabb4d1f024
+      size: 3323
     - path: reports/lme/primary_log_target/lme_model_summary.txt
       hash: md5
-      md5: 5c20f950c53fc536699024c3f181df8d
-      size: 3820
+      md5: 2b2b6f9e32df69c2a2cf7a092712e33d
+      size: 3822
   validate_lme_cv:
     cmd: python scripts/modeling/lme/02_validate_lme_cv.py --input 
       data/processed/modeling_datasets/lme_ready_dataset.csv --station_file 
@@ -1674,12 +1592,12 @@ stages:
     deps:
     - path: data/processed/modeling_datasets/lme_ready_dataset.csv
       hash: md5
-      md5: 1e472e1209bd83591a49aa3790129fe9
-      size: 6138496
+      md5: 9c243a3462ca97c9b7210998f96d6af0
+      size: 6139205
     - path: data/stations/cpcb_stations_delhi_status.csv
       hash: md5
-      md5: 4d2c634b6bdf8d8e9cf3de6d517f6776
-      size: 14245
+      md5: 9b34b7eaffcea41420f1b8b402eff13a
+      size: 4175
     - path: scripts/modeling/lme/02_validate_lme_cv.py
       hash: md5
       md5: f56ccf5923ee11e6e4ff23e7f2d0f50b
@@ -1693,24 +1611,24 @@ stages:
     outs:
     - path: reports/lme/primary_log_target/cv_random_aggregated.json
       hash: md5
-      md5: d69219dcf44647bf31807f77c4b3be05
-      size: 705
+      md5: 1254b3fb5917332b3ca2dfcd73e60bab
+      size: 706
     - path: reports/lme/primary_log_target/cv_random_folds.csv
       hash: md5
-      md5: 884d7ba52d357dd6dd878c6a27e8a00e
-      size: 9412
+      md5: fb978d8695d20b0b92a2da6065d77f93
+      size: 9422
     - path: reports/lme/primary_log_target/cv_spatial_loso_aggregated.json
       hash: md5
-      md5: 69191d3cf2229bbd643c5ac5c1f759a1
-      size: 709
+      md5: dd36570abb3e1c1c379a5a123b66ddfb
+      size: 712
     - path: reports/lme/primary_log_target/cv_spatial_loso_folds.csv
       hash: md5
-      md5: 593d21a2f6b73eb8522de380ac79bb38
-      size: 9657
+      md5: d096a2e6d31c768cdcfc344150c1bfbf
+      size: 9675
     - path: reports/lme/primary_log_target/station_buffer_exclusions.csv
       hash: md5
-      md5: 024d4ad6fbdbbd2a2664a97183338995
-      size: 1770
+      md5: e705662a0dd95e5694674363c884dd96
+      size: 1769
   validate_lme_cv_gapfill_robustness:
     cmd: python scripts/modeling/lme/02_validate_lme_cv.py --input 
       data/processed/modeling_datasets/lme_ready_dataset.csv --station_file 
@@ -1720,12 +1638,12 @@ stages:
     deps:
     - path: data/processed/modeling_datasets/lme_ready_dataset.csv
       hash: md5
-      md5: 1e472e1209bd83591a49aa3790129fe9
-      size: 6138496
+      md5: 9c243a3462ca97c9b7210998f96d6af0
+      size: 6139205
     - path: data/stations/cpcb_stations_delhi_status.csv
       hash: md5
-      md5: 4d2c634b6bdf8d8e9cf3de6d517f6776
-      size: 14245
+      md5: 9b34b7eaffcea41420f1b8b402eff13a
+      size: 4175
     - path: scripts/modeling/lme/02_validate_lme_cv.py
       hash: md5
       md5: f56ccf5923ee11e6e4ff23e7f2d0f50b
@@ -1739,12 +1657,12 @@ stages:
     outs:
     - path: reports/lme/gapfill_robustness/cv_spatial_loso_aggregated.json
       hash: md5
-      md5: ceb7b69a7c6fb37d14f1c9dd9b60f2b9
-      size: 713
+      md5: 8d269b34be20abdd516dd895dc2d267e
+      size: 712
     - path: reports/lme/gapfill_robustness/cv_spatial_loso_folds.csv
       hash: md5
-      md5: 2503597dced37d6ef65127e4860a99c8
-      size: 9657
+      md5: 3695fdaee966f344d2b1c3dad8a98ff2
+      size: 9674
   winsorize_aod_dataset:
     cmd: python scripts/modeling/lme/03_winsorize_aod.py --input 
       data/processed/modeling_datasets/lme_ready_dataset.csv --output 
@@ -1753,8 +1671,8 @@ stages:
     deps:
     - path: data/processed/modeling_datasets/lme_ready_dataset.csv
       hash: md5
-      md5: 1e472e1209bd83591a49aa3790129fe9
-      size: 6138496
+      md5: 9c243a3462ca97c9b7210998f96d6af0
+      size: 6139205
     - path: scripts/modeling/lme/03_winsorize_aod.py
       hash: md5
       md5: 46ffa45dfd3d4785103133521c4ce07e
@@ -1767,8 +1685,8 @@ stages:
     - path: 
         data/processed/modeling_datasets/lme_ready_dataset_aod_winsorized.csv
       hash: md5
-      md5: b5f280895e58f1474844a851b812e8ad
-      size: 6044953
+      md5: a9640815c8e1027332e54b061afedb7b
+      size: 6047913
   validate_lme_cv_aod_winsorized:
     cmd: python scripts/modeling/lme/02_validate_lme_cv.py --input 
       data/processed/modeling_datasets/lme_ready_dataset_aod_winsorized.csv 
@@ -1779,12 +1697,12 @@ stages:
     - path: 
         data/processed/modeling_datasets/lme_ready_dataset_aod_winsorized.csv
       hash: md5
-      md5: b5f280895e58f1474844a851b812e8ad
-      size: 6044953
+      md5: a9640815c8e1027332e54b061afedb7b
+      size: 6047913
     - path: data/stations/cpcb_stations_delhi_status.csv
       hash: md5
-      md5: 4d2c634b6bdf8d8e9cf3de6d517f6776
-      size: 14245
+      md5: 9b34b7eaffcea41420f1b8b402eff13a
+      size: 4175
     - path: scripts/modeling/lme/02_validate_lme_cv.py
       hash: md5
       md5: f56ccf5923ee11e6e4ff23e7f2d0f50b
@@ -1798,24 +1716,24 @@ stages:
     outs:
     - path: reports/lme/aod_winsorized/cv_random_aggregated.json
       hash: md5
-      md5: f1498e5a2cf37bc23073b415d7b95a36
-      size: 706
+      md5: e13581599cd94b212aeec997772ae2f9
+      size: 703
     - path: reports/lme/aod_winsorized/cv_random_folds.csv
       hash: md5
-      md5: 806e5e7a03d0540588b3e50c160e040f
-      size: 9447
+      md5: a34fa86f3aac0567f855e5f36faa8a62
+      size: 9428
     - path: reports/lme/aod_winsorized/cv_spatial_loso_aggregated.json
       hash: md5
-      md5: 03003f24ee5c4f27292521672549d495
-      size: 712
+      md5: 0e7e5e6a65a28a3b997c797f505cd654
+      size: 707
     - path: reports/lme/aod_winsorized/cv_spatial_loso_folds.csv
       hash: md5
-      md5: baae0eda1d1ec6f12a2e375673b57437
-      size: 9662
+      md5: adb53108f2d92e750408839d2d5f6a4e
+      size: 9651
     - path: reports/lme/aod_winsorized/station_buffer_exclusions.csv
       hash: md5
-      md5: 024d4ad6fbdbbd2a2664a97183338995
-      size: 1770
+      md5: e705662a0dd95e5694674363c884dd96
+      size: 1769
   validate_lme_cv_excl_outlier_stations:
     cmd: python scripts/modeling/lme/02_validate_lme_cv.py --input 
       data/processed/modeling_datasets/lme_ready_dataset.csv --station_file 
@@ -1826,12 +1744,12 @@ stages:
     deps:
     - path: data/processed/modeling_datasets/lme_ready_dataset.csv
       hash: md5
-      md5: 1e472e1209bd83591a49aa3790129fe9
-      size: 6138496
+      md5: 9c243a3462ca97c9b7210998f96d6af0
+      size: 6139205
     - path: data/stations/cpcb_stations_delhi_status.csv
       hash: md5
-      md5: 4d2c634b6bdf8d8e9cf3de6d517f6776
-      size: 14245
+      md5: 9b34b7eaffcea41420f1b8b402eff13a
+      size: 4175
     - path: scripts/modeling/lme/02_validate_lme_cv.py
       hash: md5
       md5: f56ccf5923ee11e6e4ff23e7f2d0f50b
@@ -1847,24 +1765,24 @@ stages:
     outs:
     - path: reports/lme/excl_outlier_stations/cv_random_aggregated.json
       hash: md5
-      md5: ee9357ef2e3c7d547434a6b22fb6d753
-      size: 711
+      md5: 42bc5d7d4e9ed27aebd322768d234eff
+      size: 710
     - path: reports/lme/excl_outlier_stations/cv_random_folds.csv
       hash: md5
-      md5: 914ebf2f6aa95fb24e1754885cea4cc4
-      size: 9449
+      md5: e840b9ec80299ec8a79d112a739b0981
+      size: 9435
     - path: reports/lme/excl_outlier_stations/cv_spatial_loso_aggregated.json
       hash: md5
-      md5: 4889d929738032c082360f9a1202e885
+      md5: 4938a7674d8a96f63efdea5dfd32ff7d
       size: 704
     - path: reports/lme/excl_outlier_stations/cv_spatial_loso_folds.csv
       hash: md5
-      md5: 9728c7a74a8e9d23212e809b14f27ccc
-      size: 9220
+      md5: b0bdb4cf7e0cd73ecd1d5f8baccb1246
+      size: 9198
     - path: reports/lme/excl_outlier_stations/station_buffer_exclusions.csv
       hash: md5
-      md5: 024d4ad6fbdbbd2a2664a97183338995
-      size: 1770
+      md5: e705662a0dd95e5694674363c884dd96
+      size: 1769
   fit_lme_model_gapfill_robustness:
     cmd: python scripts/modeling/lme/01_fit_lme_model.py --input 
       data/processed/modeling_datasets/lme_ready_dataset.csv --model_output 
@@ -1875,8 +1793,8 @@ stages:
     deps:
     - path: data/processed/modeling_datasets/lme_ready_dataset.csv
       hash: md5
-      md5: 1e472e1209bd83591a49aa3790129fe9
-      size: 6138496
+      md5: 9c243a3462ca97c9b7210998f96d6af0
+      size: 6139205
     - path: scripts/modeling/lme/01_fit_lme_model.py
       hash: md5
       md5: ed43a75be3a83613a1bf06d8684ec986
@@ -1884,16 +1802,16 @@ stages:
     outs:
     - path: models/lme/lme_full_model_gapfill_robustness.pkl
       hash: md5
-      md5: 00ba71342b76f443ae4700a469a601c5
-      size: 14102882
+      md5: fee11b1000529a5f83ccabcdf2f7a335
+      size: 14102565
     - path: reports/lme/gapfill_robustness/lme_fixed_effects.csv
       hash: md5
-      md5: 1f11511814ba712cd2ee30dab58939d8
-      size: 3357
+      md5: 87503e20efecf1130d515b1a251588e9
+      size: 3354
     - path: reports/lme/gapfill_robustness/lme_model_summary.txt
       hash: md5
-      md5: fd607247279621ac894a84de56ff599e
-      size: 3818
+      md5: 28c54a7430b29423369109e0c1ef842a
+      size: 3817
   fit_lme_model_aod_winsorized:
     cmd: python scripts/modeling/lme/01_fit_lme_model.py --input 
       data/processed/modeling_datasets/lme_ready_dataset_aod_winsorized.csv 
@@ -1905,8 +1823,8 @@ stages:
     - path: 
         data/processed/modeling_datasets/lme_ready_dataset_aod_winsorized.csv
       hash: md5
-      md5: b5f280895e58f1474844a851b812e8ad
-      size: 6044953
+      md5: a9640815c8e1027332e54b061afedb7b
+      size: 6047913
     - path: scripts/modeling/lme/01_fit_lme_model.py
       hash: md5
       md5: ed43a75be3a83613a1bf06d8684ec986
@@ -1914,16 +1832,16 @@ stages:
     outs:
     - path: models/lme/lme_full_model_aod_winsorized.pkl
       hash: md5
-      md5: 12a76f984451ca7af355b8db3bb88848
-      size: 15474242
+      md5: 4474078c7733f15bb5fe96f83b716609
+      size: 15473911
     - path: reports/lme/aod_winsorized/lme_fixed_effects.csv
       hash: md5
-      md5: 4f9aa1555d972553e434f779e9a49e5a
-      size: 3326
+      md5: 413719be4d52859831a8ef6bdff11278
+      size: 3325
     - path: reports/lme/aod_winsorized/lme_model_summary.txt
       hash: md5
-      md5: a0af4942c93daeba018f5174de46281c
-      size: 3819
+      md5: 6afb2e73d0b62cf4e9372030f4ac7bea
+      size: 3818
   fit_lme_model_excl_outlier_stations:
     cmd: python scripts/modeling/lme/01_fit_lme_model.py --input 
       data/processed/modeling_datasets/lme_ready_dataset.csv --model_output 
@@ -1935,8 +1853,8 @@ stages:
     deps:
     - path: data/processed/modeling_datasets/lme_ready_dataset.csv
       hash: md5
-      md5: 1e472e1209bd83591a49aa3790129fe9
-      size: 6138496
+      md5: 9c243a3462ca97c9b7210998f96d6af0
+      size: 6139205
     - path: scripts/modeling/lme/01_fit_lme_model.py
       hash: md5
       md5: ed43a75be3a83613a1bf06d8684ec986
@@ -1948,16 +1866,16 @@ stages:
     outs:
     - path: models/lme/lme_full_model_excl_outlier_stations.pkl
       hash: md5
-      md5: af21645edf1ffdff26c69f8499ab4bd7
-      size: 14730314
+      md5: 4b4ebc8b989f87b6b0db80d26aec6b01
+      size: 14729983
     - path: reports/lme/excl_outlier_stations/lme_fixed_effects.csv
       hash: md5
-      md5: d35fb73a7f35f07742c0de6676235828
-      size: 3324
+      md5: eb85cb1723124a3dd4d32df4ff80d6ea
+      size: 3328
     - path: reports/lme/excl_outlier_stations/lme_model_summary.txt
       hash: md5
-      md5: ae8454520e1c57d17d4a13678570d1d6
-      size: 3820
+      md5: 8b3909338c45d74353d3351e66ba26b4
+      size: 3817
   fit_lme_model_random_slope_aod:
     cmd: python scripts/modeling/lme/01_fit_lme_model.py --input 
       data/processed/modeling_datasets/lme_ready_dataset.csv --model_output 
@@ -1968,8 +1886,8 @@ stages:
     deps:
     - path: data/processed/modeling_datasets/lme_ready_dataset.csv
       hash: md5
-      md5: 1e472e1209bd83591a49aa3790129fe9
-      size: 6138496
+      md5: 9c243a3462ca97c9b7210998f96d6af0
+      size: 6139205
     - path: scripts/modeling/lme/01_fit_lme_model.py
       hash: md5
       md5: ed43a75be3a83613a1bf06d8684ec986
@@ -1977,16 +1895,16 @@ stages:
     outs:
     - path: models/lme/lme_full_model_random_slope_aod.pkl
       hash: md5
-      md5: 40afe58211b6ceb1b8502fd2971699eb
-      size: 15728236
+      md5: 9a7fe11dd99fb058e672c08e85363d14
+      size: 15727905
     - path: reports/lme/random_slope_aod/lme_fixed_effects.csv
       hash: md5
-      md5: c91b43186d9d79b744099b437e13b363
-      size: 3332
+      md5: 4352c9d01c156134edd9ab484e620c52
+      size: 3334
     - path: reports/lme/random_slope_aod/lme_model_summary.txt
       hash: md5
-      md5: b40fa26d4d210ef3f91f3f4292c2afa5
-      size: 4063
+      md5: 661e1067ff07691651c2e1bee47b7f12
+      size: 4062
   validate_lme_cv_random_slope_aod:
     cmd: python scripts/modeling/lme/02_validate_lme_cv.py --input 
       data/processed/modeling_datasets/lme_ready_dataset.csv --station_file 
@@ -1996,12 +1914,12 @@ stages:
     deps:
     - path: data/processed/modeling_datasets/lme_ready_dataset.csv
       hash: md5
-      md5: 1e472e1209bd83591a49aa3790129fe9
-      size: 6138496
+      md5: 9c243a3462ca97c9b7210998f96d6af0
+      size: 6139205
     - path: data/stations/cpcb_stations_delhi_status.csv
       hash: md5
-      md5: 4d2c634b6bdf8d8e9cf3de6d517f6776
-      size: 14245
+      md5: 9b34b7eaffcea41420f1b8b402eff13a
+      size: 4175
     - path: scripts/modeling/lme/02_validate_lme_cv.py
       hash: md5
       md5: f56ccf5923ee11e6e4ff23e7f2d0f50b
@@ -2015,24 +1933,24 @@ stages:
     outs:
     - path: reports/lme/random_slope_aod/cv_random_aggregated.json
       hash: md5
-      md5: 03e914d9a3b7662d029d2a340d7604c8
-      size: 708
+      md5: c0b0ac085850b379165a9808af79e51c
+      size: 709
     - path: reports/lme/random_slope_aod/cv_random_folds.csv
       hash: md5
-      md5: e318112633c720da870e0f97726b7e21
+      md5: 4aa528e583a0a414e835381cf7f7c821
       size: 9435
     - path: reports/lme/random_slope_aod/cv_spatial_loso_aggregated.json
       hash: md5
-      md5: 568e3c72ef9a3905a54cf89d0811597b
-      size: 712
+      md5: 2da6cac98a40bb4d89a7a63293b64601
+      size: 711
     - path: reports/lme/random_slope_aod/cv_spatial_loso_folds.csv
       hash: md5
-      md5: 0fa8b18433ce6ad82b76eddcd6374d4b
-      size: 9675
+      md5: cfd8807513aa9d38890e0b930eb876b4
+      size: 9658
     - path: reports/lme/random_slope_aod/station_buffer_exclusions.csv
       hash: md5
-      md5: 024d4ad6fbdbbd2a2664a97183338995
-      size: 1770
+      md5: e705662a0dd95e5694674363c884dd96
+      size: 1769
   tune_lightgbm_hyperparameters:
     cmd: python scripts/modeling/lightgbm/00_tune_lightgbm_hyperparameters.py 
       --input data/processed/modeling_datasets/lightgbm_ready_dataset.csv 
@@ -2045,12 +1963,12 @@ stages:
     deps:
     - path: data/processed/modeling_datasets/lightgbm_ready_dataset.csv
       hash: md5
-      md5: e82083c02036f7bac1280e62dbd87cc9
-      size: 5307964
+      md5: a5eeeda1eb4a2900b5dd45498ba6274a
+      size: 5322602
     - path: data/stations/cpcb_stations_delhi_status.csv
       hash: md5
-      md5: 4d2c634b6bdf8d8e9cf3de6d517f6776
-      size: 14245
+      md5: 9b34b7eaffcea41420f1b8b402eff13a
+      size: 4175
     - path: scripts/modeling/lightgbm/00_tune_lightgbm_hyperparameters.py
       hash: md5
       md5: 977d06d8a2fa65df493d119d7eae9ca9
@@ -2092,8 +2010,8 @@ stages:
     deps:
     - path: data/processed/modeling_datasets/lightgbm_ready_dataset.csv
       hash: md5
-      md5: e82083c02036f7bac1280e62dbd87cc9
-      size: 5307964
+      md5: a5eeeda1eb4a2900b5dd45498ba6274a
+      size: 5322602
     - path: models/lightgbm/tuned_hyperparameters.json
       hash: md5
       md5: 5380d067c52aa4d7895b2973f79652f9
@@ -2113,8 +2031,8 @@ stages:
     outs:
     - path: models/lightgbm/lightgbm_full_model.txt
       hash: md5
-      md5: 28a19257bbad836f6f16c0531e63b229
-      size: 1742261
+      md5: 29ec2918a0a0941eb3c21e959bfad1d3
+      size: 1742320
     - path: reports/lightgbm/primary/lightgbm_feature_importance.csv
       hash: md5
       md5: d01aaa67a23bcc4f394617dcbae38c2a
@@ -2135,12 +2053,12 @@ stages:
     deps:
     - path: data/processed/modeling_datasets/lightgbm_ready_dataset.csv
       hash: md5
-      md5: e82083c02036f7bac1280e62dbd87cc9
-      size: 5307964
+      md5: a5eeeda1eb4a2900b5dd45498ba6274a
+      size: 5322602
     - path: data/stations/cpcb_stations_delhi_status.csv
       hash: md5
-      md5: 4d2c634b6bdf8d8e9cf3de6d517f6776
-      size: 14245
+      md5: 9b34b7eaffcea41420f1b8b402eff13a
+      size: 4175
     - path: models/lightgbm/tuned_hyperparameters.json
       hash: md5
       md5: 5380d067c52aa4d7895b2973f79652f9
@@ -2180,8 +2098,8 @@ stages:
       size: 4844
     - path: reports/lightgbm/primary/station_buffer_exclusions.csv
       hash: md5
-      md5: 024d4ad6fbdbbd2a2664a97183338995
-      size: 1770
+      md5: e705662a0dd95e5694674363c884dd96
+      size: 1769
   prepare_lme_dataset_raw_target:
     cmd: python scripts/modeling/dataset_prep/02_prepare_lme_dataset.py --input 
       data/processed/modeling_datasets/master_feature_table.csv --output 
@@ -2193,8 +2111,8 @@ stages:
     deps:
     - path: data/processed/modeling_datasets/master_feature_table.csv
       hash: md5
-      md5: 45dc88a0c2cc3c64599799a83f7640cb
-      size: 6642873
+      md5: b3fa1f03e1482c5ef1d6d5879e12c108
+      size: 6657899
     - path: notebooks/01_eda_master_feature_table.ipynb
       hash: md5
       md5: 3b074e19616528c490e054e395a5dcce
@@ -2237,12 +2155,12 @@ stages:
     outs:
     - path: data/processed/modeling_datasets/lme_ready_dataset_raw_target.csv
       hash: md5
-      md5: fd33a906177bb340fc2f2b9c09d462f6
-      size: 5986029
+      md5: c5fdd863ce36b43dbab878e4b4ceebd2
+      size: 5986738
     - path: data/processed/modeling_datasets/lme_scaling_params_raw_target.csv
       hash: md5
-      md5: e2e4b5ec5de69ea78b8815eb517526d1
-      size: 938
+      md5: 7d8a81cff0223d79ae5fc4dfc8ba2b89
+      size: 941
   fit_lme_model_raw_target:
     cmd: python scripts/modeling/lme/01_fit_lme_model.py --input 
       data/processed/modeling_datasets/lme_ready_dataset_raw_target.csv 
@@ -2253,8 +2171,8 @@ stages:
     deps:
     - path: data/processed/modeling_datasets/lme_ready_dataset_raw_target.csv
       hash: md5
-      md5: fd33a906177bb340fc2f2b9c09d462f6
-      size: 5986029
+      md5: c5fdd863ce36b43dbab878e4b4ceebd2
+      size: 5986738
     - path: scripts/modeling/lme/01_fit_lme_model.py
       hash: md5
       md5: ed43a75be3a83613a1bf06d8684ec986
@@ -2262,16 +2180,16 @@ stages:
     outs:
     - path: models/lme/lme_full_model_raw_target.pkl
       hash: md5
-      md5: 9e7db4b3eaa5885f450eaca5098379cb
-      size: 15474242
+      md5: 3e1637d2131d25c7afa236a14c00570c
+      size: 15473911
     - path: reports/lme/primary_raw_target/lme_fixed_effects.csv
       hash: md5
-      md5: 24ee5875cc308039d49602b289b60688
-      size: 3211
+      md5: 00e94a82caee85ba1520b8fd5d92b13f
+      size: 3199
     - path: reports/lme/primary_raw_target/lme_model_summary.txt
       hash: md5
-      md5: d74e1129882c7465a74ad0133e7448fe
-      size: 3934
+      md5: 839ff9c2066175a60134b0bb53acfd07
+      size: 3933
   validate_lme_cv_raw_target:
     cmd: python scripts/modeling/lme/02_validate_lme_cv.py --input 
       data/processed/modeling_datasets/lme_ready_dataset_raw_target.csv 
@@ -2282,12 +2200,12 @@ stages:
     deps:
     - path: data/processed/modeling_datasets/lme_ready_dataset_raw_target.csv
       hash: md5
-      md5: fd33a906177bb340fc2f2b9c09d462f6
-      size: 5986029
+      md5: c5fdd863ce36b43dbab878e4b4ceebd2
+      size: 5986738
     - path: data/stations/cpcb_stations_delhi_status.csv
       hash: md5
-      md5: 4d2c634b6bdf8d8e9cf3de6d517f6776
-      size: 14245
+      md5: 9b34b7eaffcea41420f1b8b402eff13a
+      size: 4175
     - path: scripts/modeling/lme/02_validate_lme_cv.py
       hash: md5
       md5: f56ccf5923ee11e6e4ff23e7f2d0f50b
@@ -2301,24 +2219,24 @@ stages:
     outs:
     - path: reports/lme/primary_raw_target/cv_random_aggregated.json
       hash: md5
-      md5: af86e1f212c14d4a92dccbdc3b81c755
+      md5: 75899cd1d75e39f6032ced80c1f7148f
       size: 327
     - path: reports/lme/primary_raw_target/cv_random_folds.csv
       hash: md5
-      md5: e2a59c2e70665e058bc98308fa7fe8dd
-      size: 3975
+      md5: 16745f400e58594b2cbcc85d11415942
+      size: 3966
     - path: reports/lme/primary_raw_target/cv_spatial_loso_aggregated.json
       hash: md5
-      md5: 6667219eac9b235208e55dc2b97026c9
-      size: 329
+      md5: 7b142aca65609a0b8c369dce4d5de270
+      size: 325
     - path: reports/lme/primary_raw_target/cv_spatial_loso_folds.csv
       hash: md5
-      md5: ff89eb1c09fc5bb228873e0a1b1e8cdc
-      size: 4190
+      md5: 3aef5640f9527dfad94f8295e7bbcf44
+      size: 4191
     - path: reports/lme/primary_raw_target/station_buffer_exclusions.csv
       hash: md5
-      md5: 024d4ad6fbdbbd2a2664a97183338995
-      size: 1770
+      md5: e705662a0dd95e5694674363c884dd96
+      size: 1769
   diagnose_lightgbm_aod_coupling:
     cmd: python scripts/modeling/lightgbm/03_diagnose_aod_coupling.py --input 
       data/processed/modeling_datasets/lightgbm_ready_dataset.csv --folds 
@@ -2329,8 +2247,8 @@ stages:
     deps:
     - path: data/processed/modeling_datasets/lightgbm_ready_dataset.csv
       hash: md5
-      md5: e82083c02036f7bac1280e62dbd87cc9
-      size: 5307964
+      md5: a5eeeda1eb4a2900b5dd45498ba6274a
+      size: 5322602
     - path: reports/lightgbm/primary/cv_spatial_loso_folds.csv
       hash: md5
       md5: 55d357416581fec0f1edcc4af19d511b
@@ -2346,12 +2264,12 @@ stages:
     outs:
     - path: reports/lightgbm/diagnostics/aod_coupling_hypothesis_test.json
       hash: md5
-      md5: 311722607b3f080fe9ca80ea7ae30262
-      size: 1525
+      md5: c9b4a00520a0cac5c5ef9a3ab48382ea
+      size: 1523
     - path: reports/lightgbm/diagnostics/station_aod_coupling.csv
       hash: md5
-      md5: 1944603da530b38dac8f9b1c6017e1e8
-      size: 9548
+      md5: d7743f2727f9a5cf51554fdf2dbe5095
+      size: 9546
   validate_lightgbm_cv_excl_weak_aod_coupling:
     cmd: python scripts/modeling/lightgbm/02_validate_lightgbm_cv.py --input 
       data/processed/modeling_datasets/lightgbm_ready_dataset.csv --station_file
@@ -2365,12 +2283,12 @@ stages:
     deps:
     - path: data/processed/modeling_datasets/lightgbm_ready_dataset.csv
       hash: md5
-      md5: e82083c02036f7bac1280e62dbd87cc9
-      size: 5307964
+      md5: a5eeeda1eb4a2900b5dd45498ba6274a
+      size: 5322602
     - path: data/stations/cpcb_stations_delhi_status.csv
       hash: md5
-      md5: 4d2c634b6bdf8d8e9cf3de6d517f6776
-      size: 14245
+      md5: 9b34b7eaffcea41420f1b8b402eff13a
+      size: 4175
     - path: models/lightgbm/tuned_hyperparameters.json
       hash: md5
       md5: 5380d067c52aa4d7895b2973f79652f9
@@ -2414,8 +2332,8 @@ stages:
     - path: 
         reports/lightgbm/excl_weak_aod_coupling/station_buffer_exclusions.csv
       hash: md5
-      md5: 024d4ad6fbdbbd2a2664a97183338995
-      size: 1770
+      md5: e705662a0dd95e5694674363c884dd96
+      size: 1769
   validate_lightgbm_cv_excl_weak_aod_from_training:
     cmd: python scripts/modeling/lightgbm/02_validate_lightgbm_cv.py --input 
       data/processed/modeling_datasets/lightgbm_ready_dataset.csv --station_file
@@ -2430,12 +2348,12 @@ stages:
     deps:
     - path: data/processed/modeling_datasets/lightgbm_ready_dataset.csv
       hash: md5
-      md5: e82083c02036f7bac1280e62dbd87cc9
-      size: 5307964
+      md5: a5eeeda1eb4a2900b5dd45498ba6274a
+      size: 5322602
     - path: data/stations/cpcb_stations_delhi_status.csv
       hash: md5
-      md5: 4d2c634b6bdf8d8e9cf3de6d517f6776
-      size: 14245
+      md5: 9b34b7eaffcea41420f1b8b402eff13a
+      size: 4175
     - path: models/lightgbm/tuned_hyperparameters.json
       hash: md5
       md5: 5380d067c52aa4d7895b2973f79652f9
@@ -2481,5 +2399,57 @@ stages:
     - path: 
         reports/lightgbm/excl_weak_aod_from_training/station_buffer_exclusions.csv
       hash: md5
-      md5: 024d4ad6fbdbbd2a2664a97183338995
-      size: 1770
+      md5: e705662a0dd95e5694674363c884dd96
+      size: 1769
+  cpcb_screen_stations:
+    cmd: python scripts/datasets/cpcb/2b-screen_stations.py --input 
+      data/stations/cpcb_stations_delhi.csv --output 
+      data/stations/cpcb_stations_delhi_screened.csv
+    deps:
+    - path: data/stations/cpcb_stations_delhi.csv
+      hash: md5
+      md5: 460a3cd141a6fe4cea8063ae80b6c865
+      size: 11370
+    - path: scripts/datasets/cpcb/2b-screen_stations.py
+      hash: md5
+      md5: d14885cbb47f07427a9ab7ee827a2282
+      size: 4170
+    params:
+      params.yaml:
+        cpcb_screen_stations:
+          study_start: '2025-03-01'
+          study_end: '2026-02-28'
+          duplicate_tolerance_km: 0.01
+    outs:
+    - path: data/stations/cpcb_stations_delhi_screened.csv
+      hash: md5
+      md5: 90646948377c71d734d104a820e0d421
+      size: 3723
+  cpcb_finalize_roster:
+    cmd: python scripts/datasets/cpcb/10b-finalize_roster.py --screened 
+      data/stations/cpcb_stations_delhi_screened.csv --completeness 
+      data/interim/cpcb/pm25_qc_daily/station_completeness.csv --overrides 
+      data/stations/cpcb_station_overrides_delhi.csv --output 
+      data/stations/cpcb_stations_delhi_status.csv
+    deps:
+    - path: data/interim/cpcb/pm25_qc_daily/station_completeness.csv
+      hash: md5
+      md5: 7a4253cad9a69a265760266e2e3b9244
+      size: 1210
+    - path: data/stations/cpcb_station_overrides_delhi.csv
+      hash: md5
+      md5: d9f8557884aa27a30251c4ab33524819
+      size: 26
+    - path: data/stations/cpcb_stations_delhi_screened.csv
+      hash: md5
+      md5: 90646948377c71d734d104a820e0d421
+      size: 3723
+    - path: scripts/datasets/cpcb/10b-finalize_roster.py
+      hash: md5
+      md5: 8cccd163779e0e613e97cbb4d523c7ee
+      size: 3245
+    outs:
+    - path: data/stations/cpcb_stations_delhi_status.csv
+      hash: md5
+      md5: 9b34b7eaffcea41420f1b8b402eff13a
+      size: 4175

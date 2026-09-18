@@ -6,7 +6,6 @@ import pandas as pd
 with open("params.yaml") as f:
     params = yaml.safe_load(f)
 
-DROP_STATIONS = params["cpcb_filter_aggregate"]["drop_stations"]
 MIN_HOURS = params["cpcb_filter_aggregate"]["min_hours"]
 
 SEASON_MONTHS = {
@@ -29,12 +28,10 @@ def main():
 
     print(f"Loaded {len(df)} rows, {df['location_id'].nunique()} stations")
 
-    # drop bad stations
-    before_rows = len(df)
-    before_stations = df["location_id"].nunique()
-    df = df[~df["location_id"].isin(DROP_STATIONS)]
-    print(f"Dropped stations {DROP_STATIONS}")
-    print(f"{before_rows} -> {len(df)} rows, {before_stations} -> {df['location_id'].nunique()} stations")
+    # No stations are dropped here any more. The four stations that used to be
+    # listed in params (drop_stations) all fail the completeness check in
+    # 10-completeness_check.py, so they are now dropped by that rule instead,
+    # which also works for other cities without a hand-made list.
 
     # aggregate to daily
     df["date"] = df["dt_local"].dt.date

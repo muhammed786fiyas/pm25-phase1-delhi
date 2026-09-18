@@ -2,7 +2,13 @@ stages:
   # ============================================================
   # CPCB ground-station pipeline (Phase 1: Delhi)
   # ============================================================
+  # Stages that fetch from external services (OpenAQ, Earth Engine) are frozen:
+  # dvc repro does not re-run them, and everything downstream is rebuilt from
+  # their saved output. The services can revise historical data, so the saved
+  # snapshot is what makes the results reproducible. To refresh the data (or
+  # to run a new city), unfreeze deliberately:  dvc unfreeze <stage>
   cpcb_list_stations:
+    frozen: true
     cmd: python scripts/datasets/cpcb/2-list_stations.py --region delhi --output cpcb_stations_delhi.csv --output-dir data/stations
     deps:
       - scripts/datasets/cpcb/2-list_stations.py
@@ -15,12 +21,28 @@ stages:
       - data/stations/cpcb_stations_delhi.csv:
           cache: false
 
+  cpcb_screen_stations:
+    cmd: python scripts/datasets/cpcb/2b-screen_stations.py --input data/stations/cpcb_stations_delhi.csv --output data/stations/cpcb_stations_delhi_screened.csv
+    deps:
+      - scripts/datasets/cpcb/2b-screen_stations.py
+      - data/stations/cpcb_stations_delhi.csv
+    params:
+      - cpcb_screen_stations
+    outs:
+      - data/stations/cpcb_stations_delhi_screened.csv:
+          cache: false
+
+  # Two date ranges because the data was pulled in two batches (2025, then
+  # Q1 2026 once it existed). Downloads the screened ELIGIBLE stations -- not
+  # the final KEEP roster, which cannot be known until after downloading.
   cpcb_download_pm25:
-    cmd: python scripts/datasets/cpcb/3-download_pm25.py
+    frozen: true
+    cmd:
+      - python scripts/datasets/cpcb/3-download_pm25.py --stations data/stations/cpcb_stations_delhi_screened.csv --from-date 2025-01-01 --to-date 2025-12-31 --outdir data/raw/cpcb/pm25_delhi_2025
+      - python scripts/datasets/cpcb/3-download_pm25.py --stations data/stations/cpcb_stations_delhi_screened.csv --from-date 2026-01-01 --to-date 2026-03-31 --outdir data/raw/cpcb/pm25_delhi_2026_q1
     deps:
       - scripts/datasets/cpcb/3-download_pm25.py
-      - scripts/datasets/cpcb/cpcb_fetcher.py
-      - data/stations/cpcb_stations_delhi_status.csv
+      - data/stations/cpcb_stations_delhi_screened.csv
     outs:
       - data/raw/cpcb
 
@@ -59,7 +81,6 @@ stages:
       - scripts/datasets/cpcb/8-filter_and_aggregate.py
       - data/processed/cpcb/pm25_delhi_windowed
     params:
-      - cpcb_filter_aggregate.drop_stations
       - cpcb_filter_aggregate.min_hours
     outs:
       - data/processed/cpcb/pm25_daily
@@ -78,7 +99,7 @@ stages:
       - scripts/datasets/cpcb/10-completeness_check.py
       - data/processed/cpcb/pm25_daily
     params:
-      - cpcb_completeness.threshold
+      - cpcb_completeness
     outs:
       - data/interim/cpcb/pm25_qc_daily/station_completeness.csv
 
@@ -91,6 +112,21 @@ stages:
     outs:
       - data/interim/cpcb/pm25_qc_daily/station_pair_correlation.csv
   
+  # Turns the screened list into the final roster: ELIGIBLE -> KEEP or
+  # DROP_low_completeness, then applies the hand-written overrides file (the
+  # only place a manual decision enters). Writes to the same path the 35
+  # downstream stages already read, so none of them needed editing.
+  cpcb_finalize_roster:
+    cmd: python scripts/datasets/cpcb/10b-finalize_roster.py --screened data/stations/cpcb_stations_delhi_screened.csv --completeness data/interim/cpcb/pm25_qc_daily/station_completeness.csv --overrides data/stations/cpcb_station_overrides_delhi.csv --output data/stations/cpcb_stations_delhi_status.csv
+    deps:
+      - scripts/datasets/cpcb/10b-finalize_roster.py
+      - data/stations/cpcb_stations_delhi_screened.csv
+      - data/interim/cpcb/pm25_qc_daily/station_completeness.csv
+      - data/stations/cpcb_station_overrides_delhi.csv
+    outs:
+      - data/stations/cpcb_stations_delhi_status.csv:
+          cache: false
+
   cpcb_final_filter:
     cmd: python scripts/datasets/cpcb/12-final_filter.py --daily data/processed/cpcb/pm25_daily/pm25_daily.csv --stations data/stations/cpcb_stations_delhi_status.csv --outdir data/processed/cpcb/pm25_daily_final
     deps:
@@ -104,6 +140,7 @@ stages:
   # MAIAC AOD pipeline
   # ============================================================
   maiac_extract:
+    frozen: true
     cmd: python scripts/datasets/maiac_aod/1-extract_gee_covariates.py --stations data/stations/cpcb_stations_delhi_status.csv --outdir data/raw/maiac
     deps:
       - scripts/datasets/maiac_aod/1-extract_gee_covariates.py
@@ -164,6 +201,7 @@ stages:
   # maiac_gapfill (calibrated MERRA-2 fill)
   # ============================================================
   map_stations_to_cells:
+    frozen: true
     cmd: python scripts/datasets/merra2_aod/1-map_stations_to_cells.py
       --stations data/stations/cpcb_stations_delhi_status.csv
       --outdir data/raw/merra2_aod
@@ -177,6 +215,7 @@ stages:
       - data/raw/merra2_aod/station_cell_mapping.csv
     
   extract_merra2:
+    frozen: true
     cmd: python scripts/datasets/merra2_aod/2-extract_gee_merra2.py
       --mapping data/raw/merra2_aod/station_cell_mapping.csv
       --outdir data/raw/merra2_aod
@@ -311,6 +350,7 @@ stages:
   # ERA5-Land meteorology 
   # ============================================================
   map_stations_to_cells_era5:
+    frozen: true
     cmd: python scripts/datasets/era5_land/1-map_stations_to_cells.py --stations data/stations/cpcb_stations_delhi_status.csv --params params.yaml --outdir data/raw/era5_land
     deps:
       - scripts/datasets/era5_land/1-map_stations_to_cells.py
@@ -321,6 +361,7 @@ stages:
       - data/raw/era5_land/station_cell_mapping.csv
   
   extract_era5_land:
+    frozen: true
     cmd: python scripts/datasets/era5_land/2-extract_gee_era5land.py --mapping data/raw/era5_land/station_cell_mapping.csv --params params.yaml --outdir data/raw/era5_land
     deps:
       - scripts/datasets/era5_land/2-extract_gee_era5land.py
@@ -357,6 +398,7 @@ stages:
   # ERA5-BLH
   # ============================================================
   map_stations_to_cells_era5_blh:
+    frozen: true
     cmd: python scripts/datasets/era5_blh/1-map_stations_to_cells.py --stations data/stations/cpcb_stations_delhi_status.csv --params params.yaml --outdir data/raw/era5_blh
     deps:
       - scripts/datasets/era5_blh/1-map_stations_to_cells.py
@@ -367,6 +409,7 @@ stages:
       - data/raw/era5_blh/station_cell_mapping.csv
   
   extract_era5_blh:
+    frozen: true
     cmd: python scripts/datasets/era5_blh/2-extract_gee_era5blh.py --mapping data/raw/era5_blh/station_cell_mapping.csv --params params.yaml --outdir data/raw/era5_blh
     deps:
       - scripts/datasets/era5_blh/2-extract_gee_era5blh.py
@@ -403,6 +446,7 @@ stages:
   # Static GEE - ESA worldcover , NDVI , Elevation
   # ============================================================
   extract_worldcover_raw:
+    frozen: true
     cmd: python scripts/datasets/static_gee/01_extract_worldcover_raw.py --output data/raw/static_gee/worldcover/worldcover_raw_histogram.csv --summary_output data/raw/static_gee/worldcover/worldcover_extraction_summary.csv
     deps:
       - scripts/datasets/static_gee/01_extract_worldcover_raw.py
@@ -434,6 +478,7 @@ stages:
       - data/processed/static_gee/worldcover_landuse.csv
   
   extract_ndvi_raw:
+    frozen: true
     cmd: python scripts/datasets/static_gee/04_extract_ndvi_raw.py --output data/raw/static_gee/ndvi/ndvi_raw_periods.csv --summary_output data/raw/static_gee/ndvi/ndvi_extraction_summary.csv
     deps:
       - scripts/datasets/static_gee/04_extract_ndvi_raw.py
@@ -476,6 +521,7 @@ stages:
       - data/processed/static_gee/ndvi_gapfilled.csv
   
   extract_srtm_raw:
+    frozen: true
     cmd: python scripts/datasets/static_gee/08_extract_srtm_raw.py --output data/raw/static_gee/srtm/srtm_raw.csv --summary_output data/raw/static_gee/srtm/srtm_extraction_summary.csv
     deps:
       - scripts/datasets/static_gee/08_extract_srtm_raw.py

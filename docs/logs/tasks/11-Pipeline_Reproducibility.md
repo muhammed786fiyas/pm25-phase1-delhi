@@ -1,5 +1,5 @@
 # Task Log: Pipeline Reproducibility + Multi-City Portability
-_Last updated: 2026-09-17_
+_Last updated: 2026-09-18_
 
 ## Scope
 
@@ -8,7 +8,7 @@ Two goals, in order:
 1. **Make the Delhi pipeline fully reproducible** -- `dvc repro` from a clean state must regenerate every documented result, experiments included. Nothing is deleted or moved out; the broken stages get fixed in place so the `delhi-phase1-complete` tag stays reproducible.
 2. **Make it portable** to Mumbai, Chennai and Kolkata with minimal manual intervention.
 
-**Status: Step 1 done (commit e4c4c88); Step 2 rules prototyped and passing the acceptance test, not yet wired into stages.**
+**Status: Steps 1 and 2 COMPLETE. The Delhi pipeline now reproduces end to end -- `dvc repro` regenerates the station roster from rules and rebuilds every documented result. Steps 3-6 (city config, de-Delhi-ing the thresholds, Mumbai) not started.**
 
 ## Completed
 
@@ -126,6 +126,50 @@ Design details that matter:
 
 **New defect found**: `10-completeness_check.py` hardcodes `COMPLETENESS_THRESHOLD = 60` and the window dates, although `dvc.yaml` lists `cpcb_completeness.threshold` as a param dependency. Changing the param re-runs the stage but changes nothing.
 
+### 5. Step 2 -- the roster is now generated (2026-09-18)
+
+Two new stages, 76 total. `cpcb_stations_delhi_status.csv` is no longer hand-maintained: it is a stage output.
+
+```
+cpcb_list_stations     raw OpenAQ list (56)            frozen
+cpcb_screen_stations   NEW -> screened.csv, 47 ELIGIBLE   metadata + geometry only
+cpcb_download_pm25     downloads ELIGIBLE, not KEEP    frozen
+   ... qc, aggregate, completeness (all 47 stations) ...
+cpcb_finalize_roster   NEW -> status.csv, 42 KEEP      + hand-written overrides
+```
+
+- **`2b-screen_stations.py`** applies the four pre-download rules. Its output deliberately omits `datetime_last`, so the file changes only when a decision changes.
+- **`10b-finalize_roster.py`** turns ELIGIBLE into KEEP or `DROP_low_completeness`, then applies `data/stations/cpcb_station_overrides_delhi.csv` -- a hand-written **input**, never a stage output, so a re-run cannot wipe a manual decision. Empty for Delhi: the rules recover all 42.
+- `3-download_pm25.py` filters on `--status-value` (default ELIGIBLE) instead of the hardcoded `"KEEP"` -- the one line that made the pipeline circular.
+- `8-filter_and_aggregate.py` no longer drops the four hardcoded stations; `params.yaml`'s `cpcb_filter_aggregate.drop_stations` is deleted. Completeness now runs on all 47 stations rather than 43.
+- `10-completeness_check.py` reads its threshold and window from `params.yaml` instead of hardcoding them (fixes the defect noted in section 4); `passes_60pct` renamed `passes_threshold`, since the column name should not hardcode the value.
+- The curated roster is archived at `data/stations/archive/cpcb_stations_delhi_status_manual.csv` for its `qc_note` reasoning. Nothing reads it.
+
+**Frozen stages.** 12 stages that fetch from OpenAQ or Earth Engine carry `frozen: true`. `dvc repro` rebuilds everything downstream from their saved output rather than re-fetching, because both services can revise historical data -- the snapshot is what makes the results reproducible. Refreshing data or running a new city means `dvc unfreeze <stage>` deliberately. Trade-off, worth remembering: **a frozen stage ignores changes to its inputs**, so it must be unfrozen whenever the roster or coordinates genuinely change.
+
+**Verification -- full `dvc repro`, 32 stages, exit 0, pipeline clean afterwards.**
+
+| Result | Now | Documented |
+|---|---|---|
+| LightGBM spatial LOSO (R2 / within-R2 / RMSE) | 0.803 / 0.721 / 33.727 | 0.803 / 0.721 / 33.73 |
+| LightGBM random CV | 0.882 / 0.775 / 26.071 | 0.882 / 0.775 / 26.07 |
+| LME raw-fit spatial LOSO | 0.437 / 0.220 / 57.095 | 0.437 / 0.220 / 57.10 |
+| LME log-fit spatial LOSO | 0.423 / 0.211 / 0.638 | 0.423 / 0.211 / 0.638 |
+| LME log-fit, raw ug/m3 scale | -0.226 / 0.167 / 84.29 | -0.226 / 0.167 / 84.29 |
+
+Every headline number reproduces, and the acceptance test holds: the generated roster's 42 KEEP stations are the hand-curated 42, with identical coordinates. `pm25_daily_final.csv` -- the ground-truth table every model trains on -- is **byte-identical**. Tuned hyperparameters identical.
+
+Of 71 report files: 27 byte-identical, 29 same numbers with different bytes, 15 flagged as differing. All 15 checked individually:
+- 6 x `station_buffer_exclusions.csv` -- **row order only**. The generated roster is sorted by `location_id`, the hand-curated one was not. Sorted, the station set, neighbour counts and excluded ids match exactly. (Worth knowing: a diff on this file looks alarming -- `location_id` "differs by 6930" -- and means nothing.)
+- 6 x `lme_model_summary.txt` -- float noise in the 15th significant digit (`1.7677323918005814` -> `...816`).
+- The rest -- station 6931's name lost a trailing space upstream at OpenAQ.
+
+The master table changed only in those two ways plus float noise <= 2.3e-12 (new numpy/geopandas versions). That was still enough to make DVC re-run the whole modelling suite, which is what made this a genuine end-to-end test.
+
+**Gotcha found while verifying**: in pandas 3, `astype(str)` does not make two missing values compare equal, so a naive text comparison reported 10,007 "changed" power-plant names that were all missing on both sides. Fill missing values before comparing text columns.
+
+**A second broken stage, missed in the section 1 audit**: `cpcb_download_pm25` was also unrunnable -- its `cmd` passed none of the three required arguments, and its output holds two directories from two manual runs with different date ranges. Fixed with a DVC multi-command `cmd` (one stage, two invocations: 2025-01-01..2025-12-31 and 2026-01-01..2026-03-31, the ranges recorded in the script's own docstring), so the output layout is unchanged. Lesson: I had only tested the DAG root, not the stage after it.
+
 ## Key decisions (pre-registered 2026-09-17, before any other city is run)
 
 **1. Publication threshold for the LightGBM model -- relative, not absolute.**
@@ -156,9 +200,9 @@ Two stages worth keeping for every city despite looking Delhi-specific: **`*_gap
 
 ## Plan
 
-**Step 1 -- unbreak what is broken (~half day).** Fix A1 (the import and the missing cmd args) and A3 (duplicate outs). Acceptance: `dvc repro -s cpcb_list_stations` runs.
+**Step 1 -- unbreak what is broken. DONE (commit e4c4c88).** Fix A1 (the import and the missing cmd args) and A3 (duplicate outs). Acceptance: `dvc repro -s cpcb_list_stations` runs.
 
-**Step 2 -- break the station cycle (the crux, 1-2 days).** Restructure around *when* information becomes available:
+**Step 2 -- break the station cycle. DONE (2026-09-18, see Completed section 5).** Restructure around *when* information becomes available:
 
 ```
 list_stations      all candidates in bbox                  (automatic)
