@@ -1,0 +1,5 @@
+outs:
+- md5: 17a81d0915a0fdf9b24ded8af32c1ea9
+  size: 159353725
+  hash: md5
+  path: roads.geojson

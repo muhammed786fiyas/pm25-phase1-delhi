@@ -1,0 +1,5 @@
+outs:
+- md5: 0b654649c9f270c422fc0d8ca64fc2c4
+  size: 85807
+  hash: md5
+  path: power_plants.geojson

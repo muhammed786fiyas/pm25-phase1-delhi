@@ -1,5 +1,5 @@
 # Task Log: Pipeline Reproducibility + Multi-City Portability
-_Last updated: 2026-09-18_
+_Last updated: 2026-09-19_
 
 ## Scope
 
@@ -169,6 +169,19 @@ The master table changed only in those two ways plus float noise <= 2.3e-12 (new
 **Gotcha found while verifying**: in pandas 3, `astype(str)` does not make two missing values compare equal, so a naive text comparison reported 10,007 "changed" power-plant names that were all missing on both sides. Fill missing values before comparing text columns.
 
 **A second broken stage, missed in the section 1 audit**: `cpcb_download_pm25` was also unrunnable -- its `cmd` passed none of the three required arguments, and its output holds two directories from two manual runs with different date ranges. Fixed with a DVC multi-command `cmd` (one stage, two invocations: 2025-01-01..2025-12-31 and 2026-01-01..2026-03-31, the ranges recorded in the script's own docstring), so the output layout is unchanged. Lesson: I had only tested the DAG root, not the stage after it.
+
+### 6. Closing the fresh-clone gaps (2026-09-19)
+
+Step 2's full repro proved the pipeline logic, but only on this laptop. Checking what a fresh clone would lack found two gaps, both now closed:
+
+- **The three OSM inputs were tracked nowhere.** `data/raw/osm/{roads,industrial_landuse,power_plants}.geojson` (152 MB, 468 KB, 84 KB) were gitignored, had no `.dvc` file, and no stage produces them -- so neither `git push` nor `dvc push` had ever sent them anywhere. A fresh clone would `dvc pull` everything else and then fail at the three OSM extraction stages. Fixed with `dvc add` + `dvc push` (3 files pushed); hashes unchanged, pipeline still clean. They are now snapshots, the same reasoning as the frozen stages. Making them real Overpass download stages remains the better answer for the other cities.
+- **`README.md` was empty -- zero lines.** A fresh clone had no setup instructions, and five model scripts stop at start-up without `MLFLOW_TRACKING_URI` in a `.env` file that is not in the repo. README now covers setup, reproduction, frozen stages, refreshing data, the generated station list and the overrides file. Every command in it was tested or is standard DVC -- one written from memory (`mlflow ui --backend-store-uri file:...`) turned out to fail, because MLflow 3 also refuses the file store in the UI without `MLFLOW_ALLOW_FILE_STORE=true`; corrected before commit.
+
+After this, every non-script dependency of every stage is either produced by a stage, tracked by DVC, or tracked by git. (The two git-tracked ones are deliberate hand-written inputs: the overrides file and the EDA notebook.)
+
+**Gap still open -- and it is the important one: the DVC remote is on this laptop.** `.dvc/config` is committed with `url = E:\PROJECTS\MAIN PROJECTS\INTERNSHIP\CODEBASE`, a local folder on the same drive as the repo. `dvc push` succeeds, but the data never leaves this machine, and anyone else cloning gets a remote path that does not exist for them. So Delhi reproduces **on this machine**; reproducing it anywhere else needs a shared remote (Google Drive, S3, network folder) first. README states this plainly rather than giving setup steps that would only work here. The fresh-clone test (clone to a temp folder, install, `.env`, `dvc pull`, `dvc status`) is deferred -- with the current remote it would pass on this machine and still say nothing about anyone else's.
+
+Also noted: Python bytecode in `scripts/` shows both 3.10 (older runs) and 3.13 (this session's full repro), so README states "developed on 3.10, verified end to end on 3.13".
 
 ## Key decisions (pre-registered 2026-09-17, before any other city is run)
 

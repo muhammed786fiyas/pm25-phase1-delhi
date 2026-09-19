@@ -1,0 +1,5 @@
+outs:
+- md5: 40a83af1c7503a19499df9e172f4fabf
+  size: 475189
+  hash: md5
+  path: industrial_landuse.geojson
