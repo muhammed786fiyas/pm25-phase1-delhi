@@ -6,6 +6,20 @@ import pandas as pd
 # duplicate name/latitude/longitude columns from every table into the master
 STATION_META_COLS = ["name", "latitude", "longitude"]
 
+# Copied verbatim from scripts/datasets/cpcb/6-trim_and_season.py, which is
+# where season is assigned for the training data. Duplicated rather than
+# imported, per the repo's no-shared-utils convention -- but it MUST stay in
+# sync with that file, because season is a model feature and a different
+# month boundary would be a different feature. Only used when building from
+# --base_table (the prediction grid); the training path inherits season from
+# the PM2.5 table, which that script already produced.
+SEASON_MONTHS = {
+    3: "summer", 4: "summer", 5: "summer",
+    6: "monsoon", 7: "monsoon", 8: "monsoon", 9: "monsoon",
+    10: "post_monsoon", 11: "post_monsoon",
+    12: "winter", 1: "winter", 2: "winter",
+}
+
 def load_station_list(station_file):
     stations = pd.read_csv(station_file)
     stations = stations[stations["status"] == "KEEP"]
@@ -59,7 +73,16 @@ def merge_ndvi_periods(master, path):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--station_file", required=True)
-    parser.add_argument("--pm25", required=True)
+    # Optional, because the PREDICTION grid has no ground truth -- PM2.5 is the
+    # thing being predicted. One of --pm25 or --base_table must be given; the
+    # base simply decides which (location, date) rows exist. Everything after
+    # that is identical, which is the point: the NDVI period join in particular
+    # is a feature-defining operation (merge_asof onto 5-day period ranges) and
+    # a second copy of it for the grid would be free to drift.
+    parser.add_argument("--pm25", default=None)
+    parser.add_argument("--base_table", default=None,
+                        help="CSV of location_id,date to use as the row set "
+                             "instead of the PM2.5 table (prediction grid)")
     parser.add_argument("--aod", required=True)
     parser.add_argument("--era5_land", required=True)
     parser.add_argument("--era5_blh", required=True)
@@ -76,9 +99,26 @@ def main():
 
     # start from the PM2.5 target table -- this defines which station-days
     # are in the master table at all
-    master = pd.read_csv(args.pm25)
-    master["date"] = pd.to_datetime(master["date"])
-    print(f"Base PM2.5 table: {len(master)} station-days, {master['location_id'].nunique()} stations")
+    if args.pm25 is None and args.base_table is None:
+        raise SystemExit("ERROR: give either --pm25 (training) or --base_table (prediction grid)")
+    if args.pm25 is not None and args.base_table is not None:
+        raise SystemExit("ERROR: --pm25 and --base_table are alternatives, not both")
+    if args.pm25 is not None:
+        master = pd.read_csv(args.pm25)
+        master["date"] = pd.to_datetime(master["date"])
+        print(f"Base PM2.5 table: {len(master)} station-days, "
+              f"{master['location_id'].nunique()} stations")
+    else:
+        base = pd.read_csv(args.base_table)
+        master = base[["location_id", "date"]].drop_duplicates()
+        master["date"] = pd.to_datetime(master["date"])
+        master = master.sort_values(["location_id", "date"]).reset_index(drop=True)
+        master["season"] = master["date"].dt.month.map(SEASON_MONTHS)
+        print(f"Base grid table: {len(master)} cell-days, "
+              f"{master['location_id'].nunique()} cells, "
+              f"{master['date'].nunique()} dates (no PM2.5 -- prediction grid)")
+        print("Season assigned from month:",
+              master["season"].value_counts().to_dict())
 
     stations = load_station_list(args.station_file)
     master = master.merge(stations, on="location_id", how="left")
