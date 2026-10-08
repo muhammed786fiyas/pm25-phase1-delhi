@@ -183,6 +183,20 @@ After this, every non-script dependency of every stage is either produced by a s
 
 Also noted: Python bytecode in `scripts/` shows both 3.10 (older runs) and 3.13 (this session's full repro), so README states "developed on 3.10, verified end to end on 3.13".
 
+### 7. DVC mechanics for the multi-city design -- prototyped (2026-09-19)
+
+Tested in a throwaway repo before touching the real pipeline, because three things could break the design halfway through changing 76 stages.
+
+1. **A frozen stage that has never run cannot be run by `dvc repro` at all** -- not even targeted with `--force`. DVC treats frozen as "check the output exists" and fails with `missing data`. So a new city's download stages must start **unfrozen** and be frozen only after their first successful run.
+2. **`frozen` cannot come from `params.yaml`.** DVC validates it as a literal true/false before filling in templates (`expected bool`), so "Delhi frozen, Mumbai not" cannot be a per-city setting.
+3. **`dvc freeze` cannot freeze one city's copy of a templated stage** (`cannot dump a parametrized stage: 'fetch@delhi'`).
+
+Together these rule out templating the 12 external-download stages. **Design that works, verified end to end:** the download stages are written out once per city as plain stages (`cpcb_download_pm25_delhi`, `cpcb_download_pm25_mumbai`, ...), each frozen or not independently; everything downstream is one `foreach` template that runs per city. In the test, Delhi's download stayed frozen, Mumbai's ran on first repro and was frozen afterwards, and the downstream template built both cities.
+
+4. **Renaming Delhi's existing stages into the template form does not force a re-run.** After switching `model` to `model@delhi`, `dvc commit -f <stages>` accepts the existing outputs under the new names; `dvc repro` then reports `didn't change, skipping` for every Delhi stage and runs only Mumbai. Worth knowing when checking this: `dvc commit` itself updates an output's timestamp (it re-links the file from the cache) with identical content, so a timestamp comparison wrongly suggests a re-run. DVC's own "skipping" line, or a content hash, is the reliable check.
+
+**Gotcha: DVC's run cache breaks in deep directories on Windows.** Run-cache paths add `.dvc/cache/runs/xx/<64-char hash>/<temp file>` to the repo path; inside the session scratch folder that exceeded the 260-character limit and failed with a bare `No such file or directory`, which then corrupted later steps. The real repo path is short enough. Test DVC in short paths.
+
 ## Key decisions (pre-registered 2026-09-17, before any other city is run)
 
 **1. Publication threshold for the LightGBM model -- relative, not absolute.**
@@ -210,6 +224,18 @@ Recorded explicitly to prevent a moving goalpost. Deciding the threshold after s
 Two stages worth keeping for every city despite looking Delhi-specific: **`*_gapfill_robustness`** (answers "are results driven by imputed AOD?" -- gap-fill rates differ per city; Delhi is ~48%) and **`diagnose_lightgbm_aod_coupling`** (predicts which stations will be hard from observed data alone, before any modelling -- with 9 stations in Chennai, knowing upfront that several couple weakly tells you whether the city is viable at all).
 
 **6. Tuning design at small n.** Block-nesting exists because 42 stations make 42 tuning searches expensive. With 8-11 stations it collapses naturally into proper nested LOSO -- for each held-out station, tune on the remaining n-1 via inner `GroupKFold`. That is *more* rigorous than the block approximation and affordable, since there is less data per fold. Small n costs statistical power but buys a cleaner tuning design.
+
+**7. Repository structure for the other cities -- decided 2026-09-19: one multi-city repo, evolved from this one.** Considered and rejected:
+- *A branch per city* -- branches are for versions of the same thing that merge back; Mumbai is a sibling of Delhi, not a version of it. The two would edit the same `dvc.yaml`, `params.yaml` and data paths, so they could never merge; every script fix would need copying between branches indefinitely; and pooling or leave-one-city-out needs every city's data in one checkout.
+- *A separate repo per city* -- fastest to a first Mumbai result, but four copies of every script with fixes that don't spread, and pooling would need data merged across repos. The Delhi-specific paths, the UTM bug and the thresholds would still need fixing, once per copy.
+
+Delhi needs no separate repo to stay safe: the tags freeze it (`git checkout delhi-phase1-reproducible` always returns the exact Delhi pipeline). The city becomes a setting; core stages run once per city via DVC `foreach`; the nine Delhi-only experiment stages stay as plain Delhi stages. The repo can be renamed on GitHub later (GitHub redirects the old URL). **Acceptance test for the refactor: Delhi must still reproduce its tagged numbers.**
+
+**8b. Folder layout is city-first -- decided 2026-09-19**: `data/<city>/{stations,raw,interim,processed}/...`, `models/<city>/...`, `reports/<city>/...`. Everything for one city under one folder, matching the per-city template (each city's stages read and write only inside their own folder); pooling stages read across cities.
+
+**8. Mumbai uses Delhi's study window** (2025-03-01 to 2026-02-28) -- decided 2026-09-19. Keeps the cities comparable (same seasons, same year of weather) and keeps pooling clean.
+
+**New finding (2026-09-19): season months are hardcoded.** `SEASON_MONTHS` (June-September = monsoon) appears in several scripts across CPCB, MAIAC, gap-fill and dataset prep. Right for Mumbai, roughly right for Kolkata, **wrong for Chennai**, whose main rainy season is October-December (the northeast monsoon). Belongs in the per-city config.
 
 ## Plan
 
