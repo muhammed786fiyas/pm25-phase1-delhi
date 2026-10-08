@@ -159,3 +159,47 @@ docs/logs/            task logs (one per module) and daily work logs
   # Git Bash / Linux / macOS
   MLFLOW_ALLOW_FILE_STORE=true mlflow ui --backend-store-uri file:./models/mlflow_tracking
   ```
+
+## Data sources and citation
+
+This project derives its features from publicly available datasets. Each is credited
+below with the feature it contributes, so a number in any output can be traced back
+to its origin.
+
+```
+PM2.5 ground truth     CPCB (Central Pollution Control Board), accessed via OpenAQ
+Aerosol optical depth  MODIS MAIAC (MCD19A2), NASA
+AOD gap-fill           MERRA-2, NASA GMAO
+Meteorology            ERA5-Land (temperature, humidity, wind), Copernicus Climate
+                       Change Service / ECMWF
+Boundary layer height  ERA5, Copernicus Climate Change Service / ECMWF
+Vegetation (NDVI)      Sentinel-2, Copernicus
+Land cover             ESA WorldCover v200 (2021)
+Terrain                SRTM, NASA / USGS
+Roads, industrial      (c) OpenStreetMap contributors, ODbL
+  land use, power
+  plants
+```
+
+Earth Engine collection ids for each of these are recorded in `params.yaml`, so the
+exact product version used is reproducible rather than implied.
+
+### Using this data
+
+This dataset is free to use for research and educational purposes with attribution.
+
+Please cite: Muhammed Fiyas, "Delhi PM2.5 satellite-ground calibration", 2026.
+
+### If you redistribute outputs
+
+Any download or derived file should travel with this credit block, not just a link to
+it -- a CSV separated from its provenance is the actual risk, since the numbers end up
+in a paper with no way back to their source.
+
+Two items are worth confirming before wider redistribution: the CPCB/OpenAQ terms for
+the ground-truth measurements, and whether the OpenStreetMap-derived columns
+(`road_density_km_per_km2`, `industrial_landuse_fraction`,
+`dist_to_nearest_powerplant_km`) count as an ODbL "Produced Work" (attribution only,
+the likely reading for computed per-cell statistics) or a "Derivative Database"
+(which would carry share-alike). Attribution as given above is the normal standard for
+academic work either way.

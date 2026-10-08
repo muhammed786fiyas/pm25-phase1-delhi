@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Delhi PM2.5 Estimator</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+:root{
+  color-scheme: light;
+  --surface:#fcfcfb; --plane:#f9f9f7;
+  --ink:#0b0b0b; --ink2:#52514e; --muted:#898781;
+  --grid:#e1e0d9; --axis:#c3c2b7; --border:rgba(11,11,11,0.10);
+  --warn-bg:#fff8e6; --warn-ink:#6b4e00; --warn-line:#e8c766;
+  --accent:#2a78d6;
+  /* CPCB National AQI band colours, for instant domain recognition.
+     Severe darkened from the official #AF2D24 to #7E1A14: those two reds are
+     the commonest bands in Delhi winter (53%/47% of cells on 2025-12-15) yet
+     were only dE 12.6 apart; this widens them to 24.1. Every colour is paired
+     with a text label in the readout, tooltip and legend, so identity never
+     rests on colour alone. */
+  --aqi1:#55A84F; --aqi2:#A3C853; --aqi3:#FFF833;
+  --aqi4:#F29C33; --aqi5:#E93F33; --aqi6:#7E1A14;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    color-scheme: dark;
+    --surface:#1a1a19; --plane:#0d0d0d;
+    --ink:#ffffff; --ink2:#c3c2b7; --muted:#898781;
+    --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,0.10);
+    --warn-bg:#2a2412; --warn-ink:#f0d48a; --warn-line:#6b5a22;
+  }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--plane);color:var(--ink);
+  font:14px/1.5 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:1180px;margin:0 auto;padding:16px}
+h1{font-size:19px;margin:0 0 2px;letter-spacing:-0.01em}
+.sub{color:var(--ink2);font-size:13px;margin:0 0 12px}
+.banner{background:var(--warn-bg);color:var(--warn-ink);border:1px solid var(--warn-line);
+  border-radius:8px;padding:10px 12px;font-size:13px;margin-bottom:14px}
+.banner b{font-weight:650}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px}
+.controls{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:14px}
+.f{display:flex;flex-direction:column;gap:4px}
+.f label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+input,button{font:inherit;border-radius:7px;border:1px solid var(--axis);padding:7px 10px;
+  background:var(--surface);color:var(--ink)}
+input{width:122px}
+button{cursor:pointer;border-color:var(--accent);background:var(--accent);color:#fff;font-weight:600}
+button.ghost{background:var(--surface);color:var(--ink);border-color:var(--axis);font-weight:500}
+button:hover{filter:brightness(1.06)}
+.cols{display:grid;grid-template-columns:1fr 330px;gap:14px}
+@media (max-width:900px){.cols{grid-template-columns:1fr}}
+#map{height:520px;border-radius:10px;border:1px solid var(--border);background:var(--surface)}
+@media (max-width:900px){#map{height:380px}}
+.readout .big{font-size:40px;font-weight:680;letter-spacing:-0.02em;line-height:1.05}
+.readout .unit{font-size:15px;color:var(--ink2);font-weight:500}
+.band{display:inline-block;margin-top:6px;padding:3px 10px;border-radius:999px;
+  border:1px solid var(--axis);font-size:12px;font-weight:650;color:var(--ink2)}
+dl{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;margin:14px 0 0;font-size:13px}
+dt{color:var(--muted)} dd{margin:0;text-align:right}
+.note{margin-top:12px;padding-top:12px;border-top:1px solid var(--grid);
+  font-size:12px;color:var(--muted)}
+.legend h3,.readout h3,.card h3{font-size:11px;color:var(--muted);text-transform:uppercase;
+  letter-spacing:.04em;margin:0 0 4px}
+.err{color:#a01b1b;font-size:13px;margin-top:8px}
+@media (prefers-color-scheme: dark){.err{color:#ff8a8a}}
+table{border-collapse:collapse;width:100%;font-size:12px;margin-top:8px}
+th,td{text-align:left;padding:3px 6px;border-bottom:1px solid var(--grid)}
+th{color:var(--muted);font-weight:600}
+td.num{text-align:right;font-variant-numeric:tabular-nums}
+td.sw{width:22px;padding-right:0}
+.chip{display:block;width:16px;height:16px;border-radius:4px;border:1px solid var(--border)}
+.leaflet-container{background:var(--surface)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Delhi PM2.5 Estimator</h1>
+  <p class="sub">Satellite-to-ground calibration, Phase 1 &mdash; LightGBM on MAIAC AOD, ERA5 meteorology and land-use covariates.</p>
+
+  <div class="banner">
+    <b>Retrospective, not live.</b> This estimates PM2.5 for a past date in the study window
+    (2025-03-01 to 2026-02-28). It cannot report current air quality &mdash; its inputs are
+    ERA5 reanalysis (~5 day latency) and MAIAC AOD (1&ndash;3 day latency).
+    <br><b>Surface is a placeholder.</b> The coloured grid interpolates the model's 42 station
+    predictions; it is not yet the model predicting per cell. Point estimates return the
+    nearest station's prediction.
+  </div>
+
+  <div class="controls card">
+    <div class="f"><label for="date">Date</label><input id="date" type="date"></div>
+    <div class="f"><label for="lat">Latitude</label><input id="lat" type="number" step="0.0001" placeholder="28.6139"></div>
+    <div class="f"><label for="lon">Longitude</label><input id="lon" type="number" step="0.0001" placeholder="77.2090"></div>
+    <button id="go">Estimate</button>
+    <button id="loc" class="ghost">Use my location</button>
+    <button id="reload" class="ghost">Refresh map</button>
+  </div>
+
+  <div class="cols">
+    <div><div id="map"></div></div>
+
+    <div>
+      <div class="card readout">
+        <h3>Estimate</h3>
+        <div><span class="big" id="val">&mdash;</span> <span class="unit">&micro;g/m&sup3;</span></div>
+        <div class="band" id="band">no query yet</div>
+        <dl id="meta"></dl>
+        <div class="err" id="err"></div>
+        <div class="note" id="method"></div>
+      </div>
+
+      <div class="card legend" style="margin-top:14px">
+        <h3>National AQI band (PM2.5)</h3>
+        <table>
+          <thead><tr><th></th><th>Band</th><th class="num">&micro;g/m&sup3;</th></tr></thead>
+          <tbody id="legendrows"></tbody>
+        </table>
+        <div class="note">Hatched cells are more than 10.6&nbsp;km from any station &mdash; a larger
+          gap than spatial-LOSO validation ever spanned, so treat them as unvalidated.
+          Coverage stops at 15&nbsp;km from a station, so the coloured area &mdash; not the dashed
+          box &mdash; is where an estimate exists.</div>
+      </div>
+
+      <div class="card" style="margin-top:14px">
+        <h3>Model</h3>
+        <dl id="model"></dl>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+const RAMP   = ['#55A84F','#A3C853','#FFF833','#F29C33','#E93F33','#7E1A14'];
+const BANDS  = ['Good','Satisfactory','Moderate','Poor','Very Poor','Severe'];
+const RANGES = ['0-30','30-60','60-90','90-120','120-250','250+'];
+const BREAKS = [30,60,90,120,250];
+// Ink that stays legible on each band fill: yellow and the light greens need dark text.
+const ONBAND = ['#ffffff','#0b0b0b','#0b0b0b','#0b0b0b','#ffffff','#ffffff'];
+const BBOX = {minLat:28.4126, minLon:76.8381, maxLat:28.8814, maxLon:77.3477};
+
+function bandIndex(v){
+  for(let i=0;i<BREAKS.length;i++) if(v < BREAKS[i]) return i;
+  return 5;
+}
+function colorFor(v){ return RAMP[bandIndex(v)]; }
+function el(id){ return document.getElementById(id); }
+
+// Legend rows carry swatch + band name + numeric range, so colour is never
+// the only cue -- which is also the relief the low-contrast yellow requires.
+el('legendrows').innerHTML = RAMP.map((c,i)=>
+  '<tr><td class="sw"><span class="chip" style="background:'+c+'"></span></td>'+
+  '<td>'+BANDS[i]+'</td><td class="num">'+RANGES[i]+'</td></tr>').join('');
+
+const map = L.map('map',{zoomControl:true}).fitBounds(
+  [[BBOX.minLat,BBOX.minLon],[BBOX.maxLat,BBOX.maxLon]]);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+  {maxZoom:17, attribution:'&copy; OpenStreetMap'}).addTo(map);
+// Framing only. Coverage is gated on distance to the nearest station, so the
+// coloured cells -- not this rectangle -- show where the API will answer.
+L.rectangle([[BBOX.minLat,BBOX.minLon],[BBOX.maxLat,BBOX.maxLon]],
+  {color:'#898781',weight:1,fill:false,dashArray:'4 3'})
+ .bindTooltip('Station-roster bounding box (framing only)').addTo(map);
+
+let gridLayer = L.layerGroup().addTo(map);
+let stationLayer = L.layerGroup().addTo(map);
+let pin = null;
+
+async function getJSON(url){
+  const r = await fetch(url);
+  const j = await r.json();
+  if(!r.ok) throw new Error(j.message || j.error || ('HTTP '+r.status));
+  return j;
+}
+
+async function loadModel(){
+  const m = await getJSON('/api/model-info');
+  el('model').innerHTML =
+    '<dt>Spatial LOSO R&sup2;</dt><dd>'+m.validation.r2+'</dd>'+
+    '<dt>RMSE</dt><dd>'+m.validation.rmse_ugm3+' &micro;g/m&sup3;</dd>'+
+    '<dt>MAE</dt><dd>'+m.validation.mae_ugm3+' &micro;g/m&sup3;</dd>'+
+    '<dt>Features</dt><dd>'+m.n_features+'</dd>'+
+    '<dt>Stations</dt><dd>'+m.n_training_stations+'</dd>'+
+    '<dt>Coverage</dt><dd>'+m.coverage_rule.max_station_distance_km+' km of a station</dd>';
+  const d = el('date');
+  d.min = m.date_window.start; d.max = m.date_window.end;
+  if(!d.value) d.value = m.date_window.end;
+}
+
+async function loadStations(){
+  const s = await getJSON('/api/stations');
+  stationLayer.clearLayers();
+  s.stations.forEach(st=>{
+    L.circleMarker([st.latitude,st.longitude],
+      {radius:4,color:'#0b0b0b',weight:1.5,fillColor:'#fcfcfb',fillOpacity:1})
+     .bindTooltip(st.name+'<br><span style="color:#898781">training station '+st.location_id+'</span>')
+     .addTo(stationLayer);
+  });
+}
+
+async function loadGrid(){
+  const date = el('date').value;
+  if(!date) return;
+  const g = await getJSON('/api/grid?date='+date);
+  gridLayer.clearLayers();
+  const dLat = g.lat_step/2, dLon = g.lon_step/2;
+  g.cells.forEach(c=>{
+    const unvalidated = c.confidence === 'very low';
+    L.rectangle([[c.lat-dLat,c.lon-dLon],[c.lat+dLat,c.lon+dLon]],{
+      stroke: unvalidated, color:'#898781',
+      weight: unvalidated ? 1 : 0, dashArray: unvalidated ? '2 3' : null,
+      fillColor: colorFor(c.pm25_ugm3),
+      fillOpacity: unvalidated ? 0.32 : 0.68
+    }).bindTooltip(
+      '<b>'+c.pm25_ugm3+' &micro;g/m&sup3;</b> &mdash; '+c.aqi_band+'<br>'+
+      '<span style="color:#898781">'+c.nearest_station_km+' km to nearest station '+
+      '&middot; confidence '+c.confidence+'</span>').addTo(gridLayer);
+  });
+}
+
+function setBand(label, idx){
+  const b = el('band');
+  b.textContent = label;
+  if(idx === null){ b.style.background=''; b.style.color=''; b.style.borderColor=''; }
+  else { b.style.background = RAMP[idx]; b.style.color = ONBAND[idx];
+         b.style.borderColor = 'transparent'; }
+}
+
+async function estimate(lat, lon){
+  el('err').textContent=''; el('method').textContent='';
+  try{
+    const date = el('date').value;
+    const r = await getJSON('/api/predict?lat='+lat+'&lon='+lon+'&date='+date);
+    el('val').textContent = r.predicted_pm25_ugm3.toFixed(1);
+    setBand(r.aqi_band, bandIndex(r.predicted_pm25_ugm3));
+    el('meta').innerHTML =
+      '<dt>Confidence</dt><dd>'+r.confidence.level+'</dd>'+
+      '<dt>Nearest station</dt><dd>'+r.confidence.distance_to_nearest_station_km+' km</dd>'+
+      '<dt></dt><dd style="color:var(--muted)">'+r.nearest_station.name+'</dd>'+
+      '<dt>Observed there</dt><dd>'+r.nearest_station.observed_pm25_ugm3+' &micro;g/m&sup3;</dd>';
+    el('method').textContent = r.confidence.reason + ' — ' + r.method_note;
+    if(pin) map.removeLayer(pin);
+    pin = L.marker([lat,lon]).addTo(map)
+      .bindPopup(r.predicted_pm25_ugm3.toFixed(1)+' &micro;g/m&sup3; ('+r.aqi_band+')').openPopup();
+  }catch(e){
+    el('val').textContent = '—';
+    setBand('no estimate', null);
+    el('meta').innerHTML=''; el('err').textContent = e.message;
+  }
+}
+
+el('go').onclick = function(){
+  const lat=parseFloat(el('lat').value), lon=parseFloat(el('lon').value);
+  if(isNaN(lat)||isNaN(lon)){
+    el('err').textContent='Enter a latitude and longitude, or use your location.'; return; }
+  estimate(lat,lon);
+};
+el('loc').onclick = function(){
+  if(!navigator.geolocation){ el('err').textContent='This browser has no geolocation support.'; return; }
+  el('err').textContent='Locating…';
+  navigator.geolocation.getCurrentPosition(
+    function(p){ el('lat').value=p.coords.latitude.toFixed(4);
+                 el('lon').value=p.coords.longitude.toFixed(4);
+                 el('err').textContent=''; estimate(p.coords.latitude,p.coords.longitude); },
+    function(e){ el('err').textContent='Could not get your location: '+e.message; });
+};
+el('reload').onclick = loadGrid;
+el('date').onchange = loadGrid;
+map.on('click', function(e){
+  el('lat').value=e.latlng.lat.toFixed(4); el('lon').value=e.latlng.lng.toFixed(4);
+  estimate(e.latlng.lat, e.latlng.lng);
+});
+
+(async function(){ await loadModel(); await loadStations(); await loadGrid(); })()
+  .catch(function(e){ el('err').textContent = 'Startup failed: '+e.message; });
+</script>
+</body>
+</html>
