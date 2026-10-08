@@ -1477,8 +1477,8 @@ stages:
       size: 8429
     - path: scripts/modeling/dataset_prep/01_build_master_table.py
       hash: md5
-      md5: aba7603fa2c1a3449c64988825dae3ae
-      size: 5935
+      md5: 0a34082cca3776b4bceaeedc76a416a9
+      size: 8313
     outs:
     - path: data/training/processed/modeling_datasets/master_feature_table.csv
       hash: md5
