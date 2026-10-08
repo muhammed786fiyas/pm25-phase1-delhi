@@ -4098,3 +4098,114 @@ stages:
       hash: md5
       md5: bdd666ac53652428e477a0073a2d2a62
       size: 64541
+  predict_extract_ndvi_raw:
+    cmd: python scripts/datasets/static_gee/04_extract_ndvi_raw.py --stations 
+      data/prediction/processed/grid_1km_delhi.csv --output 
+      data/prediction/raw/static_gee/ndvi/ndvi_raw_periods.csv --summary_output 
+      data/prediction/raw/static_gee/ndvi/ndvi_extraction_summary.csv
+    deps:
+    - path: data/prediction/processed/grid_1km_delhi.csv
+      hash: md5
+      md5: 9ab84e51b6ee0bd4e5ae62171c6ee83b
+      size: 176200
+    - path: scripts/datasets/static_gee/04_extract_ndvi_raw.py
+      hash: md5
+      md5: 010b6e4b3979c783281e4b0448939556
+      size: 8725
+    params:
+      params.yaml:
+        static_gee_layers.ndvi.extract:
+          gee_project: internship-pm25
+          station_file: data/stations/cpcb_stations_delhi_status.csv
+          collection: COPERNICUS/S2_SR_HARMONIZED
+          buffer_radius_m: 1000
+          scale_m: 10
+          study_start: '2025-03-01'
+          study_end: '2026-02-28'
+          period_days: 5
+    outs:
+    - path: data/prediction/raw/static_gee/ndvi/ndvi_extraction_summary.csv
+      hash: md5
+      md5: a8f896176ad0a82f73ab2a5e8fa160d7
+      size: 421
+    - path: data/prediction/raw/static_gee/ndvi/ndvi_raw_periods.csv
+      hash: md5
+      md5: baa3609edee11b9b0e46165aed5a6c84
+      size: 15669600
+  predict_qc_ndvi:
+    cmd: python scripts/datasets/static_gee/05_qc_ndvi.py --stations 
+      data/prediction/processed/grid_1km_delhi.csv --input 
+      data/prediction/raw/static_gee/ndvi/ndvi_raw_periods.csv --output 
+      data/prediction/interim/static_gee/ndvi/ndvi_qc_summary.csv
+    deps:
+    - path: data/prediction/processed/grid_1km_delhi.csv
+      hash: md5
+      md5: 9ab84e51b6ee0bd4e5ae62171c6ee83b
+      size: 176200
+    - path: data/prediction/raw/static_gee/ndvi/ndvi_raw_periods.csv
+      hash: md5
+      md5: baa3609edee11b9b0e46165aed5a6c84
+      size: 15669600
+    - path: scripts/datasets/static_gee/05_qc_ndvi.py
+      hash: md5
+      md5: 9f6ccc47182f01a54e040df4406c8c75
+      size: 6615
+    params:
+      params.yaml:
+        static_gee_layers.ndvi.qc:
+          station_file: data/stations/cpcb_stations_delhi_status.csv
+          null_rate_warn_pct: 30
+          ndvi_plausible_min: -1.0
+          ndvi_plausible_max: 1.0
+    outs:
+    - path: data/prediction/interim/static_gee/ndvi/ndvi_qc_summary.csv
+      hash: md5
+      md5: a820f4d7786d10fc431d5a728aebc64c
+      size: 179908
+  predict_analyze_ndvi_fill_distances:
+    cmd: python scripts/datasets/static_gee/06_analyze_ndvi_fill_distances.py 
+      --input data/prediction/raw/static_gee/ndvi/ndvi_raw_periods.csv --output 
+      data/prediction/interim/static_gee/ndvi/ndvi_fill_distance_analysis.csv
+    deps:
+    - path: data/prediction/raw/static_gee/ndvi/ndvi_raw_periods.csv
+      hash: md5
+      md5: baa3609edee11b9b0e46165aed5a6c84
+      size: 15669600
+    - path: scripts/datasets/static_gee/06_analyze_ndvi_fill_distances.py
+      hash: md5
+      md5: 48347b4bc16a2c8b35b81e1b77cc2591
+      size: 3848
+    outs:
+    - path: 
+        data/prediction/interim/static_gee/ndvi/ndvi_fill_distance_analysis.csv
+      hash: md5
+      md5: 44e57017c4ee68dc5cc93e6c793767bb
+      size: 1103408
+  predict_fill_ndvi_gaps:
+    cmd: python scripts/datasets/static_gee/07_fill_ndvi_gaps.py --raw_input 
+      data/prediction/raw/static_gee/ndvi/ndvi_raw_periods.csv --distance_input 
+      data/prediction/interim/static_gee/ndvi/ndvi_fill_distance_analysis.csv 
+      --output data/prediction/processed/features/ndvi_gapfilled.csv
+    deps:
+    - path: 
+        data/prediction/interim/static_gee/ndvi/ndvi_fill_distance_analysis.csv
+      hash: md5
+      md5: 44e57017c4ee68dc5cc93e6c793767bb
+      size: 1103408
+    - path: data/prediction/raw/static_gee/ndvi/ndvi_raw_periods.csv
+      hash: md5
+      md5: baa3609edee11b9b0e46165aed5a6c84
+      size: 15669600
+    - path: scripts/datasets/static_gee/07_fill_ndvi_gaps.py
+      hash: md5
+      md5: 9c67590870fa43d6513de36d424a425e
+      size: 4391
+    params:
+      params.yaml:
+        static_gee_layers.ndvi.fill:
+          max_fill_distance_periods: 5
+    outs:
+    - path: data/prediction/processed/features/ndvi_gapfilled.csv
+      hash: md5
+      md5: 2cd489a0d50f5d10540551a813501aa4
+      size: 16652758

@@ -94,7 +94,24 @@ def main():
         station_features.append(feature)
 
     station_fc = ee.FeatureCollection(station_features)
-    region_bounds = station_fc.geometry().bounds()
+    # Materialise the bounds ONCE instead of leaving them lazy. station_fc
+    # .geometry() unions every buffered polygon server-side, and region_bounds
+    # is re-evaluated on each period's filterBounds -- 73 times. That union is
+    # trivial for 42 stations and crippling for a 2388-cell grid, where the
+    # first period had not returned after 20 minutes. Evaluating it once and
+    # rebuilding a literal rectangle from the result keeps the filter region
+    # EXACTLY the same (same coordinates, so the same images are selected and
+    # the median composite is unchanged) while paying the union cost a single
+    # time.
+    bounds_coords = station_fc.geometry().bounds().getInfo()["coordinates"][0]
+    bounds_lons = [c[0] for c in bounds_coords]
+    bounds_lats = [c[1] for c in bounds_coords]
+    region_bounds = ee.Geometry.Rectangle(
+        [min(bounds_lons), min(bounds_lats), max(bounds_lons), max(bounds_lats)],
+        None, False)
+    print("Region bounds materialised:",
+          [round(min(bounds_lons), 5), round(min(bounds_lats), 5),
+           round(max(bounds_lons), 5), round(max(bounds_lats), 5)])
 
     print("=== Building period list ===")
     periods = build_period_list(params["study_start"], params["study_end"], params["period_days"])
