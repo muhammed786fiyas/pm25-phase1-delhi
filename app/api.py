@@ -1,13 +1,15 @@
 import argparse
+import io
 import json
 import math
 import os
+import zipfile
 
 import lightgbm as lgb
 import numpy as np
 import pandas as pd
 from fastapi import FastAPI
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 # Local-only serving app for the Delhi Phase 1 LightGBM model. Historical /
@@ -29,6 +31,7 @@ from fastapi.staticfiles import StaticFiles
 ID_COLS = ["location_id", "name", "date"]
 TARGET_COL = "pm25_daily"
 GROUP_COL = "location_id"
+DATE_COL = "date"
 SEASON_COL = "season"
 SEASON_CATEGORIES = ["summer", "monsoon", "post_monsoon", "winter"]
 
@@ -89,6 +92,177 @@ AQI_BANDS = [
     (250, float("inf"), "Severe"),
 ]
 
+# Columns a station download always carries, whatever the user selects.
+# Identifiers are needed to make sense of a row at all; the observed value is
+# the whole point of this product (it is the only one of the three downloads
+# with measured rather than modelled PM2.5); and the model columns are the
+# out-of-fold prediction, i.e. from a model that never saw this station -- the
+# honest estimate, not the optimistic in-sample fit.
+DOWNLOAD_ID_COLS = ["location_id", "name", "latitude", "longitude", "date", "season"]
+DOWNLOAD_OBSERVED_COL = "pm25_observed_ugm3"
+DOWNLOAD_MODEL_COLS = ["pm25_predicted_ugm3", "pm25_lower_90_ugm3", "pm25_upper_90_ugm3"]
+
+# AOD provenance travels with the AOD column rather than being selectable.
+# aod_055 has three provenances, not two:
+#   aod_gap_filled=0                      -> MAIAC retrieval     6985 rows (51.4%)
+#   aod_gap_filled=1, aod_055 not null    -> MERRA-2 calibrated  6509 rows (47.9%)
+#   aod_gap_filled=1, aod_055 null        -> unfillable           101 rows (0.7%)
+# The flag means "not a MAIAC retrieval", NOT "a value was imputed" -- on the
+# unfillable rows neither MAIAC nor a usable MERRA-2 calibration was available,
+# so aod_055 is left null (LightGBM splits on missing natively, so those rows
+# still train and predict). aod_055 is the only column with nulls.
+#
+# This matters because network-wide AOD-PM2.5 coupling halves on filled rows
+# (0.516 observed vs 0.296 gap-filled). A researcher who cannot tell the three
+# apart is working with a column whose meaning silently changes between rows.
+DOWNLOAD_PROVENANCE_COLS = ["aod_gap_filled", "confidence_rmse"]
+
+# units / definition / source for every column that can appear in a download.
+COLUMN_DICTIONARY = [
+    ("location_id", "-", "CPCB station identifier (as used by OpenAQ)", "CPCB via OpenAQ"),
+    ("name", "-", "CPCB station name", "CPCB via OpenAQ"),
+    ("latitude", "degrees north", "station latitude, WGS84", "CPCB via OpenAQ"),
+    ("longitude", "degrees east", "station longitude, WGS84", "CPCB via OpenAQ"),
+    ("date", "YYYY-MM-DD", "calendar date, India Standard Time", "-"),
+    ("season", "-", "summer / monsoon / post_monsoon / winter", "derived"),
+    ("pm25_observed_ugm3", "ug/m3", "MEASURED daily mean PM2.5 at the station", "CPCB via OpenAQ"),
+    ("pm25_predicted_ugm3", "ug/m3",
+     "MODEL ESTIMATE from spatial leave-one-station-out cross-validation -- the "
+     "prediction from a model fitted without this station, so it is an honest "
+     "out-of-sample estimate and not an in-sample fit", "this model"),
+    ("pm25_lower_90_ugm3", "ug/m3",
+     "lower bound of the 90% conformal prediction interval", "this model"),
+    ("pm25_upper_90_ugm3", "ug/m3",
+     "upper bound of the 90% conformal prediction interval", "this model"),
+    ("aod_055", "unitless",
+     "aerosol optical depth at 550 nm, daily, 1 km", "MODIS MAIAC (MCD19A2), NASA"),
+    ("aod_gap_filled", "0 or 1",
+     "0 = aod_055 is a MAIAC retrieval. 1 = it is NOT a MAIAC retrieval, which "
+     "covers two cases: filled from MERRA-2 (aod_055 has a value) or unfillable "
+     "(aod_055 is null, 101 rows). So the three provenances are: flag=0 -> "
+     "observed; flag=1 and aod_055 not null -> MERRA-2 calibrated; flag=1 and "
+     "aod_055 null -> no AOD available. Filter on both columns, not the flag alone.",
+     "derived"),
+    ("confidence_rmse", "AOD units",
+     "RMSE of the per-station per-season MAIAC~MERRA-2 regression that produced "
+     "the fill, so smaller means a better-constrained fill. Blank on MAIAC-observed "
+     "rows (no fill was needed) and on the 101 unfillable rows (no fill happened). "
+     "Present on exactly the 6509 MERRA-2-calibrated rows. Note the units are AOD, "
+     "not ug/m3 -- this describes error in the AOD fill, not in the PM2.5 estimate.",
+     "derived"),
+    ("temperature_c", "degrees C", "2 m air temperature, satellite-overpass window mean",
+     "ERA5-Land, Copernicus / ECMWF"),
+    ("relative_humidity", "percent", "2 m relative humidity, overpass-window mean",
+     "ERA5-Land, Copernicus / ECMWF"),
+    ("wind_speed", "m/s", "10 m wind speed, overpass-window mean",
+     "ERA5-Land, Copernicus / ECMWF"),
+    ("boundary_layer_height", "m", "planetary boundary layer height, overpass-window mean",
+     "ERA5, Copernicus / ECMWF"),
+    ("ndvi_mean", "unitless (-1 to 1)",
+     "mean NDVI in a 1 km buffer, 5-day composite", "Sentinel-2, Copernicus"),
+    ("ndvi_gap_filled", "0 or 1", "1 if ndvi_mean was filled from a neighbouring period",
+     "derived"),
+    ("tree_cover_pct", "percent", "share of 1 km buffer pixels in this land-cover class",
+     "ESA WorldCover v200 (2021)"),
+    ("shrubland_pct", "percent", "share of 1 km buffer pixels in this land-cover class",
+     "ESA WorldCover v200 (2021)"),
+    ("grassland_pct", "percent", "share of 1 km buffer pixels in this land-cover class",
+     "ESA WorldCover v200 (2021)"),
+    ("cropland_pct", "percent", "share of 1 km buffer pixels in this land-cover class",
+     "ESA WorldCover v200 (2021)"),
+    ("built_up_pct", "percent", "share of 1 km buffer pixels in this land-cover class",
+     "ESA WorldCover v200 (2021)"),
+    ("bare_sparse_veg_pct", "percent", "share of 1 km buffer pixels in this land-cover class",
+     "ESA WorldCover v200 (2021)"),
+    ("water_pct", "percent", "share of 1 km buffer pixels in this land-cover class",
+     "ESA WorldCover v200 (2021)"),
+    ("wetland_herbaceous_pct", "percent", "share of 1 km buffer pixels in this land-cover class",
+     "ESA WorldCover v200 (2021)"),
+    ("elevation_m", "m", "mean elevation in a 1 km buffer", "SRTM, NASA / USGS"),
+    ("slope_deg", "degrees", "mean terrain slope in a 1 km buffer", "SRTM, NASA / USGS"),
+    ("road_density_km_per_km2", "km/km2", "road length per unit area in a 1 km buffer",
+     "OpenStreetMap, ODbL"),
+    ("industrial_landuse_fraction", "fraction (0 to 1)",
+     "industrial-tagged area divided by 1 km buffer area", "OpenStreetMap, ODbL"),
+    ("dist_to_nearest_powerplant_km", "km", "great-circle distance to the nearest power plant",
+     "OpenStreetMap, ODbL"),
+]
+
+ATTRIBUTION_TEXT = """Delhi PM2.5 satellite-ground calibration -- Phase 1
+================================================================
+
+USING THIS DATA
+
+This dataset is free to use for research and educational purposes with
+attribution.
+
+Please cite: Muhammed Fiyas, "Delhi PM2.5 satellite-ground calibration", 2026.
+
+
+DATA SOURCES
+
+PM2.5 ground truth     CPCB (Central Pollution Control Board), accessed via OpenAQ
+Aerosol optical depth  MODIS MAIAC (MCD19A2), NASA
+AOD gap-fill           MERRA-2, NASA GMAO
+Meteorology            ERA5-Land (temperature, humidity, wind), Copernicus
+                       Climate Change Service / ECMWF
+Boundary layer height  ERA5, Copernicus Climate Change Service / ECMWF
+Vegetation (NDVI)      Sentinel-2, Copernicus
+Land cover             ESA WorldCover v200 (2021)
+Terrain                SRTM, NASA / USGS
+Roads, industrial      (c) OpenStreetMap contributors, ODbL
+  land use, power
+  plants
+
+If you redistribute any part of this data, please carry this file with it.
+
+
+WHAT THE MODEL NUMBERS MEAN, AND THEIR LIMITS
+
+pm25_observed_ugm3 is MEASURED. pm25_predicted_ugm3 is a MODEL ESTIMATE and
+should not be treated as a measurement.
+
+Predictions come from spatial leave-one-station-out cross-validation: each
+station's values are predicted by a model fitted without that station (and
+without any station within 2 km of it). They are therefore out-of-sample
+estimates rather than an in-sample fit.
+
+Validated performance across all 42 stations, spatial LOSO:
+  R2    0.803
+  RMSE  33.73 ug/m3
+  MAE   20.76 ug/m3
+
+The 90% interval is a normalized conformal interval, prediction * (1 +/- 0.5514),
+calibrated on those out-of-fold residuals.
+
+IMPORTANT LIMITATION: that interval guarantees MARGINAL coverage -- correct on
+average across all predictions -- and not CONDITIONAL coverage at every
+location. Pooled held-out coverage is 89.9%, but per station it ranges from
+67.4% (Sector-125 Noida) to 98.2%, and 15 of 42 stations fall below the 90%
+target. The under-covered stations are those where column AOD tracks surface
+PM2.5 weakly. Treat a single station's interval as indicative, not guaranteed.
+
+THE AOD COLUMN HAS THREE PROVENANCES, NOT TWO
+
+aod_gap_filled means "not a MAIAC retrieval", not "a value was imputed":
+
+  aod_gap_filled == 0                        MAIAC retrieval      6985 rows (51.4%)
+  aod_gap_filled == 1, aod_055 not null      MERRA-2 calibrated   6509 rows (47.9%)
+  aod_gap_filled == 1, aod_055 null          no AOD available      101 rows (0.7%)
+
+Filter on both columns, not the flag alone. aod_055 is the only column in this
+file that contains nulls; the 101 unfillable rows are kept because LightGBM
+splits on missing values natively, so they still carry a prediction.
+
+AOD-PM2.5 coupling is roughly half as strong on the MERRA-2-calibrated rows
+(network-wide r = 0.296) as on the MAIAC-retrieved rows (r = 0.516). If your
+analysis depends on the AOD column, this split is worth respecting.
+
+
+This model is RETROSPECTIVE. Its inputs (ERA5 reanalysis, MAIAC AOD) have
+multi-day latency, so it cannot estimate present-day PM2.5.
+"""
+
 app = FastAPI(title="Delhi PM2.5 estimator (Phase 1, local demo)")
 
 STATE = {}
@@ -140,7 +314,7 @@ def distance_to_nearest_station(lat, lon):
 
 def load_state(model_path, dataset_path, station_path, metrics_path, grid_km,
                max_station_distance_km=DEFAULT_MAX_STATION_DISTANCE_KM,
-               conformal_path=None):
+               conformal_path=None, oof_path=None):
     booster = lgb.Booster(model_file=model_path)
 
     df = pd.read_csv(dataset_path)
@@ -153,6 +327,9 @@ def load_state(model_path, dataset_path, station_path, metrics_path, grid_km,
 
     with open(metrics_path) as f:
         metrics = json.load(f)
+
+    oof = pd.read_csv(oof_path)[[GROUP_COL, DATE_COL, "predicted_pm25"]]
+    print(f"Loaded out-of-fold predictions: {oof_path} ({len(oof)} rows)")
 
     with open(conformal_path) as f:
         conformal = json.load(f)
@@ -177,6 +354,7 @@ def load_state(model_path, dataset_path, station_path, metrics_path, grid_km,
         "dates": dates,
         "grid_km": grid_km,
         "max_station_distance_km": max_station_distance_km,
+        "oof": oof,
         "conformal": conformal,
         "conformal_q": level["q"],
         "model_path": model_path,
@@ -427,6 +605,176 @@ def grid(date: str):
     }
 
 
+def selectable_feature_cols():
+    # Everything the model uses, minus the columns that are always included
+    # anyway: the AOD provenance pair and `season`, which doubles as an
+    # identifier. Leaving `season` selectable would put it in the frame twice.
+    always = set(DOWNLOAD_PROVENANCE_COLS) | set(DOWNLOAD_ID_COLS)
+    return [c for c in STATE["feature_cols"] if c not in always]
+
+
+def data_dictionary_text(columns):
+    lines = ["COLUMN DICTIONARY", "=" * 70, ""]
+    known = {name: (unit, desc, src) for name, unit, desc, src in COLUMN_DICTIONARY}
+    for col in columns:
+        unit, desc, src = known.get(col, ("-", "(undocumented)", "-"))
+        lines.append(f"{col}")
+        lines.append(f"  units  : {unit}")
+        lines.append(f"  meaning: {desc}")
+        lines.append(f"  source : {src}")
+        lines.append("")
+    return "\n".join(lines)
+
+
+def build_station_download(date_from, date_to, features):
+    # Observed values and features from the modelling dataset, joined to the
+    # out-of-fold prediction so the download carries measurement, model
+    # estimate and interval side by side.
+    df = STATE["df"]
+    rows = df[(df[DATE_COL] >= date_from) & (df[DATE_COL] <= date_to)].copy()
+    if len(rows) == 0:
+        return None
+
+    coords = STATE["stations"].set_index(GROUP_COL)
+    rows["latitude"] = rows[GROUP_COL].map(coords["latitude"])
+    rows["longitude"] = rows[GROUP_COL].map(coords["longitude"])
+    rows[DOWNLOAD_OBSERVED_COL] = rows[TARGET_COL]
+
+    oof = STATE["oof"]
+    merged = rows.merge(oof, on=[GROUP_COL, DATE_COL], how="left")
+    merged["pm25_predicted_ugm3"] = merged["predicted_pm25"].round(2)
+    q = STATE["conformal_q"]
+    merged["pm25_lower_90_ugm3"] = (merged["predicted_pm25"] * (1.0 - q)).clip(lower=0).round(2)
+    merged["pm25_upper_90_ugm3"] = (merged["predicted_pm25"] * (1.0 + q)).round(2)
+
+    keep = (DOWNLOAD_ID_COLS + [DOWNLOAD_OBSERVED_COL] + DOWNLOAD_MODEL_COLS
+            + DOWNLOAD_PROVENANCE_COLS + features)
+    # Deduplicate while preserving order -- belt and braces against a column
+    # that is both an identifier and a feature.
+    seen = set()
+    keep = [c for c in keep
+            if c in merged.columns and not (c in seen or seen.add(c))]
+    out = merged[keep].copy()
+    out[SEASON_COL] = out[SEASON_COL].astype(str)
+    return out
+
+
+def parse_feature_selection(features):
+    available = selectable_feature_cols()
+    if features is None or features.strip() == "" or features.strip().lower() == "all":
+        return available, []
+    # An explicit "none" means the always-included columns only -- the measured
+    # value, the estimate and its interval. Treating it as an unknown column
+    # name would work but would report a spurious warning.
+    if features.strip().lower() == "none":
+        return [], []
+    asked = [f.strip() for f in features.split(",") if f.strip()]
+    chosen = [f for f in asked if f in available]
+    unknown = [f for f in asked if f not in available]
+    return chosen, unknown
+
+
+@app.get("/api/download/stations/columns")
+def download_station_columns():
+    return {
+        "always_included": {
+            "identifiers": DOWNLOAD_ID_COLS,
+            "observed": [DOWNLOAD_OBSERVED_COL],
+            "model": DOWNLOAD_MODEL_COLS,
+            "aod_provenance": DOWNLOAD_PROVENANCE_COLS,
+            "why_provenance_is_not_optional": (
+                "47.9% of aod_055 values are calibrated from MERRA-2 rather than "
+                "retrieved by MAIAC, and AOD-PM2.5 coupling halves on those rows "
+                "(0.516 vs 0.296), so a column that could not be filtered would "
+                "silently change meaning between rows"),
+            "aod_provenance_classes": {
+                "maiac_observed": "aod_gap_filled == 0 (6985 rows, 51.4%)",
+                "merra2_calibrated": "aod_gap_filled == 1 and aod_055 notnull (6509 rows, 47.9%)",
+                "unfillable": "aod_gap_filled == 1 and aod_055 isnull (101 rows, 0.7%)",
+                "note": ("The flag means 'not a MAIAC retrieval', not 'a value was "
+                         "imputed', so filter on both columns. aod_055 is the only "
+                         "column in the download that contains nulls."),
+            },
+        },
+        "selectable_features": selectable_feature_cols(),
+        "dictionary": [
+            {"column": n, "units": u, "meaning": d, "source": s}
+            for n, u, d, s in COLUMN_DICTIONARY
+        ],
+    }
+
+
+@app.get("/api/download/stations/preview")
+def download_station_preview(date_from: str = None, date_to: str = None,
+                             features: str = "all"):
+    date_from = date_from or STATE["dates"][0]
+    date_to = date_to or STATE["dates"][-1]
+    chosen, unknown = parse_feature_selection(features)
+    out = build_station_download(date_from, date_to, chosen)
+    if out is None:
+        return JSONResponse(status_code=422, content={
+            "error": "no_rows",
+            "message": f"No station rows between {date_from} and {date_to}.",
+            "date_window": {"start": STATE["dates"][0], "end": STATE["dates"][-1]},
+        })
+    csv_bytes = len(out.to_csv(index=False).encode("utf-8"))
+    return {
+        "date_from": date_from, "date_to": date_to,
+        "n_rows": len(out), "n_columns": out.shape[1],
+        "n_stations": int(out[GROUP_COL].nunique()),
+        "columns": out.columns.tolist(),
+        "unknown_features_ignored": unknown,
+        "estimated_size": {
+            "csv_mb": round(csv_bytes / 1e6, 2),
+            "parquet_mb": round(csv_bytes / 1e6 * 0.10, 2),
+        },
+    }
+
+
+@app.get("/api/download/stations")
+def download_stations(date_from: str = None, date_to: str = None,
+                      features: str = "all", format: str = "zip"):
+    if format not in ("zip", "csv", "parquet"):
+        return JSONResponse(status_code=422, content={
+            "error": "bad_format", "message": "format must be zip, csv or parquet"})
+
+    date_from = date_from or STATE["dates"][0]
+    date_to = date_to or STATE["dates"][-1]
+    chosen, _ = parse_feature_selection(features)
+    out = build_station_download(date_from, date_to, chosen)
+    if out is None:
+        return JSONResponse(status_code=422, content={
+            "error": "no_rows",
+            "message": f"No station rows between {date_from} and {date_to}."})
+
+    stem = f"delhi_pm25_stations_{date_from}_{date_to}"
+
+    if format == "csv":
+        return Response(out.to_csv(index=False).encode("utf-8"),
+                        media_type="text/csv",
+                        headers={"Content-Disposition": f'attachment; filename="{stem}.csv"'})
+
+    if format == "parquet":
+        buf = io.BytesIO()
+        out.to_parquet(buf, index=False)
+        return Response(buf.getvalue(), media_type="application/octet-stream",
+                        headers={"Content-Disposition": f'attachment; filename="{stem}.parquet"'})
+
+    # Default: a zip, so the data cannot travel without its dictionary and
+    # attribution. A CSV separated from its provenance is the real risk -- the
+    # numbers end up in a paper with no way back to their source.
+    data_buf = io.BytesIO()
+    out.to_parquet(data_buf, index=False)
+    zip_buf = io.BytesIO()
+    with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as z:
+        z.writestr(f"{stem}.parquet", data_buf.getvalue())
+        z.writestr(f"{stem}.csv", out.to_csv(index=False))
+        z.writestr("DATA_DICTIONARY.txt", data_dictionary_text(out.columns.tolist()))
+        z.writestr("ATTRIBUTION.txt", ATTRIBUTION_TEXT)
+    return Response(zip_buf.getvalue(), media_type="application/zip",
+                    headers={"Content-Disposition": f'attachment; filename="{stem}.zip"'})
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", default="models/lightgbm/lightgbm_full_model.txt")
@@ -439,6 +787,11 @@ def main():
     parser.add_argument("--conformal",
                         default="reports/lightgbm/primary/conformal_calibration.json",
                         help="output of 04_calibrate_conformal_intervals.py")
+    parser.add_argument("--oof",
+                        default="reports/lightgbm/primary/cv_spatial_loso_oof_predictions.csv",
+                        help="per-row out-of-fold predictions, used so the station "
+                             "download carries an honest out-of-sample estimate rather "
+                             "than an in-sample fit")
     parser.add_argument("--max_station_distance_km",
                         default=DEFAULT_MAX_STATION_DISTANCE_KM, type=float,
                         help="refuse queries further than this from any training station")
@@ -450,7 +803,7 @@ def main():
     args = parser.parse_args()
 
     load_state(args.model, args.dataset, args.station_file, args.metrics, args.grid_km,
-               args.max_station_distance_km, args.conformal)
+               args.max_station_distance_km, args.conformal, args.oof)
 
     static_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
     app.mount("/static", StaticFiles(directory=static_dir), name="static")

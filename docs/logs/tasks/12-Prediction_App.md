@@ -20,7 +20,7 @@ as pending, not deleted.
 
 ## Completed
 
-### 1. API + UI against a stub (2026-10-08)
+### API + UI against a stub (2026-10-08) -- before the 10-step plan
 
 Built interface-first so the design could be reacted to before spending GEE time on the
 expensive per-cell feature grid.
@@ -44,7 +44,7 @@ June spans 40-58 (Satisfactory).
 Run with `python app/api.py`; `--grid_km`, `--max_station_distance_km`, `--port` are the
 useful flags.
 
-### 2. Attribution and citation (2026-10-08)
+### Step 1 -- Attribution and citation (2026-10-08)
 
 Added a "Data sources and citation" section to `README.md`: every upstream dataset
 credited against the feature it contributes, GEE collection ids pointed at `params.yaml`
@@ -58,6 +58,83 @@ downstream (optional; one sentence covers it for an academic project). Flagged f
 confirmation rather than asserted: the CPCB/OpenAQ redistribution terms, and whether the
 OSM-derived columns are an ODbL "Produced Work" (attribution only, the likely reading for
 computed per-cell statistics) or a "Derivative Database" (share-alike).
+
+### Step 2 -- Out-of-fold predictions saved per row (2026-10-08)
+
+`02_validate_lightgbm_cv.py` scored each spatial-LOSO fold and threw the predictions
+away, keeping only aggregates. It now writes
+`reports/lightgbm/primary/cv_spatial_loso_oof_predictions.csv` -- one row per
+(station, date) with fold id, observed, predicted and residual.
+
+This is the input the next two steps need, and it is worth more than the metrics file:
+13,595 honest out-of-sample predictions are a reusable calibration set, and the same
+file is what lets the station download ship an out-of-sample estimate instead of an
+in-sample fit.
+
+### Steps 3 and 4 -- Conformal intervals replace the distance confidence badge (2026-10-08)
+
+`scripts/modeling/lightgbm/04_calibrate_conformal_intervals.py`, wired as a DVC stage,
+output `reports/lightgbm/primary/conformal_calibration.json` plus a per-station
+held-out coverage CSV.
+
+Normalized conformal, scaled by the prediction: `interval = prediction * (1 +/- q)`,
+with `q` a percentile of the relative absolute residual on out-of-fold rows.
+At 90%, **q = 0.5514** -- plus or minus 55.1% of the estimate. Held-out coverage,
+measured by calibrating on 41 stations and testing on the 42nd, is **89.9%** against
+a 90% target.
+
+The app serves the 90% level (`SERVED_COVERAGE_LEVEL`); 80% and 95% are also
+calibrated and sit in the JSON if the level is ever changed.
+
+What this replaced: a four-tier confidence badge keyed to distance from the nearest
+station. That was tested against actual per-fold error and **found unsupported** --
+r = 0.149, p = 0.33, n = 42. Distance still gates *scope* (`max_station_distance_km`,
+and the 10.6 km largest-validated-gap flag) because no correlation across the
+0.67-10.6 km the network spans does not license unlimited extrapolation. But it is no
+longer presented as a confidence measure anywhere in the API or UI.
+
+Full reasoning, including the three approaches rejected and the one falsified before
+being built, is in "Uncertainty: what was tested and what was rejected" below.
+
+### Step 5 -- Station data download (2026-10-08)
+
+Download product 1 of 3. Endpoints in `app/api.py`:
+
+| Endpoint | Returns |
+|---|---|
+| `/api/download/stations/columns` | selectable features, always-included columns, full data dictionary |
+| `/api/download/stations/preview` | row/column/station counts and a size estimate, before committing to a download |
+| `/api/download/stations` | the data, `format=zip` (default), `parquet` or `csv` |
+
+**What a row carries.** Identifiers, the **measured** `pm25_observed_ugm3`, the model's
+`pm25_predicted_ugm3` with `pm25_lower_90_ugm3` / `pm25_upper_90_ugm3`, the two AOD
+provenance columns, and whichever of the 21 features the user selected. 13,595 rows and
+32 columns at the full selection -- 0.59 MB as parquet, 5.8 MB as CSV.
+
+**The prediction is out-of-sample, not an in-sample fit.** It is joined from the
+spatial-LOSO OOF file, so each station's values come from a model fitted without that
+station and without anything within 2 km of it. Verified on the delivered file: RMSE
+33.73 ug/m3, exactly the published spatial-LOSO figure, and interval coverage 90.0%
+against the 89.9% the calibration predicted. An in-sample fit would have scored far
+better and been worth far less.
+
+**The ZIP is the default on purpose.** It bundles `DATA_DICTIONARY.txt` (units,
+meaning and source for every column present) and `ATTRIBUTION.txt` (source credits, the
+citation line, validated performance, and the marginal-vs-conditional coverage caveat)
+alongside both file formats. A CSV that travels without its provenance is the real
+failure mode -- the numbers end up in a paper with no route back to their source. Raw
+`csv` and `parquet` remain available for anyone scripting against the endpoint.
+
+**Feature selection** is a checkbox grid in the UI, `features=a,b,c` on the API (or
+`all` / `none`). Unknown names are ignored and *reported* in the preview response
+rather than silently dropped.
+
+**Four columns are not selectable**, and the UI says why. The identifiers and the
+observed/predicted/interval columns are the product. `aod_gap_filled` and
+`confidence_rmse` are excluded from selection because AOD-PM2.5 coupling nearly halves
+on gap-filled rows (0.516 observed vs 0.296 filled, network-wide) -- a researcher who
+could drop the provenance would be left with a column whose meaning silently changes
+between rows.
 
 ## Key decisions
 
@@ -232,23 +309,8 @@ distances.
 
 ## Pending
 
-**Step 2** -- save per-row out-of-fold predictions from `02_validate_lightgbm_cv.py`
-(`reports/lightgbm/primary/oof_predictions.csv`, 13,595 rows). They are computed on every
-validation run and discarded; they are the raw material for all uncertainty work and
-worth keeping independent of the app.
-
-**Step 3** -- calibrate q on all 42 folds, write
-`reports/lightgbm/primary/conformal_calibration.json`, verify coverage on held-out
-stations. The q values above come from 12 of 42 stations: the method is settled, the
-constant is not.
-
-**Step 4** -- replace the distance-based confidence badge with the interval in API and
-UI. Distance stays as a *scope* gate (where we are willing to answer at all, since the
-absence of correlation across 0.67-10.6 km does not license unlimited extrapolation) but
-stops being presented as *confidence*.
-
-**Step 5** -- station download (cheap, the data exists today): parquet default, feature
-selection, bundled data dictionary and attribution.
+Steps 1-5 are done -- see Completed above. Step 6 is the next one and the first
+expensive one.
 
 **Step 6** -- grid feature extraction at 5 km to prove the vertical slice before
 committing GEE time. Static features and ERA5/MERRA-2 reuse the existing scripts with a
@@ -287,5 +349,20 @@ Derivative Database question for the OSM-derived columns.
 - The bbox genuinely cuts through NCR: Noida at 77.39 lon is outside it while station
   5598 (Noida Sector-125) sits inside at 77.33. This was the original argument for
   replacing the rectangle with a distance gate.
+- **`aod_gap_filled` has three meanings, not two**, and this was found while writing the
+  download's data dictionary. The flag means "not a MAIAC retrieval", not "a value was
+  imputed": `flag=0` is a MAIAC retrieval (6,985 rows, 51.4%), `flag=1` with a non-null
+  `aod_055` is MERRA-2 calibrated (6,509 rows, 47.9%), and `flag=1` with a **null**
+  `aod_055` means neither was available (101 rows, 0.7%, all in monsoon). Those 101 rows
+  come out of `05_apply_gapfill.py`'s `unfillable` branch, which sets `gap_filled=1`
+  while leaving the value `None`. They stay in the modelling dataset because LightGBM
+  splits on missing natively. `aod_055` is the only column in the dataset with nulls.
+  Anything filtering on the flag alone is wrong -- filter on both columns.
+- **`confidence_rmse` is in AOD units, not ug/m3.** It is the RMSE of the per-station
+  per-season MAIAC~MERRA-2 regression that produced a fill (range 0.134-0.464), so it
+  describes error in the *AOD fill*, not in the PM2.5 estimate. Present on exactly the
+  6,509 MERRA-2-calibrated rows; null elsewhere, including the 101 unfillable ones.
+- `season` is both a model feature and a download identifier, so it must be excluded from
+  the selectable feature list or it lands in the frame twice.
 - A long-running dev server cannot be held open from a Claude Code background task (10
   minute ceiling). Run `python app/api.py` directly for a real session.

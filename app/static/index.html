@@ -76,6 +76,25 @@ td.num{text-align:right;font-variant-numeric:tabular-nums}
 td.sw{width:22px;padding-right:0}
 .chip{display:block;width:16px;height:16px;border-radius:4px;border:1px solid var(--border)}
 .leaflet-container{background:var(--surface)}
+.dl .dlsub{color:var(--ink2);font-size:13px;margin:2px 0 12px;max-width:70ch}
+.dlrow{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:14px}
+.dlrow select{font:inherit;border-radius:7px;border:1px solid var(--axis);padding:7px 10px;
+  background:var(--surface);color:var(--ink)}
+.feathead{display:flex;justify-content:space-between;align-items:baseline;
+  font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;
+  margin-bottom:7px}
+.featgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(205px,1fr));
+  gap:2px 14px}
+.featgrid label{display:flex;gap:7px;align-items:center;font-size:13px;
+  color:var(--ink2);cursor:pointer;padding:2px 0}
+.featgrid input[type=checkbox]{width:auto;margin:0;accent-color:var(--accent)}
+button.link{background:none;border:none;padding:0;color:var(--accent);font-weight:600;
+  font-size:11px;text-transform:uppercase;letter-spacing:.04em;cursor:pointer}
+button.link:hover{text-decoration:underline}
+.dlfoot{display:flex;justify-content:space-between;align-items:center;gap:14px;
+  margin-top:14px;padding-top:12px;border-top:1px solid var(--grid)}
+.dlfoot .prev{font-size:12px;color:var(--ink2);font-variant-numeric:tabular-nums}
+.dlfoot .prev b{color:var(--ink);font-weight:650}
 </style>
 </head>
 <body>
@@ -135,6 +154,39 @@ td.sw{width:22px;padding-right:0}
         <dl id="model"></dl>
         <div class="note" id="uncert"></div>
       </div>
+    </div>
+  </div>
+
+  <div class="card dl" style="margin-top:14px">
+    <h3>Download station data</h3>
+    <p class="dlsub">Measured daily PM2.5 at all 42 CPCB stations, each row paired with the
+      model&rsquo;s out-of-sample estimate and its 90% prediction interval. This is the only
+      download that carries measured values &mdash; the gridded products are model estimates
+      throughout.</p>
+
+    <div class="dlrow">
+      <div class="f"><label for="dfrom">From</label><input id="dfrom" type="date"></div>
+      <div class="f"><label for="dto">To</label><input id="dto" type="date"></div>
+      <div class="f"><label for="dfmt">Format</label>
+        <select id="dfmt">
+          <option value="zip">ZIP &mdash; parquet + CSV + docs</option>
+          <option value="parquet">Parquet only</option>
+          <option value="csv">CSV only</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="feathead">
+      <span>Features</span>
+      <span><button class="link" id="fall">select all</button> &middot;
+            <button class="link" id="fnone">none</button></span>
+    </div>
+    <div class="featgrid" id="featlist"></div>
+    <div class="note" id="always"></div>
+
+    <div class="dlfoot">
+      <div class="prev" id="dprev">&nbsp;</div>
+      <button id="dgo">Download</button>
     </div>
   </div>
 </div>
@@ -198,6 +250,13 @@ async function loadModel(){
   const d = el('date');
   d.min = m.date_window.start; d.max = m.date_window.end;
   if(!d.value) d.value = m.date_window.end;
+  // The download pickers span the same window and default to all of it.
+  ['dfrom','dto'].forEach(id => {
+    const x = el(id);
+    x.min = m.date_window.start; x.max = m.date_window.end;
+  });
+  if(!el('dfrom').value) el('dfrom').value = m.date_window.start;
+  if(!el('dto').value)   el('dto').value   = m.date_window.end;
 }
 
 async function loadStations(){
@@ -294,7 +353,86 @@ map.on('click', function(e){
   estimate(e.latlng.lat, e.latlng.lng);
 });
 
-(async function(){ await loadModel(); await loadStations(); await loadGrid(); })()
+// ---- download panel ----
+// Feature selection is a plain checkbox grid rather than a multi-select: a
+// researcher picking covariates needs to see the whole list at once.
+let DLCOLS = null;
+
+function chosenFeatures(){
+  return [...document.querySelectorAll('#featlist input:checked')].map(c => c.value);
+}
+
+function downloadQuery(){
+  const q = new URLSearchParams({
+    date_from: el('dfrom').value, date_to: el('dto').value,
+    features: chosenFeatures().join(',') || 'none',
+  });
+  return q;
+}
+
+async function refreshPreview(){
+  el('dprev').textContent = 'counting' + '\u2026';
+  try {
+    const p = await getJSON('/api/download/stations/preview?' + downloadQuery());
+    const size = el('dfmt').value === 'csv' ? p.estimated_size.csv_mb
+                                            : p.estimated_size.parquet_mb;
+    el('dprev').innerHTML = '<b>' + p.n_rows.toLocaleString() + '</b> rows &times; <b>' +
+      p.n_columns + '</b> columns, ' + p.n_stations + ' stations &middot; about <b>' +
+      (size < 0.01 ? '<0.01' : size.toFixed(2)) + ' MB</b>';
+  } catch (e) {
+    el('dprev').textContent = e.message;
+  }
+}
+
+// Debounced so ticking through a dozen checkboxes does not fire a dozen counts.
+let prevTimer = null;
+function queuePreview(){ clearTimeout(prevTimer); prevTimer = setTimeout(refreshPreview, 180); }
+
+async function loadColumns(){
+  DLCOLS = await getJSON('/api/download/stations/columns');
+  const meanings = {};
+  DLCOLS.dictionary.forEach(d => { meanings[d.column] = d.meaning + ' [' + d.units + ']'; });
+  el('featlist').innerHTML = DLCOLS.selectable_features.map(f =>
+    '<label title="' + (meanings[f] || '').replace(/"/g, '&quot;') + '">' +
+    '<input type="checkbox" value="' + f + '" checked>' + f + '</label>').join('');
+  el('featlist').addEventListener('change', queuePreview);
+
+  const a = DLCOLS.always_included;
+  const cls = a.aod_provenance_classes;
+  el('always').innerHTML =
+    '<b>Always included</b>, whatever you select above: ' +
+    a.identifiers.join(', ') + '; <b>' + a.observed[0] + '</b> (the measured value); ' +
+    a.model.join(', ') + ' (the model estimate and its interval); and ' +
+    a.aod_provenance.join(', ') + '.' +
+    '<br><br>Those last two are not optional because ' + a.why_provenance_is_not_optional +
+    '. The three cases are: <b>MAIAC retrieval</b> ' + cls.maiac_observed +
+    '; <b>MERRA-2 calibrated</b> ' + cls.merra2_calibrated +
+    '; <b>no AOD available</b> ' + cls.unfillable + '.' +
+    '<br><br>' + cls.note;
+}
+
+el('dfmt').addEventListener('change', refreshPreview);
+el('dfrom').addEventListener('change', queuePreview);
+el('dto').addEventListener('change', queuePreview);
+el('fall').addEventListener('click', () => {
+  document.querySelectorAll('#featlist input').forEach(c => { c.checked = true; });
+  queuePreview();
+});
+el('fnone').addEventListener('click', () => {
+  document.querySelectorAll('#featlist input').forEach(c => { c.checked = false; });
+  queuePreview();
+});
+el('dgo').addEventListener('click', () => {
+  // Let the browser handle the attachment -- fetch would buffer it in memory
+  // and then need a blob URL for no gain.
+  window.location = '/api/download/stations?' + downloadQuery() +
+    '&format=' + el('dfmt').value;
+});
+
+(async function(){
+  await loadModel(); await loadStations(); await loadGrid();
+  await loadColumns(); await refreshPreview();
+})()
   .catch(function(e){ el('err').textContent = 'Startup failed: '+e.message; });
 </script>
 </body>
