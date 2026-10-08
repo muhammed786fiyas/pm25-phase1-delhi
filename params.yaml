@@ -239,6 +239,79 @@ osm_layers:
 # Modeling (master feature table + LME/LightGBM prep)
 # ============================================================================
 
+# Prediction pipeline (the grid, its features, and inference over it).
+# Kept entirely separate from the training inputs above: training and prediction
+# run the same extractor scripts, so both emit a road_density.csv, a
+# srtm_terrain.csv and so on. See data/training/ vs data/prediction/.
+prediction:
+  grid:
+    # 1 km, not 5 km. 1 km is MAIAC AOD's native resolution and the buffer radius
+    # every static covariate was computed at, so it is the only resolution where
+    # the features mean what the model was trained on. Coarser products are
+    # AGGREGATED from these cells (mean of predictions, never predictions from
+    # mean features -- LightGBM is nonlinear, so mean(f(x)) != f(mean(x))).
+    grid_km: 1.0
+    # Matches app/api.py's DEFAULT_MAX_STATION_DISTANCE_KM. Cells beyond this are
+    # refused by the API, so extracting features for them is wasted GEE time.
+    # Keeps 2388 of the bbox's 2600 cells.
+    coverage_radius_km: 15.0
+    # Same study bbox as the station work (app/api.py BBOX_* constants).
+    bbox_min_lon: 76.8381
+    bbox_min_lat: 28.4126
+    bbox_max_lon: 77.3477
+    bbox_max_lat: 28.8814
+
+  maiac_grid:
+    # Earth Engine aborts a collection query after accumulating 5000 elements
+    # (500 points x 1 week hit it on 2026-10-08). Each chunk yields roughly
+    # cells x 30 days x 1.23 valid overpasses per cell-day, so 100 cells gives
+    # ~3700 rows -- measured 3953 for a real 100-cell month, comfortably under.
+    # Lower this if "Collection query aborted" appears.
+    cells_per_chunk: 100
+
+  osm_export:
+    # Prediction-only OSM extract. The training exports were drawn around the 42
+    # stations and every station sits inside them, so training has no gap and is
+    # left untouched; only the grid reaches outside. Region = the study bbox plus
+    # the 1 km feature buffer, so every grid cell's buffer is fully covered.
+    # Training roads reach only to lon 76.8691 and industrial to 76.9119, which is
+    # why 440 of 2388 one-kilometre cells would otherwise report a false zero.
+    bbox_west: 76.8279
+    bbox_south: 28.4036
+    bbox_east: 77.3579
+    bbox_north: 28.8904
+    # Power plants keep the wide training bbox. The feature is distance to the
+    # NEAREST plant, so the true nearest is often outside Delhi (Dadri, Jhajjar,
+    # Panipat), and the 110 km edge-effect QC threshold in osm_layers.powerplants
+    # is calibrated against this margin -- shrinking it would silently break that
+    # gate. Sparse data, so a wide query is cheap.
+    powerplant_bbox_west: 75.5
+    powerplant_bbox_south: 27.0
+    powerplant_bbox_east: 79.0
+    powerplant_bbox_north: 30.0
+    # Source is a pre-built Geofabrik regional extract, NOT the Overpass API.
+    # Overpass was tried and abandoned: it refuses responses over ~2 MB (a 5 km
+    # dense-Delhi box works, a 6 km one 504s in 12 s), the failures are
+    # intermittent, and tiling to 4 km needed 182 requests whose projected
+    # runtime climbed 91 -> 158 -> 176 minutes as it ran. No mirror works.
+    # A published extract is one download, has no rate limits, and carries a
+    # single timestamp -- so the vintage is an exact fact rather than "whenever
+    # the tiles happened to run".
+    #
+    # Northern Zone covers Delhi, Haryana, Uttar Pradesh, Rajasthan and
+    # Uttarakhand, so one file serves the study bbox AND the wide plant bbox.
+    # TWO zones. Northern Zone does NOT contain Uttar Pradesh, and UP holds both
+    # Noida/Ghaziabad (inside the study bbox) and the eastern power plants the
+    # wide plant bbox exists to catch. Measured with Northern Zone alone:
+    # 112 plants against the training export's 170 (all 57 east of lon 77.36
+    # missing, including Dadri), and only 76% of training's roads in the
+    # lon 77.30-77.36 strip. Central Zone supplies UP.
+    pbf_sources:
+      - url: "https://download.geofabrik.de/asia/india/northern-zone-latest.osm.pbf"
+        filename: "northern-zone-latest.osm.pbf"
+      - url: "https://download.geofabrik.de/asia/india/central-zone-latest.osm.pbf"
+        filename: "central-zone-latest.osm.pbf"
+
 modeling:
   master_table:
     station_file: data/stations/cpcb_stations_delhi_status.csv

@@ -19,6 +19,15 @@ def main():
     # instead of stations. Default None keeps the station behaviour unchanged.
     parser.add_argument("--stations", default=None,
                         help="station/grid roster CSV; defaults to params station_file")
+    # One frequencyHistogram request per point is fine for 42 stations and about
+    # 100 minutes for a 2388-cell prediction grid. Batching sends many buffers in
+    # a single reduceRegions call instead. The geometry, reducer and scale come
+    # from the same params either way, so this changes HOW the request is sent,
+    # not WHAT is computed -- verified by running the batched path over the 42
+    # stations and diffing against the committed output. Default 0 keeps the
+    # per-point path, so the station stages are untouched.
+    parser.add_argument("--batch_size", type=int, default=0,
+                        help="points per reduceRegions call; 0 = one call per point")
     parser.add_argument("--output", required=True)
     parser.add_argument("--summary_output", required=True)
     args = parser.parse_args()
@@ -43,6 +52,53 @@ def main():
 
     rows = []
     failed_stations = []
+
+    if args.batch_size > 0:
+        print(f"=== Extracting raw pixel counts, batched "
+              f"({args.batch_size} per call) ===")
+        station_list = stations.reset_index(drop=True)
+        for start in range(0, len(station_list), args.batch_size):
+            block = station_list.iloc[start:start + args.batch_size]
+            features = []
+            for station in block.itertuples(index=False):
+                features.append(ee.Feature(
+                    ee.Geometry.Point([station.longitude, station.latitude])
+                    .buffer(buffer_radius),
+                    {"location_id": int(station.location_id)}))
+            try:
+                result = worldcover.reduceRegions(
+                    collection=ee.FeatureCollection(features),
+                    reducer=ee.Reducer.frequencyHistogram(),
+                    scale=scale,
+                ).getInfo()
+            except Exception as error:
+                print("FAILED batch starting at", start, "-", error)
+                failed_stations.extend(block["location_id"].tolist())
+                continue
+            by_id = {}
+            for feature in result["features"]:
+                properties = feature["properties"]
+                by_id[properties["location_id"]] = properties.get("histogram", {})
+            for station in block.itertuples(index=False):
+                class_counts = by_id.get(int(station.location_id))
+                if class_counts is None:
+                    failed_stations.append(station.location_id)
+                    continue
+                row = {}
+                row["location_id"] = station.location_id
+                row["name"] = station.name
+                row["latitude"] = station.latitude
+                row["longitude"] = station.longitude
+                total_pixels = 0
+                for class_code in WORLDCOVER_CLASSES:
+                    count = class_counts.get(class_code, 0)
+                    row["class_" + class_code + "_count"] = count
+                    total_pixels = total_pixels + count
+                row["total_pixels"] = total_pixels
+                rows.append(row)
+            print(f"  {min(start + args.batch_size, len(station_list))}"
+                  f"/{len(station_list)} points")
+        stations = stations.iloc[0:0]
 
     print("=== Extracting raw pixel counts per station ===")
     for index, station in stations.iterrows():

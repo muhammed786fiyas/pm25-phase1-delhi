@@ -9,28 +9,31 @@ stages:
   # to run a new city), unfreeze deliberately:  dvc unfreeze <stage>
   cpcb_list_stations:
     frozen: true
-    cmd: python scripts/datasets/cpcb/2-list_stations.py --region delhi --output cpcb_stations_delhi.csv --output-dir data/stations
+    cmd: python scripts/datasets/cpcb/2-list_stations.py --region delhi --output
+      cpcb_stations_delhi.csv --output-dir data/stations
     deps:
-      - scripts/datasets/cpcb/2-list_stations.py
-      - scripts/datasets/cpcb/cpcb_fetcher.py
+    - scripts/datasets/cpcb/2-list_stations.py
+    - scripts/datasets/cpcb/cpcb_fetcher.py
     outs:
       # Only the file this stage actually writes. It previously claimed the
       # whole data/stations/ directory, which also holds the hand-curated
       # cpcb_stations_delhi_status.csv -- and DVC removes a stage's outputs
       # before re-running it, so a repro would have deleted the curated roster.
-      - data/stations/cpcb_stations_delhi.csv:
-          cache: false
+    - data/stations/cpcb_stations_delhi.csv:
+        cache: false
 
   cpcb_screen_stations:
-    cmd: python scripts/datasets/cpcb/2b-screen_stations.py --input data/stations/cpcb_stations_delhi.csv --output data/stations/cpcb_stations_delhi_screened.csv
+    cmd: python scripts/datasets/cpcb/2b-screen_stations.py --input 
+      data/stations/cpcb_stations_delhi.csv --output 
+      data/stations/cpcb_stations_delhi_screened.csv
     deps:
-      - scripts/datasets/cpcb/2b-screen_stations.py
-      - data/stations/cpcb_stations_delhi.csv
+    - scripts/datasets/cpcb/2b-screen_stations.py
+    - data/stations/cpcb_stations_delhi.csv
     params:
-      - cpcb_screen_stations
+    - cpcb_screen_stations
     outs:
-      - data/stations/cpcb_stations_delhi_screened.csv:
-          cache: false
+    - data/stations/cpcb_stations_delhi_screened.csv:
+        cache: false
 
   # Two date ranges because the data was pulled in two batches (2025, then
   # Q1 2026 once it existed). Downloads the screened ELIGIBLE stations -- not
@@ -38,163 +41,201 @@ stages:
   cpcb_download_pm25:
     frozen: true
     cmd:
-      - python scripts/datasets/cpcb/3-download_pm25.py --stations data/stations/cpcb_stations_delhi_screened.csv --from-date 2025-01-01 --to-date 2025-12-31 --outdir data/training/raw/cpcb/pm25_delhi_2025
-      - python scripts/datasets/cpcb/3-download_pm25.py --stations data/stations/cpcb_stations_delhi_screened.csv --from-date 2026-01-01 --to-date 2026-03-31 --outdir data/training/raw/cpcb/pm25_delhi_2026_q1
+    - python scripts/datasets/cpcb/3-download_pm25.py --stations 
+      data/stations/cpcb_stations_delhi_screened.csv --from-date 2025-01-01 
+      --to-date 2025-12-31 --outdir data/training/raw/cpcb/pm25_delhi_2025
+    - python scripts/datasets/cpcb/3-download_pm25.py --stations 
+      data/stations/cpcb_stations_delhi_screened.csv --from-date 2026-01-01 
+      --to-date 2026-03-31 --outdir data/training/raw/cpcb/pm25_delhi_2026_q1
     deps:
-      - scripts/datasets/cpcb/3-download_pm25.py
-      - data/stations/cpcb_stations_delhi_screened.csv
+    - scripts/datasets/cpcb/3-download_pm25.py
+    - data/stations/cpcb_stations_delhi_screened.csv
     outs:
-      - data/training/raw/cpcb
+    - data/training/raw/cpcb
 
   cpcb_merge_downloads:
-    cmd: python scripts/datasets/cpcb/5-merge_downloads.py --dir1 data/training/raw/cpcb/pm25_delhi_2025 --dir2 data/training/raw/cpcb/pm25_delhi_2026_q1 --outdir data/training/interim/cpcb/pm25_delhi_merged
+    cmd: python scripts/datasets/cpcb/5-merge_downloads.py --dir1 
+      data/training/raw/cpcb/pm25_delhi_2025 --dir2 
+      data/training/raw/cpcb/pm25_delhi_2026_q1 --outdir 
+      data/training/interim/cpcb/pm25_delhi_merged
     deps:
-      - scripts/datasets/cpcb/5-merge_downloads.py
-      - data/training/raw/cpcb/pm25_delhi_2025
-      - data/training/raw/cpcb/pm25_delhi_2026_q1
+    - scripts/datasets/cpcb/5-merge_downloads.py
+    - data/training/raw/cpcb/pm25_delhi_2025
+    - data/training/raw/cpcb/pm25_delhi_2026_q1
     outs:
-      - data/training/interim/cpcb/pm25_delhi_merged
+    - data/training/interim/cpcb/pm25_delhi_merged
 
   cpcb_trim_and_season:
-    cmd: python scripts/datasets/cpcb/6-trim_and_season.py --input data/training/interim/cpcb/pm25_delhi_merged/ALL_COMBINED.csv --outdir data/training/processed/cpcb/pm25_delhi_windowed
+    cmd: python scripts/datasets/cpcb/6-trim_and_season.py --input 
+      data/training/interim/cpcb/pm25_delhi_merged/ALL_COMBINED.csv --outdir 
+      data/training/processed/cpcb/pm25_delhi_windowed
     deps:
-      - scripts/datasets/cpcb/6-trim_and_season.py
-      - data/training/interim/cpcb/pm25_delhi_merged
+    - scripts/datasets/cpcb/6-trim_and_season.py
+    - data/training/interim/cpcb/pm25_delhi_merged
     outs:
-      - data/training/processed/cpcb/pm25_delhi_windowed
+    - data/training/processed/cpcb/pm25_delhi_windowed
 
   cpcb_qc_check:
-    cmd: python scripts/datasets/cpcb/7-cpcb_qc_check.py --input data/training/processed/cpcb/pm25_delhi_windowed/pm25_delhi_mar25_feb26_seasoned.csv --outdir data/training/interim/cpcb/pm25_qc_hourly
+    cmd: python scripts/datasets/cpcb/7-cpcb_qc_check.py --input 
+      data/training/processed/cpcb/pm25_delhi_windowed/pm25_delhi_mar25_feb26_seasoned.csv
+      --outdir data/training/interim/cpcb/pm25_qc_hourly
     deps:
-      - scripts/datasets/cpcb/7-cpcb_qc_check.py
-      - data/training/processed/cpcb/pm25_delhi_windowed
+    - scripts/datasets/cpcb/7-cpcb_qc_check.py
+    - data/training/processed/cpcb/pm25_delhi_windowed
     params:
-      - cpcb_qc.high_value_limit
-      - cpcb_qc.stuck_run_limit
+    - cpcb_qc.high_value_limit
+    - cpcb_qc.stuck_run_limit
     outs:
-      - data/training/interim/cpcb/pm25_qc_hourly
+    - data/training/interim/cpcb/pm25_qc_hourly
 
-  
+
   cpcb_filter_aggregate:
-    cmd: python scripts/datasets/cpcb/8-filter_and_aggregate.py --input data/training/processed/cpcb/pm25_delhi_windowed/pm25_delhi_mar25_feb26_seasoned.csv --outdir data/training/processed/cpcb/pm25_daily
+    cmd: python scripts/datasets/cpcb/8-filter_and_aggregate.py --input 
+      data/training/processed/cpcb/pm25_delhi_windowed/pm25_delhi_mar25_feb26_seasoned.csv
+      --outdir data/training/processed/cpcb/pm25_daily
     deps:
-      - scripts/datasets/cpcb/8-filter_and_aggregate.py
-      - data/training/processed/cpcb/pm25_delhi_windowed
+    - scripts/datasets/cpcb/8-filter_and_aggregate.py
+    - data/training/processed/cpcb/pm25_delhi_windowed
     params:
-      - cpcb_filter_aggregate.min_hours
+    - cpcb_filter_aggregate.min_hours
     outs:
-      - data/training/processed/cpcb/pm25_daily
-  
+    - data/training/processed/cpcb/pm25_daily
+
   cpcb_find_clusters:
-    cmd: python scripts/datasets/cpcb/9-find_station_clusters.py --stations data/stations/cpcb_stations_delhi_status.csv --outdir data/training/interim/cpcb/pm25_qc_daily
+    cmd: python scripts/datasets/cpcb/9-find_station_clusters.py --stations 
+      data/stations/cpcb_stations_delhi_status.csv --outdir 
+      data/training/interim/cpcb/pm25_qc_daily
     deps:
-      - scripts/datasets/cpcb/9-find_station_clusters.py
-      - data/stations/cpcb_stations_delhi_status.csv
+    - scripts/datasets/cpcb/9-find_station_clusters.py
+    - data/stations/cpcb_stations_delhi_status.csv
     outs:
-      - data/training/interim/cpcb/pm25_qc_daily/station_clusters.csv
-    
+    - data/training/interim/cpcb/pm25_qc_daily/station_clusters.csv
+
   cpcb_completeness_check:
-    cmd: python scripts/datasets/cpcb/10-completeness_check.py --input data/training/processed/cpcb/pm25_daily/pm25_daily.csv --outdir data/training/interim/cpcb/pm25_qc_daily
+    cmd: python scripts/datasets/cpcb/10-completeness_check.py --input 
+      data/training/processed/cpcb/pm25_daily/pm25_daily.csv --outdir 
+      data/training/interim/cpcb/pm25_qc_daily
     deps:
-      - scripts/datasets/cpcb/10-completeness_check.py
-      - data/training/processed/cpcb/pm25_daily
+    - scripts/datasets/cpcb/10-completeness_check.py
+    - data/training/processed/cpcb/pm25_daily
     params:
-      - cpcb_completeness
+    - cpcb_completeness
     outs:
-      - data/training/interim/cpcb/pm25_qc_daily/station_completeness.csv
+    - data/training/interim/cpcb/pm25_qc_daily/station_completeness.csv
 
   cpcb_correlation_check:
-    cmd: python scripts/datasets/cpcb/11-correlation_check.py --daily data/training/processed/cpcb/pm25_daily/pm25_daily.csv --clusters data/training/interim/cpcb/pm25_qc_daily/station_clusters.csv --outdir data/training/interim/cpcb/pm25_qc_daily
+    cmd: python scripts/datasets/cpcb/11-correlation_check.py --daily 
+      data/training/processed/cpcb/pm25_daily/pm25_daily.csv --clusters 
+      data/training/interim/cpcb/pm25_qc_daily/station_clusters.csv --outdir 
+      data/training/interim/cpcb/pm25_qc_daily
     deps:
-      - scripts/datasets/cpcb/11-correlation_check.py
-      - data/training/processed/cpcb/pm25_daily
-      - data/training/interim/cpcb/pm25_qc_daily/station_clusters.csv
+    - scripts/datasets/cpcb/11-correlation_check.py
+    - data/training/processed/cpcb/pm25_daily
+    - data/training/interim/cpcb/pm25_qc_daily/station_clusters.csv
     outs:
-      - data/training/interim/cpcb/pm25_qc_daily/station_pair_correlation.csv
-  
+    - data/training/interim/cpcb/pm25_qc_daily/station_pair_correlation.csv
+
   # Turns the screened list into the final roster: ELIGIBLE -> KEEP or
   # DROP_low_completeness, then applies the hand-written overrides file (the
   # only place a manual decision enters). Writes to the same path the 35
   # downstream stages already read, so none of them needed editing.
   cpcb_finalize_roster:
-    cmd: python scripts/datasets/cpcb/10b-finalize_roster.py --screened data/stations/cpcb_stations_delhi_screened.csv --completeness data/training/interim/cpcb/pm25_qc_daily/station_completeness.csv --overrides data/stations/cpcb_station_overrides_delhi.csv --output data/stations/cpcb_stations_delhi_status.csv
+    cmd: python scripts/datasets/cpcb/10b-finalize_roster.py --screened 
+      data/stations/cpcb_stations_delhi_screened.csv --completeness 
+      data/training/interim/cpcb/pm25_qc_daily/station_completeness.csv 
+      --overrides data/stations/cpcb_station_overrides_delhi.csv --output 
+      data/stations/cpcb_stations_delhi_status.csv
     deps:
-      - scripts/datasets/cpcb/10b-finalize_roster.py
-      - data/stations/cpcb_stations_delhi_screened.csv
-      - data/training/interim/cpcb/pm25_qc_daily/station_completeness.csv
-      - data/stations/cpcb_station_overrides_delhi.csv
+    - scripts/datasets/cpcb/10b-finalize_roster.py
+    - data/stations/cpcb_stations_delhi_screened.csv
+    - data/training/interim/cpcb/pm25_qc_daily/station_completeness.csv
+    - data/stations/cpcb_station_overrides_delhi.csv
     outs:
-      - data/stations/cpcb_stations_delhi_status.csv:
-          cache: false
+    - data/stations/cpcb_stations_delhi_status.csv:
+        cache: false
 
   cpcb_final_filter:
-    cmd: python scripts/datasets/cpcb/12-final_filter.py --daily data/training/processed/cpcb/pm25_daily/pm25_daily.csv --stations data/stations/cpcb_stations_delhi_status.csv --outdir data/training/processed/cpcb/pm25_daily_final
+    cmd: python scripts/datasets/cpcb/12-final_filter.py --daily 
+      data/training/processed/cpcb/pm25_daily/pm25_daily.csv --stations 
+      data/stations/cpcb_stations_delhi_status.csv --outdir 
+      data/training/processed/cpcb/pm25_daily_final
     deps:
-      - scripts/datasets/cpcb/12-final_filter.py
-      - data/training/processed/cpcb/pm25_daily
-      - data/stations/cpcb_stations_delhi_status.csv
+    - scripts/datasets/cpcb/12-final_filter.py
+    - data/training/processed/cpcb/pm25_daily
+    - data/stations/cpcb_stations_delhi_status.csv
     outs:
-      - data/training/processed/cpcb/pm25_daily_final
+    - data/training/processed/cpcb/pm25_daily_final
 
   # ============================================================
   # MAIAC AOD pipeline
   # ============================================================
   maiac_extract:
     frozen: true
-    cmd: python scripts/datasets/maiac_aod/1-extract_gee_covariates.py --stations data/stations/cpcb_stations_delhi_status.csv --outdir data/training/raw/maiac
+    cmd: python scripts/datasets/maiac_aod/1-extract_gee_covariates.py 
+      --stations data/stations/cpcb_stations_delhi_status.csv --outdir 
+      data/training/raw/maiac
     deps:
-      - scripts/datasets/maiac_aod/1-extract_gee_covariates.py
-      - data/stations/cpcb_stations_delhi_status.csv
+    - scripts/datasets/maiac_aod/1-extract_gee_covariates.py
+    - data/stations/cpcb_stations_delhi_status.csv
     params:
-      - maiac_extract.gee_project
-      - maiac_extract.collection
-      - maiac_extract.bands
-      - maiac_extract.study_start
-      - maiac_extract.study_end
+    - maiac_extract.gee_project
+    - maiac_extract.collection
+    - maiac_extract.bands
+    - maiac_extract.study_start
+    - maiac_extract.study_end
     outs:
-      - data/training/raw/maiac
+    - data/training/raw/maiac
 
   aod_filter_scale:
-    cmd: python scripts/datasets/maiac_aod/2-filter_and_scale_aod.py --input data/training/raw/maiac/maiac_aod_raw.csv --stations data/stations/cpcb_stations_delhi_status.csv --outdir data/training/interim/maiac_aod/filter_scale
+    cmd: python scripts/datasets/maiac_aod/2-filter_and_scale_aod.py --input 
+      data/training/raw/maiac/maiac_aod_raw.csv --stations 
+      data/stations/cpcb_stations_delhi_status.csv --outdir 
+      data/training/interim/maiac_aod/filter_scale
     deps:
-      - scripts/datasets/maiac_aod/2-filter_and_scale_aod.py
-      - data/training/raw/maiac/maiac_aod_raw.csv
-      - data/stations/cpcb_stations_delhi_status.csv
+    - scripts/datasets/maiac_aod/2-filter_and_scale_aod.py
+    - data/training/raw/maiac/maiac_aod_raw.csv
+    - data/stations/cpcb_stations_delhi_status.csv
     params:
-      - aod_filter_scale.scale_aod
-      - aod_filter_scale.scale_uncertainty
-      - aod_filter_scale.aod_valid_min
-      - aod_filter_scale.aod_valid_max
-      - aod_filter_scale.uncertainty_valid_min
-      - aod_filter_scale.uncertainty_valid_max
+    - aod_filter_scale.scale_aod
+    - aod_filter_scale.scale_uncertainty
+    - aod_filter_scale.aod_valid_min
+    - aod_filter_scale.aod_valid_max
+    - aod_filter_scale.uncertainty_valid_min
+    - aod_filter_scale.uncertainty_valid_max
     outs:
-      - data/training/interim/maiac_aod/filter_scale
+    - data/training/interim/maiac_aod/filter_scale
 
   aod_decode_qa:
-    cmd: python scripts/datasets/maiac_aod/3-decode_qa.py --input data/training/interim/maiac_aod/filter_scale/maiac_aod_filtered_scaled.csv --outdir data/training/interim/maiac_aod/qa_decode
+    cmd: python scripts/datasets/maiac_aod/3-decode_qa.py --input 
+      data/training/interim/maiac_aod/filter_scale/maiac_aod_filtered_scaled.csv
+      --outdir data/training/interim/maiac_aod/qa_decode
     deps:
-      - scripts/datasets/maiac_aod/3-decode_qa.py
-      - data/training/interim/maiac_aod/filter_scale/maiac_aod_filtered_scaled.csv
+    - scripts/datasets/maiac_aod/3-decode_qa.py
+    - data/training/interim/maiac_aod/filter_scale/maiac_aod_filtered_scaled.csv
     outs:
-      - data/training/interim/maiac_aod/qa_decode
-  
+    - data/training/interim/maiac_aod/qa_decode
+
   aod_qa_filter:
-    cmd: python scripts/datasets/maiac_aod/4-apply_qa_filter.py --input data/training/interim/maiac_aod/qa_decode/maiac_aod_qa_decoded.csv --outdir data/training/interim/maiac_aod/qa_filter
+    cmd: python scripts/datasets/maiac_aod/4-apply_qa_filter.py --input 
+      data/training/interim/maiac_aod/qa_decode/maiac_aod_qa_decoded.csv 
+      --outdir data/training/interim/maiac_aod/qa_filter
     deps:
-      - scripts/datasets/maiac_aod/4-apply_qa_filter.py
-      - data/training/interim/maiac_aod/qa_decode/maiac_aod_qa_decoded.csv
+    - scripts/datasets/maiac_aod/4-apply_qa_filter.py
+    - data/training/interim/maiac_aod/qa_decode/maiac_aod_qa_decoded.csv
     params:
-      - aod_qa_filter.strictness
+    - aod_qa_filter.strictness
     outs:
-      - data/training/interim/maiac_aod/qa_filter
-  
+    - data/training/interim/maiac_aod/qa_filter
+
   aod_aggregate_daily:
-    cmd: python scripts/datasets/maiac_aod/5-aggregate_aod_daily.py --input data/training/interim/maiac_aod/qa_filter/maiac_aod_qa_filtered.csv --outdir data/training/processed/maiac_aod
+    cmd: python scripts/datasets/maiac_aod/5-aggregate_aod_daily.py --input 
+      data/training/interim/maiac_aod/qa_filter/maiac_aod_qa_filtered.csv 
+      --outdir data/training/processed/maiac_aod
     deps:
-      - scripts/datasets/maiac_aod/5-aggregate_aod_daily.py
-      - data/training/interim/maiac_aod/qa_filter/maiac_aod_qa_filtered.csv
+    - scripts/datasets/maiac_aod/5-aggregate_aod_daily.py
+    - data/training/interim/maiac_aod/qa_filter/maiac_aod_qa_filtered.csv
     outs:
-      - data/training/processed/maiac_aod
+    - data/training/processed/maiac_aod
 
 
   # ============================================================  
@@ -202,454 +243,525 @@ stages:
   # ============================================================
   map_stations_to_cells:
     frozen: true
-    cmd: python scripts/datasets/merra2_aod/1-map_stations_to_cells.py
-      --stations data/stations/cpcb_stations_delhi_status.csv
-      --outdir data/training/raw/merra2_aod
-      --params params.yaml
+    cmd: python scripts/datasets/merra2_aod/1-map_stations_to_cells.py 
+      --stations data/stations/cpcb_stations_delhi_status.csv --outdir 
+      data/training/raw/merra2_aod --params params.yaml
     deps:
-      - scripts/datasets/merra2_aod/1-map_stations_to_cells.py
-      - data/stations/cpcb_stations_delhi_status.csv
+    - scripts/datasets/merra2_aod/1-map_stations_to_cells.py
+    - data/stations/cpcb_stations_delhi_status.csv
     params:
-      - merra2_station_mapping
+    - merra2_station_mapping
     outs:
-      - data/training/raw/merra2_aod/station_cell_mapping.csv
-    
+    - data/training/raw/merra2_aod/station_cell_mapping.csv
+
   extract_merra2:
     frozen: true
-    cmd: python scripts/datasets/merra2_aod/2-extract_gee_merra2.py
-      --mapping data/training/raw/merra2_aod/station_cell_mapping.csv
-      --outdir data/training/raw/merra2_aod
-      --params params.yaml
+    cmd: python scripts/datasets/merra2_aod/2-extract_gee_merra2.py --mapping 
+      data/training/raw/merra2_aod/station_cell_mapping.csv --outdir 
+      data/training/raw/merra2_aod --params params.yaml
     deps:
-      - scripts/datasets/merra2_aod/2-extract_gee_merra2.py
-      - data/training/raw/merra2_aod/station_cell_mapping.csv
+    - scripts/datasets/merra2_aod/2-extract_gee_merra2.py
+    - data/training/raw/merra2_aod/station_cell_mapping.csv
     params:
-      - merra2_extraction
+    - merra2_extraction
     outs:
-      - data/training/raw/merra2_aod/merra2_aod_raw.csv
+    - data/training/raw/merra2_aod/merra2_aod_raw.csv
   window_qc_merra2:
-    cmd: python scripts/datasets/merra2_aod/3-window_and_qc_merra2.py
-      --raw data/training/raw/merra2_aod/merra2_aod_raw.csv
-      --mapping data/training/raw/merra2_aod/station_cell_mapping.csv
-      --outdir data/training/interim/merra2_aod
-      --params params.yaml
+    cmd: python scripts/datasets/merra2_aod/3-window_and_qc_merra2.py --raw 
+      data/training/raw/merra2_aod/merra2_aod_raw.csv --mapping 
+      data/training/raw/merra2_aod/station_cell_mapping.csv --outdir 
+      data/training/interim/merra2_aod --params params.yaml
     deps:
-      - scripts/datasets/merra2_aod/3-window_and_qc_merra2.py
-      - data/training/raw/merra2_aod/merra2_aod_raw.csv
-      - data/training/raw/merra2_aod/station_cell_mapping.csv
+    - scripts/datasets/merra2_aod/3-window_and_qc_merra2.py
+    - data/training/raw/merra2_aod/merra2_aod_raw.csv
+    - data/training/raw/merra2_aod/station_cell_mapping.csv
     params:
-      - merra2_windowing_qc
+    - merra2_windowing_qc
     outs:
-      - data/training/interim/merra2_aod/merra2_aod_windowed_qc.csv
+    - data/training/interim/merra2_aod/merra2_aod_windowed_qc.csv
 
   aggregate_merra2:
-    cmd: python scripts/datasets/merra2_aod/4-aggregate_merra2_daily.py
-      --windowed data/training/interim/merra2_aod/merra2_aod_windowed_qc.csv
-      --mapping data/training/raw/merra2_aod/station_cell_mapping.csv
-      --outdir data/training/processed/merra2_aod
-      --params params.yaml
+    cmd: python scripts/datasets/merra2_aod/4-aggregate_merra2_daily.py 
+      --windowed data/training/interim/merra2_aod/merra2_aod_windowed_qc.csv 
+      --mapping data/training/raw/merra2_aod/station_cell_mapping.csv --outdir 
+      data/training/processed/merra2_aod --params params.yaml
     deps:
-      - scripts/datasets/merra2_aod/4-aggregate_merra2_daily.py
-      - data/training/interim/merra2_aod/merra2_aod_windowed_qc.csv
-      - data/training/raw/merra2_aod/station_cell_mapping.csv
+    - scripts/datasets/merra2_aod/4-aggregate_merra2_daily.py
+    - data/training/interim/merra2_aod/merra2_aod_windowed_qc.csv
+    - data/training/raw/merra2_aod/station_cell_mapping.csv
     params:
-      - merra2_aggregation
+    - merra2_aggregation
     outs:
-      - data/training/processed/merra2_aod/merra2_aod_daily.csv
+    - data/training/processed/merra2_aod/merra2_aod_daily.csv
 
   # ============================================================
   # MAIAC gap-fill calibration (per-station MAIAC ~ a + b*MERRA2)
   # ============================================================
   maiac_gapfill_build_dataset:
-    cmd: python scripts/datasets/maiac_gapfill/01_build_calibration_dataset.py
-      --maiac_input data/training/processed/maiac_aod/maiac_aod_daily.csv
-      --merra2_input data/training/processed/merra2_aod/merra2_aod_daily.csv
-      --station_file data/stations/cpcb_stations_delhi_status.csv
-      --output data/training/raw/maiac_gapfill/calibration_dataset.csv
-      --summary_output data/training/raw/maiac_gapfill/overlap_summary.csv
+    cmd: python scripts/datasets/maiac_gapfill/01_build_calibration_dataset.py 
+      --maiac_input data/training/processed/maiac_aod/maiac_aod_daily.csv 
+      --merra2_input data/training/processed/merra2_aod/merra2_aod_daily.csv 
+      --station_file data/stations/cpcb_stations_delhi_status.csv --output 
+      data/training/raw/maiac_gapfill/calibration_dataset.csv --summary_output 
+      data/training/raw/maiac_gapfill/overlap_summary.csv
     deps:
-      - scripts/datasets/maiac_gapfill/01_build_calibration_dataset.py
-      - data/training/processed/maiac_aod/maiac_aod_daily.csv
-      - data/training/processed/merra2_aod/merra2_aod_daily.csv
-      - data/stations/cpcb_stations_delhi_status.csv
+    - scripts/datasets/maiac_gapfill/01_build_calibration_dataset.py
+    - data/training/processed/maiac_aod/maiac_aod_daily.csv
+    - data/training/processed/merra2_aod/merra2_aod_daily.csv
+    - data/stations/cpcb_stations_delhi_status.csv
     outs:
-      - data/training/raw/maiac_gapfill/calibration_dataset.csv
-      - data/training/raw/maiac_gapfill/overlap_summary.csv
+    - data/training/raw/maiac_gapfill/calibration_dataset.csv
+    - data/training/raw/maiac_gapfill/overlap_summary.csv
 
   maiac_gapfill_fit_calibration:
-    cmd: python scripts/datasets/maiac_gapfill/02_fit_station_calibration.py
-      --input data/training/raw/maiac_gapfill/calibration_dataset.csv
-      --station_file data/stations/cpcb_stations_delhi_status.csv
-      --output data/training/raw/maiac_gapfill/station_calibration_raw.csv
-      --params params.yaml
+    cmd: python scripts/datasets/maiac_gapfill/02_fit_station_calibration.py 
+      --input data/training/raw/maiac_gapfill/calibration_dataset.csv 
+      --station_file data/stations/cpcb_stations_delhi_status.csv --output 
+      data/training/raw/maiac_gapfill/station_calibration_raw.csv --params 
+      params.yaml
     deps:
-      - scripts/datasets/maiac_gapfill/02_fit_station_calibration.py
-      - data/training/raw/maiac_gapfill/calibration_dataset.csv
-      - data/stations/cpcb_stations_delhi_status.csv
+    - scripts/datasets/maiac_gapfill/02_fit_station_calibration.py
+    - data/training/raw/maiac_gapfill/calibration_dataset.csv
+    - data/stations/cpcb_stations_delhi_status.csv
     params:
-      - maiac_gapfill.calibration
+    - maiac_gapfill.calibration
     outs:
-      - data/training/raw/maiac_gapfill/station_calibration_raw.csv
+    - data/training/raw/maiac_gapfill/station_calibration_raw.csv
 
   maiac_gapfill_qc_calibration:
-    cmd: python scripts/datasets/maiac_gapfill/03_qc_calibration.py
-      --input data/training/raw/maiac_gapfill/station_calibration_raw.csv
-      --station_file data/stations/cpcb_stations_delhi_status.csv
-      --output data/training/interim/maiac_gapfill/calibration_qc_summary.csv
-      --params params.yaml
+    cmd: python scripts/datasets/maiac_gapfill/03_qc_calibration.py --input 
+      data/training/raw/maiac_gapfill/station_calibration_raw.csv --station_file
+      data/stations/cpcb_stations_delhi_status.csv --output 
+      data/training/interim/maiac_gapfill/calibration_qc_summary.csv --params 
+      params.yaml
     deps:
-      - scripts/datasets/maiac_gapfill/03_qc_calibration.py
-      - data/training/raw/maiac_gapfill/station_calibration_raw.csv
-      - data/stations/cpcb_stations_delhi_status.csv
+    - scripts/datasets/maiac_gapfill/03_qc_calibration.py
+    - data/training/raw/maiac_gapfill/station_calibration_raw.csv
+    - data/stations/cpcb_stations_delhi_status.csv
     params:
-      - maiac_gapfill.qc
+    - maiac_gapfill.qc
     outs:
-      - data/training/interim/maiac_gapfill/calibration_qc_summary.csv
+    - data/training/interim/maiac_gapfill/calibration_qc_summary.csv
 
   maiac_gapfill_score_confidence:
-    cmd: python scripts/datasets/maiac_gapfill/04_score_confidence.py
-      --input data/training/raw/maiac_gapfill/calibration_dataset.csv
-      --residuals_output data/training/interim/maiac_gapfill/loocv_residuals.csv
-      --output data/training/processed/maiac_gapfill/confidence_scores.csv
-      --params params.yaml
+    cmd: python scripts/datasets/maiac_gapfill/04_score_confidence.py --input 
+      data/training/raw/maiac_gapfill/calibration_dataset.csv --residuals_output
+      data/training/interim/maiac_gapfill/loocv_residuals.csv --output 
+      data/training/processed/maiac_gapfill/confidence_scores.csv --params 
+      params.yaml
     deps:
-      - scripts/datasets/maiac_gapfill/04_score_confidence.py
-      - data/training/raw/maiac_gapfill/calibration_dataset.csv
-      - data/training/interim/maiac_gapfill/calibration_qc_summary.csv
+    - scripts/datasets/maiac_gapfill/04_score_confidence.py
+    - data/training/raw/maiac_gapfill/calibration_dataset.csv
+    - data/training/interim/maiac_gapfill/calibration_qc_summary.csv
     params:
-      - maiac_gapfill.calibration
-      - maiac_gapfill.confidence
+    - maiac_gapfill.calibration
+    - maiac_gapfill.confidence
     outs:
-      - data/training/interim/maiac_gapfill/loocv_residuals.csv
-      - data/training/processed/maiac_gapfill/confidence_scores.csv
+    - data/training/interim/maiac_gapfill/loocv_residuals.csv
+    - data/training/processed/maiac_gapfill/confidence_scores.csv
 
   maiac_gapfill_apply_fill:
-    cmd: python scripts/datasets/maiac_gapfill/05_apply_gapfill.py
-      --maiac_input data/training/processed/maiac_aod/maiac_aod_daily.csv
-      --merra2_input data/training/processed/merra2_aod/merra2_aod_daily.csv
-      --calibration_input data/training/raw/maiac_gapfill/station_calibration_raw.csv
-      --confidence_input data/training/processed/maiac_gapfill/confidence_scores.csv
-      --station_file data/stations/cpcb_stations_delhi_status.csv
-      --output data/training/processed/maiac_gapfill/maiac_aod_gapfilled.csv
-      --summary_output data/training/processed/maiac_gapfill/fill_summary.csv
+    cmd: python scripts/datasets/maiac_gapfill/05_apply_gapfill.py --maiac_input
+      data/training/processed/maiac_aod/maiac_aod_daily.csv --merra2_input 
+      data/training/processed/merra2_aod/merra2_aod_daily.csv 
+      --calibration_input 
+      data/training/raw/maiac_gapfill/station_calibration_raw.csv 
+      --confidence_input 
+      data/training/processed/maiac_gapfill/confidence_scores.csv --station_file
+      data/stations/cpcb_stations_delhi_status.csv --output 
+      data/training/processed/maiac_gapfill/maiac_aod_gapfilled.csv 
+      --summary_output data/training/processed/maiac_gapfill/fill_summary.csv 
       --params params.yaml
     deps:
-      - scripts/datasets/maiac_gapfill/05_apply_gapfill.py
-      - data/training/processed/maiac_aod/maiac_aod_daily.csv
-      - data/training/processed/merra2_aod/merra2_aod_daily.csv
-      - data/training/raw/maiac_gapfill/station_calibration_raw.csv
-      - data/training/processed/maiac_gapfill/confidence_scores.csv
-      - data/stations/cpcb_stations_delhi_status.csv
+    - scripts/datasets/maiac_gapfill/05_apply_gapfill.py
+    - data/training/processed/maiac_aod/maiac_aod_daily.csv
+    - data/training/processed/merra2_aod/merra2_aod_daily.csv
+    - data/training/raw/maiac_gapfill/station_calibration_raw.csv
+    - data/training/processed/maiac_gapfill/confidence_scores.csv
+    - data/stations/cpcb_stations_delhi_status.csv
     params:
-      - maiac_gapfill.fill
+    - maiac_gapfill.fill
     outs:
-      - data/training/processed/maiac_gapfill/maiac_aod_gapfilled.csv
-      - data/training/processed/maiac_gapfill/fill_summary.csv
+    - data/training/processed/maiac_gapfill/maiac_aod_gapfilled.csv
+    - data/training/processed/maiac_gapfill/fill_summary.csv
 
   # ============================================================
   # ERA5-Land meteorology 
   # ============================================================
   map_stations_to_cells_era5:
     frozen: true
-    cmd: python scripts/datasets/era5_land/1-map_stations_to_cells.py --stations data/stations/cpcb_stations_delhi_status.csv --params params.yaml --outdir data/training/raw/era5_land
+    cmd: python scripts/datasets/era5_land/1-map_stations_to_cells.py --stations
+      data/stations/cpcb_stations_delhi_status.csv --params params.yaml --outdir
+      data/training/raw/era5_land
     deps:
-      - scripts/datasets/era5_land/1-map_stations_to_cells.py
-      - data/stations/cpcb_stations_delhi_status.csv
+    - scripts/datasets/era5_land/1-map_stations_to_cells.py
+    - data/stations/cpcb_stations_delhi_status.csv
     params:
-      - era5_land.map_stations_to_cells
+    - era5_land.map_stations_to_cells
     outs:
-      - data/training/raw/era5_land/station_cell_mapping.csv
-  
+    - data/training/raw/era5_land/station_cell_mapping.csv
+
   extract_era5_land:
     frozen: true
-    cmd: python scripts/datasets/era5_land/2-extract_gee_era5land.py --mapping data/training/raw/era5_land/station_cell_mapping.csv --params params.yaml --outdir data/training/raw/era5_land
+    cmd: python scripts/datasets/era5_land/2-extract_gee_era5land.py --mapping 
+      data/training/raw/era5_land/station_cell_mapping.csv --params params.yaml 
+      --outdir data/training/raw/era5_land
     deps:
-      - scripts/datasets/era5_land/2-extract_gee_era5land.py
-      - data/training/raw/era5_land/station_cell_mapping.csv
+    - scripts/datasets/era5_land/2-extract_gee_era5land.py
+    - data/training/raw/era5_land/station_cell_mapping.csv
     params:
-      - era5_land.extract
+    - era5_land.extract
     outs:
-      - data/training/raw/era5_land/era5_land_raw.csv
+    - data/training/raw/era5_land/era5_land_raw.csv
 
   window_qc_era5_land:
-    cmd: python scripts/datasets/era5_land/3-window_and_qc_era5land.py --raw data/training/raw/era5_land/era5_land_raw.csv --mapping data/training/raw/era5_land/station_cell_mapping.csv --params params.yaml --outdir data/training/interim/era5_land
+    cmd: python scripts/datasets/era5_land/3-window_and_qc_era5land.py --raw 
+      data/training/raw/era5_land/era5_land_raw.csv --mapping 
+      data/training/raw/era5_land/station_cell_mapping.csv --params params.yaml 
+      --outdir data/training/interim/era5_land
     deps:
-      - scripts/datasets/era5_land/3-window_and_qc_era5land.py
-      - data/training/raw/era5_land/era5_land_raw.csv
-      - data/training/raw/era5_land/station_cell_mapping.csv
+    - scripts/datasets/era5_land/3-window_and_qc_era5land.py
+    - data/training/raw/era5_land/era5_land_raw.csv
+    - data/training/raw/era5_land/station_cell_mapping.csv
     params:
-      - era5_land.window_qc
+    - era5_land.window_qc
     outs:
-      - data/training/interim/era5_land/era5_land_windowed.csv
-      - data/training/interim/era5_land/era5_land_window_summary.csv
-  
+    - data/training/interim/era5_land/era5_land_windowed.csv
+    - data/training/interim/era5_land/era5_land_window_summary.csv
+
   aggregate_era5_land_daily:
-    cmd: python scripts/datasets/era5_land/4-aggregate_era5land_daily.py --windowed data/training/interim/era5_land/era5_land_windowed.csv --params params.yaml --outdir data/training/processed/era5_land
+    cmd: python scripts/datasets/era5_land/4-aggregate_era5land_daily.py 
+      --windowed data/training/interim/era5_land/era5_land_windowed.csv --params
+      params.yaml --outdir data/training/processed/era5_land
     deps:
-      - scripts/datasets/era5_land/4-aggregate_era5land_daily.py
-      - data/training/interim/era5_land/era5_land_windowed.csv
+    - scripts/datasets/era5_land/4-aggregate_era5land_daily.py
+    - data/training/interim/era5_land/era5_land_windowed.csv
     params:
-      - era5_land.daily_aggregation
+    - era5_land.daily_aggregation
     outs:
-      - data/training/processed/era5_land/era5_land_daily.csv
-      - data/training/processed/era5_land/era5_land_daily_summary.csv
-  
+    - data/training/processed/era5_land/era5_land_daily.csv
+    - data/training/processed/era5_land/era5_land_daily_summary.csv
+
   # ============================================================
   # ERA5-BLH
   # ============================================================
   map_stations_to_cells_era5_blh:
     frozen: true
-    cmd: python scripts/datasets/era5_blh/1-map_stations_to_cells.py --stations data/stations/cpcb_stations_delhi_status.csv --params params.yaml --outdir data/training/raw/era5_blh
+    cmd: python scripts/datasets/era5_blh/1-map_stations_to_cells.py --stations 
+      data/stations/cpcb_stations_delhi_status.csv --params params.yaml --outdir
+      data/training/raw/era5_blh
     deps:
-      - scripts/datasets/era5_blh/1-map_stations_to_cells.py
-      - data/stations/cpcb_stations_delhi_status.csv
+    - scripts/datasets/era5_blh/1-map_stations_to_cells.py
+    - data/stations/cpcb_stations_delhi_status.csv
     params:
-      - era5_blh.map_stations_to_cells
+    - era5_blh.map_stations_to_cells
     outs:
-      - data/training/raw/era5_blh/station_cell_mapping.csv
-  
+    - data/training/raw/era5_blh/station_cell_mapping.csv
+
   extract_era5_blh:
     frozen: true
-    cmd: python scripts/datasets/era5_blh/2-extract_gee_era5blh.py --mapping data/training/raw/era5_blh/station_cell_mapping.csv --params params.yaml --outdir data/training/raw/era5_blh
+    cmd: python scripts/datasets/era5_blh/2-extract_gee_era5blh.py --mapping 
+      data/training/raw/era5_blh/station_cell_mapping.csv --params params.yaml 
+      --outdir data/training/raw/era5_blh
     deps:
-      - scripts/datasets/era5_blh/2-extract_gee_era5blh.py
-      - data/training/raw/era5_blh/station_cell_mapping.csv
+    - scripts/datasets/era5_blh/2-extract_gee_era5blh.py
+    - data/training/raw/era5_blh/station_cell_mapping.csv
     params:
-      - era5_blh.extract
+    - era5_blh.extract
     outs:
-      - data/training/raw/era5_blh/era5_blh_raw.csv
-  
+    - data/training/raw/era5_blh/era5_blh_raw.csv
+
   window_qc_era5_blh:
-    cmd: python scripts/datasets/era5_blh/3-window_and_qc_era5blh.py --raw data/training/raw/era5_blh/era5_blh_raw.csv --mapping data/training/raw/era5_blh/station_cell_mapping.csv --params params.yaml --outdir data/training/interim/era5_blh
+    cmd: python scripts/datasets/era5_blh/3-window_and_qc_era5blh.py --raw 
+      data/training/raw/era5_blh/era5_blh_raw.csv --mapping 
+      data/training/raw/era5_blh/station_cell_mapping.csv --params params.yaml 
+      --outdir data/training/interim/era5_blh
     deps:
-      - scripts/datasets/era5_blh/3-window_and_qc_era5blh.py
-      - data/training/raw/era5_blh/era5_blh_raw.csv
-      - data/training/raw/era5_blh/station_cell_mapping.csv
+    - scripts/datasets/era5_blh/3-window_and_qc_era5blh.py
+    - data/training/raw/era5_blh/era5_blh_raw.csv
+    - data/training/raw/era5_blh/station_cell_mapping.csv
     params:
-      - era5_blh.window_qc
+    - era5_blh.window_qc
     outs:
-      - data/training/interim/era5_blh/era5_blh_windowed.csv
-      - data/training/interim/era5_blh/era5_blh_window_summary.csv
-  
+    - data/training/interim/era5_blh/era5_blh_windowed.csv
+    - data/training/interim/era5_blh/era5_blh_window_summary.csv
+
   aggregate_era5_blh_daily:
-    cmd: python scripts/datasets/era5_blh/4-aggregate_era5blh_daily.py --windowed data/training/interim/era5_blh/era5_blh_windowed.csv --params params.yaml --outdir data/training/processed/era5_blh
+    cmd: python scripts/datasets/era5_blh/4-aggregate_era5blh_daily.py 
+      --windowed data/training/interim/era5_blh/era5_blh_windowed.csv --params 
+      params.yaml --outdir data/training/processed/era5_blh
     deps:
-      - scripts/datasets/era5_blh/4-aggregate_era5blh_daily.py
-      - data/training/interim/era5_blh/era5_blh_windowed.csv
+    - scripts/datasets/era5_blh/4-aggregate_era5blh_daily.py
+    - data/training/interim/era5_blh/era5_blh_windowed.csv
     params:
-      - era5_blh.daily_aggregation
+    - era5_blh.daily_aggregation
     outs:
-      - data/training/processed/era5_blh/era5_blh_daily.csv
-      - data/training/processed/era5_blh/era5_blh_daily_summary.csv
+    - data/training/processed/era5_blh/era5_blh_daily.csv
+    - data/training/processed/era5_blh/era5_blh_daily_summary.csv
 
   # ============================================================
   # Static GEE - ESA worldcover , NDVI , Elevation
   # ============================================================
   extract_worldcover_raw:
     frozen: true
-    cmd: python scripts/datasets/static_gee/01_extract_worldcover_raw.py --output data/training/raw/static_gee/worldcover/worldcover_raw_histogram.csv --summary_output data/training/raw/static_gee/worldcover/worldcover_extraction_summary.csv
+    cmd: python scripts/datasets/static_gee/01_extract_worldcover_raw.py 
+      --output 
+      data/training/raw/static_gee/worldcover/worldcover_raw_histogram.csv 
+      --summary_output 
+      data/training/raw/static_gee/worldcover/worldcover_extraction_summary.csv
     deps:
-      - scripts/datasets/static_gee/01_extract_worldcover_raw.py
-      - data/stations/cpcb_stations_delhi_status.csv
+    - scripts/datasets/static_gee/01_extract_worldcover_raw.py
+    - data/stations/cpcb_stations_delhi_status.csv
     params:
-      - static_gee_layers.worldcover.extract
+    - static_gee_layers.worldcover.extract
     outs:
-      - data/training/raw/static_gee/worldcover/worldcover_raw_histogram.csv
-      - data/training/raw/static_gee/worldcover/worldcover_extraction_summary.csv
+    - data/training/raw/static_gee/worldcover/worldcover_raw_histogram.csv
+    - data/training/raw/static_gee/worldcover/worldcover_extraction_summary.csv
 
   qc_worldcover:
-    cmd: python scripts/datasets/static_gee/02_qc_worldcover.py --input data/training/raw/static_gee/worldcover/worldcover_raw_histogram.csv --output data/training/interim/static_gee/worldcover/worldcover_qc_summary.csv
+    cmd: python scripts/datasets/static_gee/02_qc_worldcover.py --input 
+      data/training/raw/static_gee/worldcover/worldcover_raw_histogram.csv 
+      --output 
+      data/training/interim/static_gee/worldcover/worldcover_qc_summary.csv
     deps:
-      - scripts/datasets/static_gee/02_qc_worldcover.py
-      - data/training/raw/static_gee/worldcover/worldcover_raw_histogram.csv
-      - data/stations/cpcb_stations_delhi_status.csv
+    - scripts/datasets/static_gee/02_qc_worldcover.py
+    - data/training/raw/static_gee/worldcover/worldcover_raw_histogram.csv
+    - data/stations/cpcb_stations_delhi_status.csv
     params:
-      - static_gee_layers.worldcover.qc
+    - static_gee_layers.worldcover.qc
     outs:
-      - data/training/interim/static_gee/worldcover/worldcover_qc_summary.csv
-  
+    - data/training/interim/static_gee/worldcover/worldcover_qc_summary.csv
+
   compute_worldcover_fractions:
-    cmd: python scripts/datasets/static_gee/03_compute_worldcover_fractions.py --input data/training/raw/static_gee/worldcover/worldcover_raw_histogram.csv --output data/training/processed/static_gee/worldcover_landuse.csv
+    cmd: python scripts/datasets/static_gee/03_compute_worldcover_fractions.py 
+      --input 
+      data/training/raw/static_gee/worldcover/worldcover_raw_histogram.csv 
+      --output data/training/processed/static_gee/worldcover_landuse.csv
     deps:
-      - scripts/datasets/static_gee/03_compute_worldcover_fractions.py
-      - data/training/raw/static_gee/worldcover/worldcover_raw_histogram.csv
-      - data/training/interim/static_gee/worldcover/worldcover_qc_summary.csv
+    - scripts/datasets/static_gee/03_compute_worldcover_fractions.py
+    - data/training/raw/static_gee/worldcover/worldcover_raw_histogram.csv
+    - data/training/interim/static_gee/worldcover/worldcover_qc_summary.csv
     outs:
-      - data/training/processed/static_gee/worldcover_landuse.csv
-  
+    - data/training/processed/static_gee/worldcover_landuse.csv
+
   extract_ndvi_raw:
     frozen: true
-    cmd: python scripts/datasets/static_gee/04_extract_ndvi_raw.py --output data/training/raw/static_gee/ndvi/ndvi_raw_periods.csv --summary_output data/training/raw/static_gee/ndvi/ndvi_extraction_summary.csv
+    cmd: python scripts/datasets/static_gee/04_extract_ndvi_raw.py --output 
+      data/training/raw/static_gee/ndvi/ndvi_raw_periods.csv --summary_output 
+      data/training/raw/static_gee/ndvi/ndvi_extraction_summary.csv
     deps:
-      - scripts/datasets/static_gee/04_extract_ndvi_raw.py
-      - data/stations/cpcb_stations_delhi_status.csv
+    - scripts/datasets/static_gee/04_extract_ndvi_raw.py
+    - data/stations/cpcb_stations_delhi_status.csv
     params:
-      - static_gee_layers.ndvi.extract
+    - static_gee_layers.ndvi.extract
     outs:
-      - data/training/raw/static_gee/ndvi/ndvi_raw_periods.csv
-      - data/training/raw/static_gee/ndvi/ndvi_extraction_summary.csv
-    
+    - data/training/raw/static_gee/ndvi/ndvi_raw_periods.csv
+    - data/training/raw/static_gee/ndvi/ndvi_extraction_summary.csv
+
   qc_ndvi:
-    cmd: python scripts/datasets/static_gee/05_qc_ndvi.py --input data/training/raw/static_gee/ndvi/ndvi_raw_periods.csv --output data/training/interim/static_gee/ndvi/ndvi_qc_summary.csv
+    cmd: python scripts/datasets/static_gee/05_qc_ndvi.py --input 
+      data/training/raw/static_gee/ndvi/ndvi_raw_periods.csv --output 
+      data/training/interim/static_gee/ndvi/ndvi_qc_summary.csv
     deps:
-      - scripts/datasets/static_gee/05_qc_ndvi.py
-      - data/training/raw/static_gee/ndvi/ndvi_raw_periods.csv
-      - data/stations/cpcb_stations_delhi_status.csv
+    - scripts/datasets/static_gee/05_qc_ndvi.py
+    - data/training/raw/static_gee/ndvi/ndvi_raw_periods.csv
+    - data/stations/cpcb_stations_delhi_status.csv
     params:
-      - static_gee_layers.ndvi.qc
+    - static_gee_layers.ndvi.qc
     outs:
-      - data/training/interim/static_gee/ndvi/ndvi_qc_summary.csv
-  
+    - data/training/interim/static_gee/ndvi/ndvi_qc_summary.csv
+
   analyze_ndvi_fill_distances:
-    cmd: python scripts/datasets/static_gee/06_analyze_ndvi_fill_distances.py --input data/training/raw/static_gee/ndvi/ndvi_raw_periods.csv --output data/training/interim/static_gee/ndvi/ndvi_fill_distance_analysis.csv
+    cmd: python scripts/datasets/static_gee/06_analyze_ndvi_fill_distances.py 
+      --input data/training/raw/static_gee/ndvi/ndvi_raw_periods.csv --output 
+      data/training/interim/static_gee/ndvi/ndvi_fill_distance_analysis.csv
     deps:
-      - scripts/datasets/static_gee/06_analyze_ndvi_fill_distances.py
-      - data/training/raw/static_gee/ndvi/ndvi_raw_periods.csv
-      - data/training/interim/static_gee/ndvi/ndvi_qc_summary.csv
+    - scripts/datasets/static_gee/06_analyze_ndvi_fill_distances.py
+    - data/training/raw/static_gee/ndvi/ndvi_raw_periods.csv
+    - data/training/interim/static_gee/ndvi/ndvi_qc_summary.csv
     outs:
-      - data/training/interim/static_gee/ndvi/ndvi_fill_distance_analysis.csv
-  
+    - data/training/interim/static_gee/ndvi/ndvi_fill_distance_analysis.csv
+
   fill_ndvi_gaps:
-    cmd: python scripts/datasets/static_gee/07_fill_ndvi_gaps.py --raw_input data/training/raw/static_gee/ndvi/ndvi_raw_periods.csv --distance_input data/training/interim/static_gee/ndvi/ndvi_fill_distance_analysis.csv --output data/training/processed/static_gee/ndvi_gapfilled.csv
+    cmd: python scripts/datasets/static_gee/07_fill_ndvi_gaps.py --raw_input 
+      data/training/raw/static_gee/ndvi/ndvi_raw_periods.csv --distance_input 
+      data/training/interim/static_gee/ndvi/ndvi_fill_distance_analysis.csv 
+      --output data/training/processed/static_gee/ndvi_gapfilled.csv
     deps:
-      - scripts/datasets/static_gee/07_fill_ndvi_gaps.py
-      - data/training/raw/static_gee/ndvi/ndvi_raw_periods.csv
-      - data/training/interim/static_gee/ndvi/ndvi_fill_distance_analysis.csv
+    - scripts/datasets/static_gee/07_fill_ndvi_gaps.py
+    - data/training/raw/static_gee/ndvi/ndvi_raw_periods.csv
+    - data/training/interim/static_gee/ndvi/ndvi_fill_distance_analysis.csv
     params:
-      - static_gee_layers.ndvi.fill
+    - static_gee_layers.ndvi.fill
     outs:
-      - data/training/processed/static_gee/ndvi_gapfilled.csv
-  
+    - data/training/processed/static_gee/ndvi_gapfilled.csv
+
   extract_srtm_raw:
     frozen: true
-    cmd: python scripts/datasets/static_gee/08_extract_srtm_raw.py --output data/training/raw/static_gee/srtm/srtm_raw.csv --summary_output data/training/raw/static_gee/srtm/srtm_extraction_summary.csv
+    cmd: python scripts/datasets/static_gee/08_extract_srtm_raw.py --output 
+      data/training/raw/static_gee/srtm/srtm_raw.csv --summary_output 
+      data/training/raw/static_gee/srtm/srtm_extraction_summary.csv
     deps:
-      - scripts/datasets/static_gee/08_extract_srtm_raw.py
-      - data/stations/cpcb_stations_delhi_status.csv
+    - scripts/datasets/static_gee/08_extract_srtm_raw.py
+    - data/stations/cpcb_stations_delhi_status.csv
     params:
-      - static_gee_layers.srtm.extract
+    - static_gee_layers.srtm.extract
     outs:
-      - data/training/raw/static_gee/srtm/srtm_raw.csv
-      - data/training/raw/static_gee/srtm/srtm_extraction_summary.csv
+    - data/training/raw/static_gee/srtm/srtm_raw.csv
+    - data/training/raw/static_gee/srtm/srtm_extraction_summary.csv
 
   qc_srtm:
-    cmd: python scripts/datasets/static_gee/09_qc_srtm.py --input data/training/raw/static_gee/srtm/srtm_raw.csv --output data/training/interim/static_gee/srtm/srtm_qc_summary.csv
+    cmd: python scripts/datasets/static_gee/09_qc_srtm.py --input 
+      data/training/raw/static_gee/srtm/srtm_raw.csv --output 
+      data/training/interim/static_gee/srtm/srtm_qc_summary.csv
     deps:
-      - scripts/datasets/static_gee/09_qc_srtm.py
-      - data/training/raw/static_gee/srtm/srtm_raw.csv
-      - data/stations/cpcb_stations_delhi_status.csv
+    - scripts/datasets/static_gee/09_qc_srtm.py
+    - data/training/raw/static_gee/srtm/srtm_raw.csv
+    - data/stations/cpcb_stations_delhi_status.csv
     params:
-      - static_gee_layers.srtm.qc
+    - static_gee_layers.srtm.qc
     outs:
-      - data/training/interim/static_gee/srtm/srtm_qc_summary.csv
+    - data/training/interim/static_gee/srtm/srtm_qc_summary.csv
 
   finalize_srtm:
-    cmd: python scripts/datasets/static_gee/10_finalize_srtm.py --input data/training/raw/static_gee/srtm/srtm_raw.csv --output data/training/processed/static_gee/srtm_terrain.csv
+    cmd: python scripts/datasets/static_gee/10_finalize_srtm.py --input 
+      data/training/raw/static_gee/srtm/srtm_raw.csv --output 
+      data/training/processed/static_gee/srtm_terrain.csv
     deps:
-      - scripts/datasets/static_gee/10_finalize_srtm.py
-      - data/training/raw/static_gee/srtm/srtm_raw.csv
-      - data/training/interim/static_gee/srtm/srtm_qc_summary.csv
+    - scripts/datasets/static_gee/10_finalize_srtm.py
+    - data/training/raw/static_gee/srtm/srtm_raw.csv
+    - data/training/interim/static_gee/srtm/srtm_qc_summary.csv
     outs:
-      - data/training/processed/static_gee/srtm_terrain.csv
+    - data/training/processed/static_gee/srtm_terrain.csv
 
   # ============================================================
   # OSM features (road density, industrial land-use %, distance to power plant)
   # ============================================================
   extract_road_lengths:
-    cmd: python scripts/datasets/osm/01_extract_road_lengths.py --station_file data/stations/cpcb_stations_delhi_status.csv --roads_geojson data/training/raw/osm/roads.geojson --buffer_radius_m 1000 --output data/training/raw/osm/road_lengths_raw.csv --summary_output data/training/raw/osm/road_lengths_extraction_summary.csv
+    cmd: python scripts/datasets/osm/01_extract_road_lengths.py --station_file 
+      data/stations/cpcb_stations_delhi_status.csv --roads_geojson 
+      data/training/raw/osm/roads.geojson --buffer_radius_m 1000 --output 
+      data/training/raw/osm/road_lengths_raw.csv --summary_output 
+      data/training/raw/osm/road_lengths_extraction_summary.csv
     deps:
-      - scripts/datasets/osm/01_extract_road_lengths.py
-      - data/stations/cpcb_stations_delhi_status.csv
-      - data/training/raw/osm/roads.geojson
+    - scripts/datasets/osm/01_extract_road_lengths.py
+    - data/stations/cpcb_stations_delhi_status.csv
+    - data/training/raw/osm/roads.geojson
     params:
-      - osm_layers.roads.extract
+    - osm_layers.roads.extract
     outs:
-      - data/training/raw/osm/road_lengths_raw.csv
-      - data/training/raw/osm/road_lengths_extraction_summary.csv
+    - data/training/raw/osm/road_lengths_raw.csv
+    - data/training/raw/osm/road_lengths_extraction_summary.csv
 
   qc_roads:
-    cmd: python scripts/datasets/osm/02_qc_roads.py --input data/training/raw/osm/road_lengths_raw.csv --station_file data/stations/cpcb_stations_delhi_status.csv --max_plausible_density_km_per_km2 50 --output data/training/interim/osm/road_qc_summary.csv
+    cmd: python scripts/datasets/osm/02_qc_roads.py --input 
+      data/training/raw/osm/road_lengths_raw.csv --station_file 
+      data/stations/cpcb_stations_delhi_status.csv 
+      --max_plausible_density_km_per_km2 50 --output 
+      data/training/interim/osm/road_qc_summary.csv
     deps:
-      - scripts/datasets/osm/02_qc_roads.py
-      - data/training/raw/osm/road_lengths_raw.csv
-      - data/stations/cpcb_stations_delhi_status.csv
+    - scripts/datasets/osm/02_qc_roads.py
+    - data/training/raw/osm/road_lengths_raw.csv
+    - data/stations/cpcb_stations_delhi_status.csv
     params:
-      - osm_layers.roads.qc
+    - osm_layers.roads.qc
     outs:
-      - data/training/interim/osm/road_qc_summary.csv
+    - data/training/interim/osm/road_qc_summary.csv
 
   compute_road_density:
-    cmd: python scripts/datasets/osm/03_compute_road_density.py --input data/training/raw/osm/road_lengths_raw.csv --output data/training/processed/osm/road_density.csv
+    cmd: python scripts/datasets/osm/03_compute_road_density.py --input 
+      data/training/raw/osm/road_lengths_raw.csv --output 
+      data/training/processed/osm/road_density.csv
     deps:
-      - scripts/datasets/osm/03_compute_road_density.py
-      - data/training/raw/osm/road_lengths_raw.csv
-      - data/training/interim/osm/road_qc_summary.csv
+    - scripts/datasets/osm/03_compute_road_density.py
+    - data/training/raw/osm/road_lengths_raw.csv
+    - data/training/interim/osm/road_qc_summary.csv
     outs:
-      - data/training/processed/osm/road_density.csv
+    - data/training/processed/osm/road_density.csv
 
   extract_industrial_area:
-    cmd: python scripts/datasets/osm/04_extract_industrial_area.py --station_file data/stations/cpcb_stations_delhi_status.csv --industrial_geojson data/training/raw/osm/industrial_landuse.geojson --buffer_radius_m 1000 --output data/training/raw/osm/industrial_area_raw.csv --summary_output data/training/raw/osm/industrial_area_extraction_summary.csv
+    cmd: python scripts/datasets/osm/04_extract_industrial_area.py 
+      --station_file data/stations/cpcb_stations_delhi_status.csv 
+      --industrial_geojson data/training/raw/osm/industrial_landuse.geojson 
+      --buffer_radius_m 1000 --output 
+      data/training/raw/osm/industrial_area_raw.csv --summary_output 
+      data/training/raw/osm/industrial_area_extraction_summary.csv
     deps:
-      - scripts/datasets/osm/04_extract_industrial_area.py
-      - data/stations/cpcb_stations_delhi_status.csv
-      - data/training/raw/osm/industrial_landuse.geojson
+    - scripts/datasets/osm/04_extract_industrial_area.py
+    - data/stations/cpcb_stations_delhi_status.csv
+    - data/training/raw/osm/industrial_landuse.geojson
     params:
-      - osm_layers.industrial.extract
+    - osm_layers.industrial.extract
     outs:
-      - data/training/raw/osm/industrial_area_raw.csv
-      - data/training/raw/osm/industrial_area_extraction_summary.csv
+    - data/training/raw/osm/industrial_area_raw.csv
+    - data/training/raw/osm/industrial_area_extraction_summary.csv
 
   qc_industrial:
-    cmd: python scripts/datasets/osm/05_qc_industrial.py --input data/training/raw/osm/industrial_area_raw.csv --station_file data/stations/cpcb_stations_delhi_status.csv --output data/training/interim/osm/industrial_qc_summary.csv
+    cmd: python scripts/datasets/osm/05_qc_industrial.py --input 
+      data/training/raw/osm/industrial_area_raw.csv --station_file 
+      data/stations/cpcb_stations_delhi_status.csv --output 
+      data/training/interim/osm/industrial_qc_summary.csv
     deps:
-      - scripts/datasets/osm/05_qc_industrial.py
-      - data/training/raw/osm/industrial_area_raw.csv
-      - data/stations/cpcb_stations_delhi_status.csv
+    - scripts/datasets/osm/05_qc_industrial.py
+    - data/training/raw/osm/industrial_area_raw.csv
+    - data/stations/cpcb_stations_delhi_status.csv
     params:
-      - osm_layers.industrial.qc
+    - osm_layers.industrial.qc
     outs:
-      - data/training/interim/osm/industrial_qc_summary.csv
+    - data/training/interim/osm/industrial_qc_summary.csv
 
   compute_industrial_fraction:
-    cmd: python scripts/datasets/osm/06_compute_industrial_fraction.py --input data/training/raw/osm/industrial_area_raw.csv --output data/training/processed/osm/industrial_fraction.csv
+    cmd: python scripts/datasets/osm/06_compute_industrial_fraction.py --input 
+      data/training/raw/osm/industrial_area_raw.csv --output 
+      data/training/processed/osm/industrial_fraction.csv
     deps:
-      - scripts/datasets/osm/06_compute_industrial_fraction.py
-      - data/training/raw/osm/industrial_area_raw.csv
-      - data/training/interim/osm/industrial_qc_summary.csv
+    - scripts/datasets/osm/06_compute_industrial_fraction.py
+    - data/training/raw/osm/industrial_area_raw.csv
+    - data/training/interim/osm/industrial_qc_summary.csv
     outs:
-      - data/training/processed/osm/industrial_fraction.csv
+    - data/training/processed/osm/industrial_fraction.csv
 
   extract_powerplant_distances:
-    cmd: python scripts/datasets/osm/07_extract_powerplant_distances.py --station_file data/stations/cpcb_stations_delhi_status.csv --powerplants_geojson data/training/raw/osm/power_plants.geojson --output data/training/raw/osm/powerplant_distances_raw.csv --summary_output data/training/raw/osm/powerplant_distances_extraction_summary.csv
+    cmd: python scripts/datasets/osm/07_extract_powerplant_distances.py 
+      --station_file data/stations/cpcb_stations_delhi_status.csv 
+      --powerplants_geojson data/training/raw/osm/power_plants.geojson --output 
+      data/training/raw/osm/powerplant_distances_raw.csv --summary_output 
+      data/training/raw/osm/powerplant_distances_extraction_summary.csv
     deps:
-      - scripts/datasets/osm/07_extract_powerplant_distances.py
-      - data/stations/cpcb_stations_delhi_status.csv
-      - data/training/raw/osm/power_plants.geojson
+    - scripts/datasets/osm/07_extract_powerplant_distances.py
+    - data/stations/cpcb_stations_delhi_status.csv
+    - data/training/raw/osm/power_plants.geojson
     params:
-      - osm_layers.powerplants.extract
+    - osm_layers.powerplants.extract
     outs:
-      - data/training/raw/osm/powerplant_distances_raw.csv
-      - data/training/raw/osm/powerplant_distances_extraction_summary.csv
+    - data/training/raw/osm/powerplant_distances_raw.csv
+    - data/training/raw/osm/powerplant_distances_extraction_summary.csv
 
   qc_powerplants:
-    cmd: python scripts/datasets/osm/08_qc_powerplants.py --input data/training/raw/osm/powerplant_distances_raw.csv --station_file data/stations/cpcb_stations_delhi_status.csv --edge_effect_distance_km_threshold 110 --output data/training/interim/osm/powerplant_qc_summary.csv
+    cmd: python scripts/datasets/osm/08_qc_powerplants.py --input 
+      data/training/raw/osm/powerplant_distances_raw.csv --station_file 
+      data/stations/cpcb_stations_delhi_status.csv 
+      --edge_effect_distance_km_threshold 110 --output 
+      data/training/interim/osm/powerplant_qc_summary.csv
     deps:
-      - scripts/datasets/osm/08_qc_powerplants.py
-      - data/training/raw/osm/powerplant_distances_raw.csv
-      - data/stations/cpcb_stations_delhi_status.csv
+    - scripts/datasets/osm/08_qc_powerplants.py
+    - data/training/raw/osm/powerplant_distances_raw.csv
+    - data/stations/cpcb_stations_delhi_status.csv
     params:
-      - osm_layers.powerplants.qc
+    - osm_layers.powerplants.qc
     outs:
-      - data/training/interim/osm/powerplant_qc_summary.csv
+    - data/training/interim/osm/powerplant_qc_summary.csv
 
   finalize_powerplant_distance:
-    cmd: python scripts/datasets/osm/09_finalize_powerplant_distance.py --input data/training/raw/osm/powerplant_distances_raw.csv --output data/training/processed/osm/powerplant_distance.csv
+    cmd: python scripts/datasets/osm/09_finalize_powerplant_distance.py --input 
+      data/training/raw/osm/powerplant_distances_raw.csv --output 
+      data/training/processed/osm/powerplant_distance.csv
     deps:
-      - scripts/datasets/osm/09_finalize_powerplant_distance.py
-      - data/training/raw/osm/powerplant_distances_raw.csv
-      - data/training/interim/osm/powerplant_qc_summary.csv
+    - scripts/datasets/osm/09_finalize_powerplant_distance.py
+    - data/training/raw/osm/powerplant_distances_raw.csv
+    - data/training/interim/osm/powerplant_qc_summary.csv
     outs:
-      - data/training/processed/osm/powerplant_distance.csv
+    - data/training/processed/osm/powerplant_distance.csv
 
 
   # ============================================================
@@ -657,56 +769,85 @@ stages:
   # ============================================================
 
   build_master_feature_table:
-    cmd: python scripts/modeling/dataset_prep/01_build_master_table.py --station_file data/stations/cpcb_stations_delhi_status.csv --pm25 data/training/processed/cpcb/pm25_daily_final/pm25_daily_final.csv --aod data/training/processed/maiac_gapfill/maiac_aod_gapfilled.csv --era5_land data/training/processed/era5_land/era5_land_daily.csv --era5_blh data/training/processed/era5_blh/era5_blh_daily.csv --ndvi data/training/processed/static_gee/ndvi_gapfilled.csv --worldcover data/training/processed/static_gee/worldcover_landuse.csv --srtm data/training/processed/static_gee/srtm_terrain.csv --roads data/training/processed/osm/road_density.csv --industrial data/training/processed/osm/industrial_fraction.csv --powerplants data/training/processed/osm/powerplant_distance.csv --output data/training/processed/modeling_datasets/master_feature_table.csv
+    cmd: python scripts/modeling/dataset_prep/01_build_master_table.py 
+      --station_file data/stations/cpcb_stations_delhi_status.csv --pm25 
+      data/training/processed/cpcb/pm25_daily_final/pm25_daily_final.csv --aod 
+      data/training/processed/maiac_gapfill/maiac_aod_gapfilled.csv --era5_land 
+      data/training/processed/era5_land/era5_land_daily.csv --era5_blh 
+      data/training/processed/era5_blh/era5_blh_daily.csv --ndvi 
+      data/training/processed/static_gee/ndvi_gapfilled.csv --worldcover 
+      data/training/processed/static_gee/worldcover_landuse.csv --srtm 
+      data/training/processed/static_gee/srtm_terrain.csv --roads 
+      data/training/processed/osm/road_density.csv --industrial 
+      data/training/processed/osm/industrial_fraction.csv --powerplants 
+      data/training/processed/osm/powerplant_distance.csv --output 
+      data/training/processed/modeling_datasets/master_feature_table.csv
     deps:
-      - scripts/modeling/dataset_prep/01_build_master_table.py
-      - data/stations/cpcb_stations_delhi_status.csv
-      - data/training/processed/cpcb/pm25_daily_final/pm25_daily_final.csv
-      - data/training/processed/maiac_gapfill/maiac_aod_gapfilled.csv
-      - data/training/processed/era5_land/era5_land_daily.csv
-      - data/training/processed/era5_blh/era5_blh_daily.csv
-      - data/training/processed/static_gee/ndvi_gapfilled.csv
-      - data/training/processed/static_gee/worldcover_landuse.csv
-      - data/training/processed/static_gee/srtm_terrain.csv
-      - data/training/processed/osm/road_density.csv
-      - data/training/processed/osm/industrial_fraction.csv
-      - data/training/processed/osm/powerplant_distance.csv
+    - scripts/modeling/dataset_prep/01_build_master_table.py
+    - data/stations/cpcb_stations_delhi_status.csv
+    - data/training/processed/cpcb/pm25_daily_final/pm25_daily_final.csv
+    - data/training/processed/maiac_gapfill/maiac_aod_gapfilled.csv
+    - data/training/processed/era5_land/era5_land_daily.csv
+    - data/training/processed/era5_blh/era5_blh_daily.csv
+    - data/training/processed/static_gee/ndvi_gapfilled.csv
+    - data/training/processed/static_gee/worldcover_landuse.csv
+    - data/training/processed/static_gee/srtm_terrain.csv
+    - data/training/processed/osm/road_density.csv
+    - data/training/processed/osm/industrial_fraction.csv
+    - data/training/processed/osm/powerplant_distance.csv
     outs:
-      - data/training/processed/modeling_datasets/master_feature_table.csv
+    - data/training/processed/modeling_datasets/master_feature_table.csv
 
   prepare_lme_dataset:
-    cmd: python scripts/modeling/dataset_prep/02_prepare_lme_dataset.py --input data/training/processed/modeling_datasets/master_feature_table.csv --output data/training/processed/modeling_datasets/lme_ready_dataset.csv --scaling_output data/training/processed/modeling_datasets/lme_scaling_params.csv --target_transform log --drop_zero_target_rows true --clip_negative_aod_to_zero true
+    cmd: python scripts/modeling/dataset_prep/02_prepare_lme_dataset.py --input 
+      data/training/processed/modeling_datasets/master_feature_table.csv 
+      --output data/training/processed/modeling_datasets/lme_ready_dataset.csv 
+      --scaling_output 
+      data/training/processed/modeling_datasets/lme_scaling_params.csv 
+      --target_transform log --drop_zero_target_rows true 
+      --clip_negative_aod_to_zero true
     deps:
-      - scripts/modeling/dataset_prep/02_prepare_lme_dataset.py
-      - data/training/processed/modeling_datasets/master_feature_table.csv
-      - notebooks/01_eda_master_feature_table.ipynb
+    - scripts/modeling/dataset_prep/02_prepare_lme_dataset.py
+    - data/training/processed/modeling_datasets/master_feature_table.csv
+    - notebooks/01_eda_master_feature_table.ipynb
     params:
-      - modeling.lme_prep
+    - modeling.lme_prep
     outs:
-      - data/training/processed/modeling_datasets/lme_ready_dataset.csv
-      - data/training/processed/modeling_datasets/lme_scaling_params.csv
+    - data/training/processed/modeling_datasets/lme_ready_dataset.csv
+    - data/training/processed/modeling_datasets/lme_scaling_params.csv
 
   prepare_lme_dataset_raw_target:
-    cmd: python scripts/modeling/dataset_prep/02_prepare_lme_dataset.py --input data/training/processed/modeling_datasets/master_feature_table.csv --output data/training/processed/modeling_datasets/lme_ready_dataset_raw_target.csv --scaling_output data/training/processed/modeling_datasets/lme_scaling_params_raw_target.csv --target_transform raw --drop_zero_target_rows true --clip_negative_aod_to_zero true
+    cmd: python scripts/modeling/dataset_prep/02_prepare_lme_dataset.py --input 
+      data/training/processed/modeling_datasets/master_feature_table.csv 
+      --output 
+      data/training/processed/modeling_datasets/lme_ready_dataset_raw_target.csv
+      --scaling_output 
+      data/training/processed/modeling_datasets/lme_scaling_params_raw_target.csv
+      --target_transform raw --drop_zero_target_rows true 
+      --clip_negative_aod_to_zero true
     deps:
-      - scripts/modeling/dataset_prep/02_prepare_lme_dataset.py
-      - data/training/processed/modeling_datasets/master_feature_table.csv
-      - notebooks/01_eda_master_feature_table.ipynb
+    - scripts/modeling/dataset_prep/02_prepare_lme_dataset.py
+    - data/training/processed/modeling_datasets/master_feature_table.csv
+    - notebooks/01_eda_master_feature_table.ipynb
     params:
-      - modeling.lme_prep_raw_target
+    - modeling.lme_prep_raw_target
     outs:
-      - data/training/processed/modeling_datasets/lme_ready_dataset_raw_target.csv
-      - data/training/processed/modeling_datasets/lme_scaling_params_raw_target.csv
+    - data/training/processed/modeling_datasets/lme_ready_dataset_raw_target.csv
+    - data/training/processed/modeling_datasets/lme_scaling_params_raw_target.csv
 
   prepare_lightgbm_dataset:
-    cmd: python scripts/modeling/dataset_prep/03_prepare_lightgbm_dataset.py --input data/training/processed/modeling_datasets/master_feature_table.csv --output data/training/processed/modeling_datasets/lightgbm_ready_dataset.csv --drop_zero_target_rows true --clip_negative_aod_to_zero true
+    cmd: python scripts/modeling/dataset_prep/03_prepare_lightgbm_dataset.py 
+      --input data/training/processed/modeling_datasets/master_feature_table.csv
+      --output 
+      data/training/processed/modeling_datasets/lightgbm_ready_dataset.csv 
+      --drop_zero_target_rows true --clip_negative_aod_to_zero true
     deps:
-      - scripts/modeling/dataset_prep/03_prepare_lightgbm_dataset.py
-      - data/training/processed/modeling_datasets/master_feature_table.csv
+    - scripts/modeling/dataset_prep/03_prepare_lightgbm_dataset.py
+    - data/training/processed/modeling_datasets/master_feature_table.csv
     params:
-      - modeling.lightgbm_prep
+    - modeling.lightgbm_prep
     outs:
-      - data/training/processed/modeling_datasets/lightgbm_ready_dataset.csv
+    - data/training/processed/modeling_datasets/lightgbm_ready_dataset.csv
 
 
   # ============================================================
@@ -714,274 +855,641 @@ stages:
   # ============================================================
 
   fit_lme_model:
-    cmd: python scripts/modeling/lme/01_fit_lme_model.py --input data/training/processed/modeling_datasets/lme_ready_dataset.csv --model_output models/lme/lme_full_model.pkl --coef_output reports/lme/primary_log_target/lme_fixed_effects.csv --summary_output reports/lme/primary_log_target/lme_model_summary.txt --exclude_low_confidence false
+    cmd: python scripts/modeling/lme/01_fit_lme_model.py --input 
+      data/training/processed/modeling_datasets/lme_ready_dataset.csv 
+      --model_output models/lme/lme_full_model.pkl --coef_output 
+      reports/lme/primary_log_target/lme_fixed_effects.csv --summary_output 
+      reports/lme/primary_log_target/lme_model_summary.txt 
+      --exclude_low_confidence false
     deps:
-      - scripts/modeling/lme/01_fit_lme_model.py
-      - data/training/processed/modeling_datasets/lme_ready_dataset.csv
+    - scripts/modeling/lme/01_fit_lme_model.py
+    - data/training/processed/modeling_datasets/lme_ready_dataset.csv
     outs:
-      - models/lme/lme_full_model.pkl
-      - reports/lme/primary_log_target/lme_fixed_effects.csv
-      - reports/lme/primary_log_target/lme_model_summary.txt
+    - models/lme/lme_full_model.pkl
+    - reports/lme/primary_log_target/lme_fixed_effects.csv
+    - reports/lme/primary_log_target/lme_model_summary.txt
 
   fit_lme_model_gapfill_robustness:
-    cmd: python scripts/modeling/lme/01_fit_lme_model.py --input data/training/processed/modeling_datasets/lme_ready_dataset.csv --model_output models/lme/lme_full_model_gapfill_robustness.pkl --coef_output reports/lme/gapfill_robustness/lme_fixed_effects.csv --summary_output reports/lme/gapfill_robustness/lme_model_summary.txt --exclude_low_confidence true
+    cmd: python scripts/modeling/lme/01_fit_lme_model.py --input 
+      data/training/processed/modeling_datasets/lme_ready_dataset.csv 
+      --model_output models/lme/lme_full_model_gapfill_robustness.pkl 
+      --coef_output reports/lme/gapfill_robustness/lme_fixed_effects.csv 
+      --summary_output reports/lme/gapfill_robustness/lme_model_summary.txt 
+      --exclude_low_confidence true
     deps:
-      - scripts/modeling/lme/01_fit_lme_model.py
-      - data/training/processed/modeling_datasets/lme_ready_dataset.csv
+    - scripts/modeling/lme/01_fit_lme_model.py
+    - data/training/processed/modeling_datasets/lme_ready_dataset.csv
     outs:
-      - models/lme/lme_full_model_gapfill_robustness.pkl
-      - reports/lme/gapfill_robustness/lme_fixed_effects.csv
-      - reports/lme/gapfill_robustness/lme_model_summary.txt
+    - models/lme/lme_full_model_gapfill_robustness.pkl
+    - reports/lme/gapfill_robustness/lme_fixed_effects.csv
+    - reports/lme/gapfill_robustness/lme_model_summary.txt
 
   fit_lme_model_aod_winsorized:
-    cmd: python scripts/modeling/lme/01_fit_lme_model.py --input data/training/processed/modeling_datasets/lme_ready_dataset_aod_winsorized.csv --model_output models/lme/lme_full_model_aod_winsorized.pkl --coef_output reports/lme/aod_winsorized/lme_fixed_effects.csv --summary_output reports/lme/aod_winsorized/lme_model_summary.txt --exclude_low_confidence false --run_tag aod_winsorized
+    cmd: python scripts/modeling/lme/01_fit_lme_model.py --input 
+      data/training/processed/modeling_datasets/lme_ready_dataset_aod_winsorized.csv
+      --model_output models/lme/lme_full_model_aod_winsorized.pkl --coef_output 
+      reports/lme/aod_winsorized/lme_fixed_effects.csv --summary_output 
+      reports/lme/aod_winsorized/lme_model_summary.txt --exclude_low_confidence 
+      false --run_tag aod_winsorized
     deps:
-      - scripts/modeling/lme/01_fit_lme_model.py
-      - data/training/processed/modeling_datasets/lme_ready_dataset_aod_winsorized.csv
+    - scripts/modeling/lme/01_fit_lme_model.py
+    - data/training/processed/modeling_datasets/lme_ready_dataset_aod_winsorized.csv
     outs:
-      - models/lme/lme_full_model_aod_winsorized.pkl
-      - reports/lme/aod_winsorized/lme_fixed_effects.csv
-      - reports/lme/aod_winsorized/lme_model_summary.txt
+    - models/lme/lme_full_model_aod_winsorized.pkl
+    - reports/lme/aod_winsorized/lme_fixed_effects.csv
+    - reports/lme/aod_winsorized/lme_model_summary.txt
 
   fit_lme_model_excl_outlier_stations:
-    cmd: python scripts/modeling/lme/01_fit_lme_model.py --input data/training/processed/modeling_datasets/lme_ready_dataset.csv --model_output models/lme/lme_full_model_excl_outlier_stations.pkl --coef_output reports/lme/excl_outlier_stations/lme_fixed_effects.csv --summary_output reports/lme/excl_outlier_stations/lme_model_summary.txt --exclude_low_confidence false --exclude_stations 5598,6934 --run_tag excl_outlier_stations
+    cmd: python scripts/modeling/lme/01_fit_lme_model.py --input 
+      data/training/processed/modeling_datasets/lme_ready_dataset.csv 
+      --model_output models/lme/lme_full_model_excl_outlier_stations.pkl 
+      --coef_output reports/lme/excl_outlier_stations/lme_fixed_effects.csv 
+      --summary_output reports/lme/excl_outlier_stations/lme_model_summary.txt 
+      --exclude_low_confidence false --exclude_stations 5598,6934 --run_tag 
+      excl_outlier_stations
     deps:
-      - scripts/modeling/lme/01_fit_lme_model.py
-      - data/training/processed/modeling_datasets/lme_ready_dataset.csv
+    - scripts/modeling/lme/01_fit_lme_model.py
+    - data/training/processed/modeling_datasets/lme_ready_dataset.csv
     params:
-      - modeling.lme_validation_excl_outlier_stations
+    - modeling.lme_validation_excl_outlier_stations
     outs:
-      - models/lme/lme_full_model_excl_outlier_stations.pkl
-      - reports/lme/excl_outlier_stations/lme_fixed_effects.csv
-      - reports/lme/excl_outlier_stations/lme_model_summary.txt
+    - models/lme/lme_full_model_excl_outlier_stations.pkl
+    - reports/lme/excl_outlier_stations/lme_fixed_effects.csv
+    - reports/lme/excl_outlier_stations/lme_model_summary.txt
 
   fit_lme_model_random_slope_aod:
-    cmd: python scripts/modeling/lme/01_fit_lme_model.py --input data/training/processed/modeling_datasets/lme_ready_dataset.csv --model_output models/lme/lme_full_model_random_slope_aod.pkl --coef_output reports/lme/random_slope_aod/lme_fixed_effects.csv --summary_output reports/lme/random_slope_aod/lme_model_summary.txt --exclude_low_confidence false --random_slope_aod true
+    cmd: python scripts/modeling/lme/01_fit_lme_model.py --input 
+      data/training/processed/modeling_datasets/lme_ready_dataset.csv 
+      --model_output models/lme/lme_full_model_random_slope_aod.pkl 
+      --coef_output reports/lme/random_slope_aod/lme_fixed_effects.csv 
+      --summary_output reports/lme/random_slope_aod/lme_model_summary.txt 
+      --exclude_low_confidence false --random_slope_aod true
     deps:
-      - scripts/modeling/lme/01_fit_lme_model.py
-      - data/training/processed/modeling_datasets/lme_ready_dataset.csv
+    - scripts/modeling/lme/01_fit_lme_model.py
+    - data/training/processed/modeling_datasets/lme_ready_dataset.csv
     outs:
-      - models/lme/lme_full_model_random_slope_aod.pkl
-      - reports/lme/random_slope_aod/lme_fixed_effects.csv
-      - reports/lme/random_slope_aod/lme_model_summary.txt
+    - models/lme/lme_full_model_random_slope_aod.pkl
+    - reports/lme/random_slope_aod/lme_fixed_effects.csv
+    - reports/lme/random_slope_aod/lme_model_summary.txt
 
   fit_lme_model_raw_target:
-    cmd: python scripts/modeling/lme/01_fit_lme_model.py --input data/training/processed/modeling_datasets/lme_ready_dataset_raw_target.csv --model_output models/lme/lme_full_model_raw_target.pkl --coef_output reports/lme/primary_raw_target/lme_fixed_effects.csv --summary_output reports/lme/primary_raw_target/lme_model_summary.txt --exclude_low_confidence false --target_transform raw --run_tag raw_target
+    cmd: python scripts/modeling/lme/01_fit_lme_model.py --input 
+      data/training/processed/modeling_datasets/lme_ready_dataset_raw_target.csv
+      --model_output models/lme/lme_full_model_raw_target.pkl --coef_output 
+      reports/lme/primary_raw_target/lme_fixed_effects.csv --summary_output 
+      reports/lme/primary_raw_target/lme_model_summary.txt 
+      --exclude_low_confidence false --target_transform raw --run_tag raw_target
     deps:
-      - scripts/modeling/lme/01_fit_lme_model.py
-      - data/training/processed/modeling_datasets/lme_ready_dataset_raw_target.csv
+    - scripts/modeling/lme/01_fit_lme_model.py
+    - data/training/processed/modeling_datasets/lme_ready_dataset_raw_target.csv
     outs:
-      - models/lme/lme_full_model_raw_target.pkl
-      - reports/lme/primary_raw_target/lme_fixed_effects.csv
-      - reports/lme/primary_raw_target/lme_model_summary.txt
+    - models/lme/lme_full_model_raw_target.pkl
+    - reports/lme/primary_raw_target/lme_fixed_effects.csv
+    - reports/lme/primary_raw_target/lme_model_summary.txt
 
   validate_lme_cv_raw_target:
-    cmd: python scripts/modeling/lme/02_validate_lme_cv.py --input data/training/processed/modeling_datasets/lme_ready_dataset_raw_target.csv --station_file data/stations/cpcb_stations_delhi_status.csv --buffer_km 2.0 --n_random_folds 42 --random_seed 42 --exclude_low_confidence false --target_transform raw --run_tag raw_target --output_dir reports/lme/primary_raw_target
+    cmd: python scripts/modeling/lme/02_validate_lme_cv.py --input 
+      data/training/processed/modeling_datasets/lme_ready_dataset_raw_target.csv
+      --station_file data/stations/cpcb_stations_delhi_status.csv --buffer_km 
+      2.0 --n_random_folds 42 --random_seed 42 --exclude_low_confidence false 
+      --target_transform raw --run_tag raw_target --output_dir 
+      reports/lme/primary_raw_target
     deps:
-      - scripts/modeling/lme/02_validate_lme_cv.py
-      - data/training/processed/modeling_datasets/lme_ready_dataset_raw_target.csv
-      - data/stations/cpcb_stations_delhi_status.csv
+    - scripts/modeling/lme/02_validate_lme_cv.py
+    - data/training/processed/modeling_datasets/lme_ready_dataset_raw_target.csv
+    - data/stations/cpcb_stations_delhi_status.csv
     params:
-      - modeling.lme_validation
+    - modeling.lme_validation
     outs:
-      - reports/lme/primary_raw_target/station_buffer_exclusions.csv
-      - reports/lme/primary_raw_target/cv_spatial_loso_folds.csv
-      - reports/lme/primary_raw_target/cv_spatial_loso_aggregated.json
-      - reports/lme/primary_raw_target/cv_random_folds.csv
-      - reports/lme/primary_raw_target/cv_random_aggregated.json
+    - reports/lme/primary_raw_target/station_buffer_exclusions.csv
+    - reports/lme/primary_raw_target/cv_spatial_loso_folds.csv
+    - reports/lme/primary_raw_target/cv_spatial_loso_aggregated.json
+    - reports/lme/primary_raw_target/cv_random_folds.csv
+    - reports/lme/primary_raw_target/cv_random_aggregated.json
 
   validate_lme_cv:
-    cmd: python scripts/modeling/lme/02_validate_lme_cv.py --input data/training/processed/modeling_datasets/lme_ready_dataset.csv --station_file data/stations/cpcb_stations_delhi_status.csv --buffer_km 2.0 --n_random_folds 42 --random_seed 42 --exclude_low_confidence false --output_dir reports/lme/primary_log_target
+    cmd: python scripts/modeling/lme/02_validate_lme_cv.py --input 
+      data/training/processed/modeling_datasets/lme_ready_dataset.csv 
+      --station_file data/stations/cpcb_stations_delhi_status.csv --buffer_km 
+      2.0 --n_random_folds 42 --random_seed 42 --exclude_low_confidence false 
+      --output_dir reports/lme/primary_log_target
     deps:
-      - scripts/modeling/lme/02_validate_lme_cv.py
-      - data/training/processed/modeling_datasets/lme_ready_dataset.csv
-      - data/stations/cpcb_stations_delhi_status.csv
+    - scripts/modeling/lme/02_validate_lme_cv.py
+    - data/training/processed/modeling_datasets/lme_ready_dataset.csv
+    - data/stations/cpcb_stations_delhi_status.csv
     params:
-      - modeling.lme_validation
+    - modeling.lme_validation
     outs:
-      - reports/lme/primary_log_target/station_buffer_exclusions.csv
-      - reports/lme/primary_log_target/cv_spatial_loso_folds.csv
-      - reports/lme/primary_log_target/cv_spatial_loso_aggregated.json
-      - reports/lme/primary_log_target/cv_random_folds.csv
-      - reports/lme/primary_log_target/cv_random_aggregated.json
+    - reports/lme/primary_log_target/station_buffer_exclusions.csv
+    - reports/lme/primary_log_target/cv_spatial_loso_folds.csv
+    - reports/lme/primary_log_target/cv_spatial_loso_aggregated.json
+    - reports/lme/primary_log_target/cv_random_folds.csv
+    - reports/lme/primary_log_target/cv_random_aggregated.json
 
   validate_lme_cv_gapfill_robustness:
-    cmd: python scripts/modeling/lme/02_validate_lme_cv.py --input data/training/processed/modeling_datasets/lme_ready_dataset.csv --station_file data/stations/cpcb_stations_delhi_status.csv --buffer_km 2.0 --n_random_folds 42 --random_seed 42 --exclude_low_confidence true --output_dir reports/lme/gapfill_robustness
+    cmd: python scripts/modeling/lme/02_validate_lme_cv.py --input 
+      data/training/processed/modeling_datasets/lme_ready_dataset.csv 
+      --station_file data/stations/cpcb_stations_delhi_status.csv --buffer_km 
+      2.0 --n_random_folds 42 --random_seed 42 --exclude_low_confidence true 
+      --output_dir reports/lme/gapfill_robustness
     deps:
-      - scripts/modeling/lme/02_validate_lme_cv.py
-      - data/training/processed/modeling_datasets/lme_ready_dataset.csv
-      - data/stations/cpcb_stations_delhi_status.csv
+    - scripts/modeling/lme/02_validate_lme_cv.py
+    - data/training/processed/modeling_datasets/lme_ready_dataset.csv
+    - data/stations/cpcb_stations_delhi_status.csv
     params:
-      - modeling.lme_validation
+    - modeling.lme_validation
     outs:
-      - reports/lme/gapfill_robustness/cv_spatial_loso_folds.csv
-      - reports/lme/gapfill_robustness/cv_spatial_loso_aggregated.json
+    - reports/lme/gapfill_robustness/cv_spatial_loso_folds.csv
+    - reports/lme/gapfill_robustness/cv_spatial_loso_aggregated.json
 
   winsorize_aod_dataset:
-    cmd: python scripts/modeling/lme/03_winsorize_aod.py --input data/training/processed/modeling_datasets/lme_ready_dataset.csv --output data/training/processed/modeling_datasets/lme_ready_dataset_aod_winsorized.csv --zscore_cap 3.0
+    cmd: python scripts/modeling/lme/03_winsorize_aod.py --input 
+      data/training/processed/modeling_datasets/lme_ready_dataset.csv --output 
+      data/training/processed/modeling_datasets/lme_ready_dataset_aod_winsorized.csv
+      --zscore_cap 3.0
     deps:
-      - scripts/modeling/lme/03_winsorize_aod.py
-      - data/training/processed/modeling_datasets/lme_ready_dataset.csv
+    - scripts/modeling/lme/03_winsorize_aod.py
+    - data/training/processed/modeling_datasets/lme_ready_dataset.csv
     params:
-      - modeling.lme_winsorize
+    - modeling.lme_winsorize
     outs:
-      - data/training/processed/modeling_datasets/lme_ready_dataset_aod_winsorized.csv
+    - data/training/processed/modeling_datasets/lme_ready_dataset_aod_winsorized.csv
 
   validate_lme_cv_aod_winsorized:
-    cmd: python scripts/modeling/lme/02_validate_lme_cv.py --input data/training/processed/modeling_datasets/lme_ready_dataset_aod_winsorized.csv --station_file data/stations/cpcb_stations_delhi_status.csv --buffer_km 2.0 --n_random_folds 42 --random_seed 42 --exclude_low_confidence false --run_tag aod_winsorized --output_dir reports/lme/aod_winsorized
+    cmd: python scripts/modeling/lme/02_validate_lme_cv.py --input 
+      data/training/processed/modeling_datasets/lme_ready_dataset_aod_winsorized.csv
+      --station_file data/stations/cpcb_stations_delhi_status.csv --buffer_km 
+      2.0 --n_random_folds 42 --random_seed 42 --exclude_low_confidence false 
+      --run_tag aod_winsorized --output_dir reports/lme/aod_winsorized
     deps:
-      - scripts/modeling/lme/02_validate_lme_cv.py
-      - data/training/processed/modeling_datasets/lme_ready_dataset_aod_winsorized.csv
-      - data/stations/cpcb_stations_delhi_status.csv
+    - scripts/modeling/lme/02_validate_lme_cv.py
+    - data/training/processed/modeling_datasets/lme_ready_dataset_aod_winsorized.csv
+    - data/stations/cpcb_stations_delhi_status.csv
     params:
-      - modeling.lme_validation
+    - modeling.lme_validation
     outs:
-      - reports/lme/aod_winsorized/station_buffer_exclusions.csv
-      - reports/lme/aod_winsorized/cv_spatial_loso_folds.csv
-      - reports/lme/aod_winsorized/cv_spatial_loso_aggregated.json
-      - reports/lme/aod_winsorized/cv_random_folds.csv
-      - reports/lme/aod_winsorized/cv_random_aggregated.json
+    - reports/lme/aod_winsorized/station_buffer_exclusions.csv
+    - reports/lme/aod_winsorized/cv_spatial_loso_folds.csv
+    - reports/lme/aod_winsorized/cv_spatial_loso_aggregated.json
+    - reports/lme/aod_winsorized/cv_random_folds.csv
+    - reports/lme/aod_winsorized/cv_random_aggregated.json
 
   validate_lme_cv_excl_outlier_stations:
-    cmd: python scripts/modeling/lme/02_validate_lme_cv.py --input data/training/processed/modeling_datasets/lme_ready_dataset.csv --station_file data/stations/cpcb_stations_delhi_status.csv --buffer_km 2.0 --n_random_folds 42 --random_seed 42 --exclude_low_confidence false --exclude_stations 5598,6934 --run_tag excl_outlier_stations --output_dir reports/lme/excl_outlier_stations
+    cmd: python scripts/modeling/lme/02_validate_lme_cv.py --input 
+      data/training/processed/modeling_datasets/lme_ready_dataset.csv 
+      --station_file data/stations/cpcb_stations_delhi_status.csv --buffer_km 
+      2.0 --n_random_folds 42 --random_seed 42 --exclude_low_confidence false 
+      --exclude_stations 5598,6934 --run_tag excl_outlier_stations --output_dir 
+      reports/lme/excl_outlier_stations
     deps:
-      - scripts/modeling/lme/02_validate_lme_cv.py
-      - data/training/processed/modeling_datasets/lme_ready_dataset.csv
-      - data/stations/cpcb_stations_delhi_status.csv
+    - scripts/modeling/lme/02_validate_lme_cv.py
+    - data/training/processed/modeling_datasets/lme_ready_dataset.csv
+    - data/stations/cpcb_stations_delhi_status.csv
     params:
-      - modeling.lme_validation
-      - modeling.lme_validation_excl_outlier_stations
+    - modeling.lme_validation
+    - modeling.lme_validation_excl_outlier_stations
     outs:
-      - reports/lme/excl_outlier_stations/station_buffer_exclusions.csv
-      - reports/lme/excl_outlier_stations/cv_spatial_loso_folds.csv
-      - reports/lme/excl_outlier_stations/cv_spatial_loso_aggregated.json
-      - reports/lme/excl_outlier_stations/cv_random_folds.csv
-      - reports/lme/excl_outlier_stations/cv_random_aggregated.json
+    - reports/lme/excl_outlier_stations/station_buffer_exclusions.csv
+    - reports/lme/excl_outlier_stations/cv_spatial_loso_folds.csv
+    - reports/lme/excl_outlier_stations/cv_spatial_loso_aggregated.json
+    - reports/lme/excl_outlier_stations/cv_random_folds.csv
+    - reports/lme/excl_outlier_stations/cv_random_aggregated.json
 
   validate_lme_cv_random_slope_aod:
-    cmd: python scripts/modeling/lme/02_validate_lme_cv.py --input data/training/processed/modeling_datasets/lme_ready_dataset.csv --station_file data/stations/cpcb_stations_delhi_status.csv --buffer_km 2.0 --n_random_folds 42 --random_seed 42 --exclude_low_confidence false --random_slope_aod true --output_dir reports/lme/random_slope_aod
+    cmd: python scripts/modeling/lme/02_validate_lme_cv.py --input 
+      data/training/processed/modeling_datasets/lme_ready_dataset.csv 
+      --station_file data/stations/cpcb_stations_delhi_status.csv --buffer_km 
+      2.0 --n_random_folds 42 --random_seed 42 --exclude_low_confidence false 
+      --random_slope_aod true --output_dir reports/lme/random_slope_aod
     deps:
-      - scripts/modeling/lme/02_validate_lme_cv.py
-      - data/training/processed/modeling_datasets/lme_ready_dataset.csv
-      - data/stations/cpcb_stations_delhi_status.csv
+    - scripts/modeling/lme/02_validate_lme_cv.py
+    - data/training/processed/modeling_datasets/lme_ready_dataset.csv
+    - data/stations/cpcb_stations_delhi_status.csv
     params:
-      - modeling.lme_validation
+    - modeling.lme_validation
     outs:
-      - reports/lme/random_slope_aod/station_buffer_exclusions.csv
-      - reports/lme/random_slope_aod/cv_spatial_loso_folds.csv
-      - reports/lme/random_slope_aod/cv_spatial_loso_aggregated.json
-      - reports/lme/random_slope_aod/cv_random_folds.csv
-      - reports/lme/random_slope_aod/cv_random_aggregated.json
+    - reports/lme/random_slope_aod/station_buffer_exclusions.csv
+    - reports/lme/random_slope_aod/cv_spatial_loso_folds.csv
+    - reports/lme/random_slope_aod/cv_spatial_loso_aggregated.json
+    - reports/lme/random_slope_aod/cv_random_folds.csv
+    - reports/lme/random_slope_aod/cv_random_aggregated.json
 
   # ============================================================
   # Modeling: LightGBM tune + fit + validate (scripts/modeling/lightgbm/)
   # ============================================================
 
   tune_lightgbm_hyperparameters:
-    cmd: python scripts/modeling/lightgbm/00_tune_lightgbm_hyperparameters.py --input data/training/processed/modeling_datasets/lightgbm_ready_dataset.csv --station_file data/stations/cpcb_stations_delhi_status.csv --buffer_km 2.0 --n_blocks 6 --n_inner_folds 5 --n_trials 100 --learning_rate 0.03 --max_boosting_rounds 3000 --early_stopping_rounds 100 --random_seed 42 --output models/lightgbm/tuned_hyperparameters.json --block_output reports/lightgbm/tuning/station_tuning_blocks.csv --trials_output reports/lightgbm/tuning/optuna_trials.csv
+    cmd: python scripts/modeling/lightgbm/00_tune_lightgbm_hyperparameters.py 
+      --input 
+      data/training/processed/modeling_datasets/lightgbm_ready_dataset.csv 
+      --station_file data/stations/cpcb_stations_delhi_status.csv --buffer_km 
+      2.0 --n_blocks 6 --n_inner_folds 5 --n_trials 100 --learning_rate 0.03 
+      --max_boosting_rounds 3000 --early_stopping_rounds 100 --random_seed 42 
+      --output models/lightgbm/tuned_hyperparameters.json --block_output 
+      reports/lightgbm/tuning/station_tuning_blocks.csv --trials_output 
+      reports/lightgbm/tuning/optuna_trials.csv
     deps:
-      - scripts/modeling/lightgbm/00_tune_lightgbm_hyperparameters.py
-      - data/training/processed/modeling_datasets/lightgbm_ready_dataset.csv
-      - data/stations/cpcb_stations_delhi_status.csv
+    - data/stations/cpcb_stations_delhi_status.csv
+    - data/training/processed/modeling_datasets/lightgbm_ready_dataset.csv
+    - scripts/modeling/lightgbm/00_tune_lightgbm_hyperparameters.py
     params:
-      - modeling.lightgbm_tuning
+    - modeling.lightgbm_tuning
     outs:
-      - models/lightgbm/tuned_hyperparameters.json
-      - reports/lightgbm/tuning/station_tuning_blocks.csv
-      - reports/lightgbm/tuning/optuna_trials.csv
+    - models/lightgbm/tuned_hyperparameters.json
+    - reports/lightgbm/tuning/optuna_trials.csv
+    - reports/lightgbm/tuning/station_tuning_blocks.csv
 
   fit_lightgbm_model:
-    cmd: python scripts/modeling/lightgbm/01_fit_lightgbm_model.py --input data/training/processed/modeling_datasets/lightgbm_ready_dataset.csv --hyperparameters models/lightgbm/tuned_hyperparameters.json --model_output models/lightgbm/lightgbm_full_model.txt --importance_output reports/lightgbm/primary/lightgbm_feature_importance.csv --summary_output reports/lightgbm/primary/lightgbm_model_summary.txt --learning_rate 0.03 --max_boosting_rounds 3000 --early_stopping_rounds 100 --validation_station_fraction 0.15 --random_seed 42
+    cmd: python scripts/modeling/lightgbm/01_fit_lightgbm_model.py --input 
+      data/training/processed/modeling_datasets/lightgbm_ready_dataset.csv 
+      --hyperparameters models/lightgbm/tuned_hyperparameters.json 
+      --model_output models/lightgbm/lightgbm_full_model.txt --importance_output
+      reports/lightgbm/primary/lightgbm_feature_importance.csv --summary_output 
+      reports/lightgbm/primary/lightgbm_model_summary.txt --learning_rate 0.03 
+      --max_boosting_rounds 3000 --early_stopping_rounds 100 
+      --validation_station_fraction 0.15 --random_seed 42
     deps:
-      - scripts/modeling/lightgbm/01_fit_lightgbm_model.py
-      - data/training/processed/modeling_datasets/lightgbm_ready_dataset.csv
-      - models/lightgbm/tuned_hyperparameters.json
+    - scripts/modeling/lightgbm/01_fit_lightgbm_model.py
+    - data/training/processed/modeling_datasets/lightgbm_ready_dataset.csv
+    - models/lightgbm/tuned_hyperparameters.json
     params:
-      - modeling.lightgbm_fit
+    - modeling.lightgbm_fit
     outs:
-      - models/lightgbm/lightgbm_full_model.txt
-      - reports/lightgbm/primary/lightgbm_feature_importance.csv
-      - reports/lightgbm/primary/lightgbm_model_summary.txt
+    - models/lightgbm/lightgbm_full_model.txt
+    - reports/lightgbm/primary/lightgbm_feature_importance.csv
+    - reports/lightgbm/primary/lightgbm_model_summary.txt
 
   validate_lightgbm_cv:
-    cmd: python scripts/modeling/lightgbm/02_validate_lightgbm_cv.py --input data/training/processed/modeling_datasets/lightgbm_ready_dataset.csv --station_file data/stations/cpcb_stations_delhi_status.csv --hyperparameters models/lightgbm/tuned_hyperparameters.json --buffer_km 2.0 --n_random_folds 42 --random_seed 42 --learning_rate 0.03 --max_boosting_rounds 3000 --early_stopping_rounds 100 --validation_station_fraction 0.15 --validation_row_fraction 0.15 --output_dir reports/lightgbm/primary
+    cmd: python scripts/modeling/lightgbm/02_validate_lightgbm_cv.py --input 
+      data/training/processed/modeling_datasets/lightgbm_ready_dataset.csv 
+      --station_file data/stations/cpcb_stations_delhi_status.csv 
+      --hyperparameters models/lightgbm/tuned_hyperparameters.json --buffer_km 
+      2.0 --n_random_folds 42 --random_seed 42 --learning_rate 0.03 
+      --max_boosting_rounds 3000 --early_stopping_rounds 100 
+      --validation_station_fraction 0.15 --validation_row_fraction 0.15 
+      --output_dir reports/lightgbm/primary
     deps:
-      - scripts/modeling/lightgbm/02_validate_lightgbm_cv.py
-      - data/training/processed/modeling_datasets/lightgbm_ready_dataset.csv
-      - data/stations/cpcb_stations_delhi_status.csv
-      - models/lightgbm/tuned_hyperparameters.json
+    - scripts/modeling/lightgbm/02_validate_lightgbm_cv.py
+    - data/training/processed/modeling_datasets/lightgbm_ready_dataset.csv
+    - data/stations/cpcb_stations_delhi_status.csv
+    - models/lightgbm/tuned_hyperparameters.json
     params:
-      - modeling.lightgbm_validation
+    - modeling.lightgbm_validation
     outs:
-      - reports/lightgbm/primary/station_buffer_exclusions.csv
-      - reports/lightgbm/primary/cv_spatial_loso_folds.csv
-      - reports/lightgbm/primary/cv_spatial_loso_oof_predictions.csv
-      - reports/lightgbm/primary/cv_spatial_loso_aggregated.json
-      - reports/lightgbm/primary/cv_random_folds.csv
-      - reports/lightgbm/primary/cv_random_oof_predictions.csv
-      - reports/lightgbm/primary/cv_random_aggregated.json
+    - reports/lightgbm/primary/station_buffer_exclusions.csv
+    - reports/lightgbm/primary/cv_spatial_loso_folds.csv
+    - reports/lightgbm/primary/cv_spatial_loso_oof_predictions.csv
+    - reports/lightgbm/primary/cv_spatial_loso_aggregated.json
+    - reports/lightgbm/primary/cv_random_folds.csv
+    - reports/lightgbm/primary/cv_random_oof_predictions.csv
+    - reports/lightgbm/primary/cv_random_aggregated.json
 
   diagnose_lightgbm_aod_coupling:
-    cmd: python scripts/modeling/lightgbm/03_diagnose_aod_coupling.py --input data/training/processed/modeling_datasets/lightgbm_ready_dataset.csv --folds reports/lightgbm/primary/cv_spatial_loso_folds.csv --n_exclude 4 --coupling_output reports/lightgbm/diagnostics/station_aod_coupling.csv --test_output reports/lightgbm/diagnostics/aod_coupling_hypothesis_test.json
+    cmd: python scripts/modeling/lightgbm/03_diagnose_aod_coupling.py --input 
+      data/training/processed/modeling_datasets/lightgbm_ready_dataset.csv 
+      --folds reports/lightgbm/primary/cv_spatial_loso_folds.csv --n_exclude 4 
+      --coupling_output reports/lightgbm/diagnostics/station_aod_coupling.csv 
+      --test_output 
+      reports/lightgbm/diagnostics/aod_coupling_hypothesis_test.json
     deps:
-      - scripts/modeling/lightgbm/03_diagnose_aod_coupling.py
-      - data/training/processed/modeling_datasets/lightgbm_ready_dataset.csv
-      - reports/lightgbm/primary/cv_spatial_loso_folds.csv
+    - scripts/modeling/lightgbm/03_diagnose_aod_coupling.py
+    - data/training/processed/modeling_datasets/lightgbm_ready_dataset.csv
+    - reports/lightgbm/primary/cv_spatial_loso_folds.csv
     params:
-      - modeling.lightgbm_diagnostics
+    - modeling.lightgbm_diagnostics
     outs:
-      - reports/lightgbm/diagnostics/station_aod_coupling.csv
-      - reports/lightgbm/diagnostics/aod_coupling_hypothesis_test.json
+    - reports/lightgbm/diagnostics/station_aod_coupling.csv
+    - reports/lightgbm/diagnostics/aod_coupling_hypothesis_test.json
 
   calibrate_lightgbm_conformal_intervals:
-    cmd: python scripts/modeling/lightgbm/04_calibrate_conformal_intervals.py --oof_input reports/lightgbm/primary/cv_spatial_loso_oof_predictions.csv --calibration_output reports/lightgbm/primary/conformal_calibration.json --diagnostics_output reports/lightgbm/primary/conformal_heldout_coverage.csv
+    cmd: python scripts/modeling/lightgbm/04_calibrate_conformal_intervals.py 
+      --oof_input reports/lightgbm/primary/cv_spatial_loso_oof_predictions.csv 
+      --calibration_output reports/lightgbm/primary/conformal_calibration.json 
+      --diagnostics_output 
+      reports/lightgbm/primary/conformal_heldout_coverage.csv
     deps:
-      - scripts/modeling/lightgbm/04_calibrate_conformal_intervals.py
-      - reports/lightgbm/primary/cv_spatial_loso_oof_predictions.csv
+    - scripts/modeling/lightgbm/04_calibrate_conformal_intervals.py
+    - reports/lightgbm/primary/cv_spatial_loso_oof_predictions.csv
     outs:
-      - reports/lightgbm/primary/conformal_calibration.json
-      - reports/lightgbm/primary/conformal_heldout_coverage.csv
+    - reports/lightgbm/primary/conformal_calibration.json
+    - reports/lightgbm/primary/conformal_heldout_coverage.csv
 
   validate_lightgbm_cv_excl_weak_aod_coupling:
-    cmd: python scripts/modeling/lightgbm/02_validate_lightgbm_cv.py --input data/training/processed/modeling_datasets/lightgbm_ready_dataset.csv --station_file data/stations/cpcb_stations_delhi_status.csv --hyperparameters models/lightgbm/tuned_hyperparameters.json --buffer_km 2.0 --n_random_folds 42 --random_seed 42 --learning_rate 0.03 --max_boosting_rounds 3000 --early_stopping_rounds 100 --validation_station_fraction 0.15 --validation_row_fraction 0.15 --exclude_stations 5622,5630,6359,7005 --run_tag excl_weak_aod_coupling --output_dir reports/lightgbm/excl_weak_aod_coupling
+    cmd: python scripts/modeling/lightgbm/02_validate_lightgbm_cv.py --input 
+      data/training/processed/modeling_datasets/lightgbm_ready_dataset.csv 
+      --station_file data/stations/cpcb_stations_delhi_status.csv 
+      --hyperparameters models/lightgbm/tuned_hyperparameters.json --buffer_km 
+      2.0 --n_random_folds 42 --random_seed 42 --learning_rate 0.03 
+      --max_boosting_rounds 3000 --early_stopping_rounds 100 
+      --validation_station_fraction 0.15 --validation_row_fraction 0.15 
+      --exclude_stations 5622,5630,6359,7005 --run_tag excl_weak_aod_coupling 
+      --output_dir reports/lightgbm/excl_weak_aod_coupling
     deps:
-      - scripts/modeling/lightgbm/02_validate_lightgbm_cv.py
-      - data/training/processed/modeling_datasets/lightgbm_ready_dataset.csv
-      - data/stations/cpcb_stations_delhi_status.csv
-      - models/lightgbm/tuned_hyperparameters.json
+    - scripts/modeling/lightgbm/02_validate_lightgbm_cv.py
+    - data/training/processed/modeling_datasets/lightgbm_ready_dataset.csv
+    - data/stations/cpcb_stations_delhi_status.csv
+    - models/lightgbm/tuned_hyperparameters.json
     params:
-      - modeling.lightgbm_validation
-      - modeling.lightgbm_validation_excl_weak_aod_coupling
+    - modeling.lightgbm_validation
+    - modeling.lightgbm_validation_excl_weak_aod_coupling
     outs:
-      - reports/lightgbm/excl_weak_aod_coupling/station_buffer_exclusions.csv
-      - reports/lightgbm/excl_weak_aod_coupling/cv_spatial_loso_folds.csv
-      - reports/lightgbm/excl_weak_aod_coupling/cv_spatial_loso_oof_predictions.csv
-      - reports/lightgbm/excl_weak_aod_coupling/cv_spatial_loso_aggregated.json
-      - reports/lightgbm/excl_weak_aod_coupling/cv_random_folds.csv
-      - reports/lightgbm/excl_weak_aod_coupling/cv_random_oof_predictions.csv
-      - reports/lightgbm/excl_weak_aod_coupling/cv_random_aggregated.json
+    - reports/lightgbm/excl_weak_aod_coupling/station_buffer_exclusions.csv
+    - reports/lightgbm/excl_weak_aod_coupling/cv_spatial_loso_folds.csv
+    - reports/lightgbm/excl_weak_aod_coupling/cv_spatial_loso_oof_predictions.csv
+    - reports/lightgbm/excl_weak_aod_coupling/cv_spatial_loso_aggregated.json
+    - reports/lightgbm/excl_weak_aod_coupling/cv_random_folds.csv
+    - reports/lightgbm/excl_weak_aod_coupling/cv_random_oof_predictions.csv
+    - reports/lightgbm/excl_weak_aod_coupling/cv_random_aggregated.json
 
   validate_lightgbm_cv_excl_weak_aod_from_training:
-    cmd: python scripts/modeling/lightgbm/02_validate_lightgbm_cv.py --input data/training/processed/modeling_datasets/lightgbm_ready_dataset.csv --station_file data/stations/cpcb_stations_delhi_status.csv --hyperparameters models/lightgbm/tuned_hyperparameters.json --buffer_km 2.0 --n_random_folds 42 --random_seed 42 --learning_rate 0.03 --max_boosting_rounds 3000 --early_stopping_rounds 100 --validation_station_fraction 0.15 --validation_row_fraction 0.15 --exclude_stations 5622,5630,6359,7005 --exclude_from_training_only true --run_tag excl_weak_aod_from_training --output_dir reports/lightgbm/excl_weak_aod_from_training
+    cmd: python scripts/modeling/lightgbm/02_validate_lightgbm_cv.py --input 
+      data/training/processed/modeling_datasets/lightgbm_ready_dataset.csv 
+      --station_file data/stations/cpcb_stations_delhi_status.csv 
+      --hyperparameters models/lightgbm/tuned_hyperparameters.json --buffer_km 
+      2.0 --n_random_folds 42 --random_seed 42 --learning_rate 0.03 
+      --max_boosting_rounds 3000 --early_stopping_rounds 100 
+      --validation_station_fraction 0.15 --validation_row_fraction 0.15 
+      --exclude_stations 5622,5630,6359,7005 --exclude_from_training_only true 
+      --run_tag excl_weak_aod_from_training --output_dir 
+      reports/lightgbm/excl_weak_aod_from_training
     deps:
-      - scripts/modeling/lightgbm/02_validate_lightgbm_cv.py
-      - data/training/processed/modeling_datasets/lightgbm_ready_dataset.csv
-      - data/stations/cpcb_stations_delhi_status.csv
-      - models/lightgbm/tuned_hyperparameters.json
+    - scripts/modeling/lightgbm/02_validate_lightgbm_cv.py
+    - data/training/processed/modeling_datasets/lightgbm_ready_dataset.csv
+    - data/stations/cpcb_stations_delhi_status.csv
+    - models/lightgbm/tuned_hyperparameters.json
     params:
-      - modeling.lightgbm_validation
-      - modeling.lightgbm_validation_excl_weak_aod_from_training
+    - modeling.lightgbm_validation
+    - modeling.lightgbm_validation_excl_weak_aod_from_training
     outs:
-      - reports/lightgbm/excl_weak_aod_from_training/station_buffer_exclusions.csv
-      - reports/lightgbm/excl_weak_aod_from_training/cv_spatial_loso_folds.csv
-      - reports/lightgbm/excl_weak_aod_from_training/cv_spatial_loso_oof_predictions.csv
-      - reports/lightgbm/excl_weak_aod_from_training/cv_spatial_loso_aggregated.json
-      - reports/lightgbm/excl_weak_aod_from_training/cv_random_folds.csv
-      - reports/lightgbm/excl_weak_aod_from_training/cv_random_oof_predictions.csv
-      - reports/lightgbm/excl_weak_aod_from_training/cv_random_aggregated.json
+    - reports/lightgbm/excl_weak_aod_from_training/station_buffer_exclusions.csv
+    - reports/lightgbm/excl_weak_aod_from_training/cv_spatial_loso_folds.csv
+    - reports/lightgbm/excl_weak_aod_from_training/cv_spatial_loso_oof_predictions.csv
+    - reports/lightgbm/excl_weak_aod_from_training/cv_spatial_loso_aggregated.json
+    - reports/lightgbm/excl_weak_aod_from_training/cv_random_folds.csv
+    - reports/lightgbm/excl_weak_aod_from_training/cv_random_oof_predictions.csv
+    - reports/lightgbm/excl_weak_aod_from_training/cv_random_aggregated.json
 
   # ============================================================
   # Validation — add stages here once scripts/validation/ has content
   # e.g. per-airshed out-of-site CV, depends on models/
   # ============================================================
 
+
+  # ============================================================
+  # Prediction pipeline (step 6+). Everything here writes under
+  # data/prediction/; data/training/ is never touched.
+  #
+  # The per-source feature extractors are the SAME scripts the training stages
+  # use, invoked with the grid in place of the station roster. That is
+  # deliberate: the model was fitted on features those exact scripts produced,
+  # so a separate copy of the computation would drift and silently feed it a
+  # different quantity. Only genuinely prediction-specific logic lives in
+  # scripts/prediction/.
+  # ============================================================
+
+  predict_build_grid:
+    cmd: python scripts/prediction/grid/01_build_grid.py --stations 
+      data/stations/cpcb_stations_delhi_status.csv --output 
+      data/prediction/processed/grid_1km_delhi.csv --summary_output 
+      data/prediction/interim/grid_1km_build_summary.csv
+    deps:
+    - scripts/prediction/grid/01_build_grid.py
+    - data/stations/cpcb_stations_delhi_status.csv
+    params:
+    - prediction.grid
+    outs:
+    - data/prediction/processed/grid_1km_delhi.csv
+    - data/prediction/interim/grid_1km_build_summary.csv
+
+  # Frozen once it has run, like the 12 training external-fetch stages: OSM
+  # changes continuously, so re-querying would silently change the features
+  # under a fixed model. Unfreeze deliberately to refresh the snapshot.
+  predict_download_osm:
+    frozen: true
+    cmd: python scripts/prediction/features/01_download_osm_extract.py 
+      --roads_output data/prediction/raw/osm/roads.geojson --industrial_output 
+      data/prediction/raw/osm/industrial_landuse.geojson --powerplants_output 
+      data/prediction/raw/osm/power_plants.geojson --summary_output 
+      data/prediction/raw/osm/osm_export_summary.csv --parts_dir 
+      data/prediction/interim/osm_tiles
+    deps:
+    - scripts/prediction/features/01_download_osm_extract.py
+    params:
+    - prediction.osm_export
+    outs:
+    - data/prediction/raw/osm/roads.geojson
+    - data/prediction/raw/osm/industrial_landuse.geojson
+    - data/prediction/raw/osm/power_plants.geojson
+    - data/prediction/raw/osm/osm_export_summary.csv
+
+  predict_extract_road_lengths:
+    cmd: python scripts/datasets/osm/01_extract_road_lengths.py --station_file 
+      data/prediction/processed/grid_1km_delhi.csv --roads_geojson 
+      data/prediction/raw/osm/roads.geojson --buffer_radius_m 1000 --output 
+      data/prediction/raw/osm_features/road_lengths_raw.csv --summary_output 
+      data/prediction/raw/osm_features/road_lengths_extraction_summary.csv
+    deps:
+    - scripts/datasets/osm/01_extract_road_lengths.py
+    - data/prediction/raw/osm/roads.geojson
+    - data/prediction/processed/grid_1km_delhi.csv
+    outs:
+    - data/prediction/raw/osm_features/road_lengths_raw.csv
+    - data/prediction/raw/osm_features/road_lengths_extraction_summary.csv
+
+  predict_qc_roads:
+    cmd: python scripts/datasets/osm/02_qc_roads.py --input 
+      data/prediction/raw/osm_features/road_lengths_raw.csv --station_file 
+      data/prediction/processed/grid_1km_delhi.csv 
+      --max_plausible_density_km_per_km2 50 --output 
+      data/prediction/interim/osm_features/road_qc_summary.csv
+    deps:
+    - scripts/datasets/osm/02_qc_roads.py
+    - data/prediction/raw/osm_features/road_lengths_raw.csv
+    - data/prediction/processed/grid_1km_delhi.csv
+    outs:
+    - data/prediction/interim/osm_features/road_qc_summary.csv
+
+  predict_compute_road_density:
+    cmd: python scripts/datasets/osm/03_compute_road_density.py --input 
+      data/prediction/raw/osm_features/road_lengths_raw.csv --output 
+      data/prediction/processed/features/road_density.csv
+    deps:
+    - scripts/datasets/osm/03_compute_road_density.py
+    - data/prediction/raw/osm_features/road_lengths_raw.csv
+    - data/prediction/interim/osm_features/road_qc_summary.csv
+    outs:
+    - data/prediction/processed/features/road_density.csv
+
+  predict_extract_industrial_area:
+    cmd: python scripts/datasets/osm/04_extract_industrial_area.py 
+      --station_file data/prediction/processed/grid_1km_delhi.csv 
+      --industrial_geojson data/prediction/raw/osm/industrial_landuse.geojson 
+      --buffer_radius_m 1000 --output 
+      data/prediction/raw/osm_features/industrial_area_raw.csv --summary_output 
+      data/prediction/raw/osm_features/industrial_area_extraction_summary.csv
+    deps:
+    - scripts/datasets/osm/04_extract_industrial_area.py
+    - data/prediction/raw/osm/industrial_landuse.geojson
+    - data/prediction/processed/grid_1km_delhi.csv
+    outs:
+    - data/prediction/raw/osm_features/industrial_area_raw.csv
+    - data/prediction/raw/osm_features/industrial_area_extraction_summary.csv
+
+  predict_qc_industrial:
+    cmd: python scripts/datasets/osm/05_qc_industrial.py --input 
+      data/prediction/raw/osm_features/industrial_area_raw.csv --station_file 
+      data/prediction/processed/grid_1km_delhi.csv --output 
+      data/prediction/interim/osm_features/industrial_qc_summary.csv
+    deps:
+    - scripts/datasets/osm/05_qc_industrial.py
+    - data/prediction/raw/osm_features/industrial_area_raw.csv
+    - data/prediction/processed/grid_1km_delhi.csv
+    outs:
+    - data/prediction/interim/osm_features/industrial_qc_summary.csv
+
+  predict_compute_industrial_fraction:
+    cmd: python scripts/datasets/osm/06_compute_industrial_fraction.py --input 
+      data/prediction/raw/osm_features/industrial_area_raw.csv --output 
+      data/prediction/processed/features/industrial_fraction.csv
+    deps:
+    - scripts/datasets/osm/06_compute_industrial_fraction.py
+    - data/prediction/raw/osm_features/industrial_area_raw.csv
+    - data/prediction/interim/osm_features/industrial_qc_summary.csv
+    outs:
+    - data/prediction/processed/features/industrial_fraction.csv
+
+  predict_extract_powerplant_distances:
+    cmd: python scripts/datasets/osm/07_extract_powerplant_distances.py 
+      --station_file data/prediction/processed/grid_1km_delhi.csv 
+      --powerplants_geojson data/prediction/raw/osm/power_plants.geojson 
+      --output data/prediction/raw/osm_features/powerplant_distances_raw.csv 
+      --summary_output 
+      data/prediction/raw/osm_features/powerplant_distances_extraction_summary.csv
+    deps:
+    - scripts/datasets/osm/07_extract_powerplant_distances.py
+    - data/prediction/raw/osm/power_plants.geojson
+    - data/prediction/processed/grid_1km_delhi.csv
+    outs:
+    - data/prediction/raw/osm_features/powerplant_distances_raw.csv
+    - data/prediction/raw/osm_features/powerplant_distances_extraction_summary.csv
+
+  predict_qc_powerplants:
+    cmd: python scripts/datasets/osm/08_qc_powerplants.py --input 
+      data/prediction/raw/osm_features/powerplant_distances_raw.csv 
+      --station_file data/prediction/processed/grid_1km_delhi.csv 
+      --edge_effect_distance_km_threshold 110 --output 
+      data/prediction/interim/osm_features/powerplant_qc_summary.csv
+    deps:
+    - scripts/datasets/osm/08_qc_powerplants.py
+    - data/prediction/raw/osm_features/powerplant_distances_raw.csv
+    - data/prediction/processed/grid_1km_delhi.csv
+    outs:
+    - data/prediction/interim/osm_features/powerplant_qc_summary.csv
+
+  predict_finalize_powerplant_distance:
+    cmd: python scripts/datasets/osm/09_finalize_powerplant_distance.py --input 
+      data/prediction/raw/osm_features/powerplant_distances_raw.csv --output 
+      data/prediction/processed/features/powerplant_distance.csv
+    deps:
+    - scripts/datasets/osm/09_finalize_powerplant_distance.py
+    - data/prediction/raw/osm_features/powerplant_distances_raw.csv
+    - data/prediction/interim/osm_features/powerplant_qc_summary.csv
+    outs:
+    - data/prediction/processed/features/powerplant_distance.csv
+
+  predict_extract_srtm_raw:
+    cmd: python scripts/datasets/static_gee/08_extract_srtm_raw.py --stations 
+      data/prediction/processed/grid_1km_delhi.csv --batch_size 300 --output 
+      data/prediction/raw/static_gee/srtm/srtm_raw.csv --summary_output 
+      data/prediction/raw/static_gee/srtm/srtm_extraction_summary.csv
+    deps:
+    - scripts/datasets/static_gee/08_extract_srtm_raw.py
+    - data/prediction/processed/grid_1km_delhi.csv
+    params:
+    - static_gee_layers.srtm.extract
+    outs:
+    - data/prediction/raw/static_gee/srtm/srtm_raw.csv
+    - data/prediction/raw/static_gee/srtm/srtm_extraction_summary.csv
+
+  predict_qc_srtm:
+    cmd: python scripts/datasets/static_gee/09_qc_srtm.py --stations 
+      data/prediction/processed/grid_1km_delhi.csv --elevation_max_m 350 --input
+      data/prediction/raw/static_gee/srtm/srtm_raw.csv --output 
+      data/prediction/interim/static_gee/srtm/srtm_qc_summary.csv
+    deps:
+    - scripts/datasets/static_gee/09_qc_srtm.py
+    - data/prediction/raw/static_gee/srtm/srtm_raw.csv
+    - data/prediction/processed/grid_1km_delhi.csv
+    params:
+    - static_gee_layers.srtm.qc
+    outs:
+    - data/prediction/interim/static_gee/srtm/srtm_qc_summary.csv
+
+  predict_finalize_srtm:
+    cmd: python scripts/datasets/static_gee/10_finalize_srtm.py --input 
+      data/prediction/raw/static_gee/srtm/srtm_raw.csv --output 
+      data/prediction/processed/features/srtm_terrain.csv
+    deps:
+    - scripts/datasets/static_gee/10_finalize_srtm.py
+    - data/prediction/raw/static_gee/srtm/srtm_raw.csv
+    - data/prediction/interim/static_gee/srtm/srtm_qc_summary.csv
+    outs:
+    - data/prediction/processed/features/srtm_terrain.csv
+
+  predict_extract_worldcover_raw:
+    cmd: python scripts/datasets/static_gee/01_extract_worldcover_raw.py 
+      --stations data/prediction/processed/grid_1km_delhi.csv --batch_size 300 --output 
+      data/prediction/raw/static_gee/worldcover/worldcover_raw_histogram.csv 
+      --summary_output 
+      data/prediction/raw/static_gee/worldcover/worldcover_extraction_summary.csv
+    deps:
+    - scripts/datasets/static_gee/01_extract_worldcover_raw.py
+    - data/prediction/processed/grid_1km_delhi.csv
+    params:
+    - static_gee_layers.worldcover.extract
+    outs:
+    - data/prediction/raw/static_gee/worldcover/worldcover_raw_histogram.csv
+    - data/prediction/raw/static_gee/worldcover/worldcover_extraction_summary.csv
+
+  predict_qc_worldcover:
+    cmd: python scripts/datasets/static_gee/02_qc_worldcover.py --stations 
+      data/prediction/processed/grid_1km_delhi.csv --input 
+      data/prediction/raw/static_gee/worldcover/worldcover_raw_histogram.csv 
+      --output 
+      data/prediction/interim/static_gee/worldcover/worldcover_qc_summary.csv
+    deps:
+    - scripts/datasets/static_gee/02_qc_worldcover.py
+    - data/prediction/raw/static_gee/worldcover/worldcover_raw_histogram.csv
+    - data/prediction/processed/grid_1km_delhi.csv
+    params:
+    - static_gee_layers.worldcover.qc
+    outs:
+    - data/prediction/interim/static_gee/worldcover/worldcover_qc_summary.csv
+
+  predict_compute_worldcover_fractions:
+    cmd: python scripts/datasets/static_gee/03_compute_worldcover_fractions.py 
+      --input 
+      data/prediction/raw/static_gee/worldcover/worldcover_raw_histogram.csv 
+      --output data/prediction/processed/features/worldcover_landuse.csv
+    deps:
+    - scripts/datasets/static_gee/03_compute_worldcover_fractions.py
+    - data/prediction/raw/static_gee/worldcover/worldcover_raw_histogram.csv
+    - data/prediction/interim/static_gee/worldcover/worldcover_qc_summary.csv
+    outs:
+    - data/prediction/processed/features/worldcover_landuse.csv
+
+  predict_extract_maiac:
+    cmd: python scripts/prediction/features/02_extract_maiac_grid.py --grid 
+      data/prediction/processed/grid_1km_delhi.csv --output 
+      data/prediction/raw/maiac/maiac_aod_raw.csv --summary_output 
+      data/prediction/raw/maiac/maiac_extraction_summary.csv --parts_dir 
+      data/prediction/interim/maiac_chunks
+    deps:
+    - scripts/prediction/features/02_extract_maiac_grid.py
+    - data/prediction/processed/grid_1km_delhi.csv
+    params:
+    - maiac_extract
+    - prediction.maiac_grid
+    outs:
+    - data/prediction/raw/maiac/maiac_aod_raw.csv
+    - data/prediction/raw/maiac/maiac_extraction_summary.csv

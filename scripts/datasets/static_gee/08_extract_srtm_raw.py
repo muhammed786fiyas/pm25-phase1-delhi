@@ -17,6 +17,16 @@ def main():
     # instead of stations. Default None keeps the station behaviour unchanged.
     parser.add_argument("--stations", default=None,
                         help="station/grid roster CSV; defaults to params station_file")
+    # One request per point costs ~2.5 s, which is fine for 42 stations and
+    # ~100 minutes for a 2388-cell prediction grid. Batching sends many buffers
+    # in a single reduceRegions call instead: measured 2.0 s for all 42 stations,
+    # and -- verified against the committed station output -- it reproduces
+    # elevation and slope to 1e-9 on all 42. The geometry, reducer and scale are
+    # read from the same params either way, so this changes HOW the request is
+    # sent and not WHAT is computed. Default 0 keeps the per-point path, so
+    # existing station stages are untouched.
+    parser.add_argument("--batch_size", type=int, default=0,
+                        help="points per reduceRegions call; 0 = one call per point")
     parser.add_argument("--output", required=True)
     parser.add_argument("--summary_output", required=True)
     args = parser.parse_args()
@@ -45,6 +55,49 @@ def main():
 
     rows = []
     failed_stations = []
+
+    if args.batch_size > 0:
+        print(f"=== Extracting elevation + slope, batched ({args.batch_size} per call) ===")
+        station_list = stations.reset_index(drop=True)
+        for start in range(0, len(station_list), args.batch_size):
+            block = station_list.iloc[start:start + args.batch_size]
+            features = []
+            for station in block.itertuples(index=False):
+                features.append(ee.Feature(
+                    ee.Geometry.Point([station.longitude, station.latitude])
+                    .buffer(buffer_radius),
+                    {"location_id": int(station.location_id)}))
+            collection = ee.FeatureCollection(features)
+            try:
+                result = terrain.reduceRegions(
+                    collection=collection,
+                    reducer=ee.Reducer.mean(),
+                    scale=scale,
+                ).getInfo()
+            except Exception as error:
+                print("FAILED batch starting at", start, "-", error)
+                failed_stations.extend(block["location_id"].tolist())
+                continue
+            by_id = {}
+            for feature in result["features"]:
+                properties = feature["properties"]
+                by_id[properties["location_id"]] = properties
+            for station in block.itertuples(index=False):
+                properties = by_id.get(int(station.location_id))
+                if properties is None:
+                    failed_stations.append(station.location_id)
+                    continue
+                rows.append({
+                    "location_id": station.location_id,
+                    "name": station.name,
+                    "latitude": station.latitude,
+                    "longitude": station.longitude,
+                    "elevation_m": properties.get("elevation"),
+                    "slope_deg": properties.get("slope"),
+                })
+            print(f"  {min(start + args.batch_size, len(station_list))}"
+                  f"/{len(station_list)} points")
+        stations = stations.iloc[0:0]
 
     print("=== Extracting elevation + slope per station ===")
     for index, station in stations.iterrows():

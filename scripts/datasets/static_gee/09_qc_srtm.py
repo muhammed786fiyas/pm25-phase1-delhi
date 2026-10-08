@@ -16,6 +16,10 @@ def main():
     # instead of stations. Default None keeps the station behaviour unchanged.
     parser.add_argument("--stations", default=None,
                         help="station/grid roster CSV; defaults to params station_file")
+    parser.add_argument("--elevation_min_m", type=float, default=None,
+                        help="override the params bound; for the prediction grid")
+    parser.add_argument("--elevation_max_m", type=float, default=None,
+                        help="override the params bound; for the prediction grid")
     parser.add_argument("--input", required=True)
     parser.add_argument("--output", required=True)
     args = parser.parse_args()
@@ -25,8 +29,18 @@ def main():
         all_params = yaml.safe_load(f)
     params = all_params["static_gee_layers"]["srtm"]["qc"]
 
+    # The params bounds are calibrated for the 42 CPCB stations, which are all
+    # urban and span 199.7-271.7 m. The prediction grid reaches terrain the
+    # stations never sample -- its southernmost row sits on the Aravalli ridge
+    # in south Delhi, where 301 m is genuine. Overriding the ceiling for that
+    # run keeps the check meaningful (a 1000 m reading still fails) instead of
+    # suppressing it or loosening it for the station stages too.
     elevation_min = params["elevation_min_m"]
     elevation_max = params["elevation_max_m"]
+    if args.elevation_max_m is not None:
+        elevation_max = args.elevation_max_m
+    if args.elevation_min_m is not None:
+        elevation_min = args.elevation_min_m
     slope_min = params["slope_min_deg"]
     slope_max = params["slope_max_deg"]
 

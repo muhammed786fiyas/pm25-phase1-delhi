@@ -345,6 +345,117 @@ The 5 km grid artifacts were deleted rather than moved -- 1 km is the target (se
 and what the 5 km extraction produced was never a shippable product anyway: 1 km-buffer
 features sampled every 5 km is a sparse point sample, not a 5 km areal mean.
 
+### Step 6 -- Grid feature extraction at 1 km (2026-10-08)
+
+Target: all 23 model features on a 2388-cell 1 km grid. Every decision below is
+recorded with the alternatives rejected, because most of them were made while
+Muhammed was asleep.
+
+**Why 1 km and not the planned 5 km.** The plan called for a 5 km vertical slice
+first. Dropped it, because what a 5 km extraction produces is not a 5 km product:
+it is 1 km-BUFFER features sampled every 5 km, a sparse point sample rather than
+an areal mean, and the download design says coarse products are AGGREGATED from
+1 km cells. 1 km is also MAIAC's native resolution and the buffer radius every
+static covariate was computed at, so it is the only resolution whose features
+mean what the model was fitted on. The slice had already paid for itself by
+then: it proved the schema reuse, measured throughput, and surfaced both the OSM
+coverage gap and the land-use extrapolation problem. *Alternative rejected:*
+extract 5 km, validate, then redo at 1 km -- two GEE runs for information the
+first run had already produced.
+
+**Grid definition.** 2600 cells in the study bbox, 2388 kept after dropping
+those more than 15 km from a station -- the radius at which the API refuses to
+answer, so extracting features for them is wasted GEE time. Written in the
+station roster's exact schema (location_id, name, latitude, longitude, status),
+which is what lets every existing extractor read it unchanged. Synthetic ids
+from 900000 so a grid row can never be mistaken for a CPCB station.
+
+**OSM: a prediction-only extract, from Geofabrik, not Overpass.**
+Muhammed's call, and it was the right one: training has NO gap (all 42 stations
+sit well inside the hand-drawn exports), so only the grid needs new data.
+Extending the training files would have dirtied every downstream training stage
+and left one file holding two OSM vintages, to deliver something training never
+uses. *Alternative rejected:* gap-only merge into the training geojsons.
+
+Overpass then proved unusable and cost four failed attempts before the switch:
+
+| query | result |
+|---|---|
+| 1 km box, dense Delhi | OK, 166 ways, 0.12 MB, 3.2 s |
+| 5 km box, dense Delhi | OK, 2721 ways, 1.63 MB, 7.8 s |
+| 6 km box, dense Delhi | **504 in 12 s** |
+| 1/16 of study area, `out geom` | **504 in 7 s** |
+| 1/16 of study area, `out ids` | **OK, all 23180 ways** |
+
+A 504 in 6-12 s cannot be the 120 s query budget expiring, and `out ids`
+succeeding where `out geom` fails on the SAME tile proves the gateway refuses
+large RESPONSES rather than timing out on computation. Rate limiting was ruled
+out (status endpoint reported 4 free slots throughout) and no mirror helps
+(kumi.systems and private.coffee 500 on every attempt, osm.jp and maps.mail.ru
+fail TLS). Tiling to 4 km made each request legal but failures were intermittent
+and across 182 tiles the projected runtime CLIMBED 91 -> 158 -> 176 minutes.
+A pre-built extract is one download, has no rate limits, and carries a single
+published timestamp -- so the vintage is an exact fact rather than "whenever the
+182 tiles happened to run". **The decisive evidence (`out ids` succeeding)
+arrived early and should have ended the Overpass attempt two iterations sooner.**
+
+**TWO Geofabrik zones, not one.** Northern Zone alone silently excluded Uttar
+Pradesh: 112 power plants against the training export's 170 (every one of the 57
+east of lon 77.36 missing, including Dadri, which task log 6 names as a key
+out-of-Delhi plant) and only 76% of training's roads in the lon 77.30-77.36
+strip -- which is Noida and Ghaziabad, inside the study bbox. Both would have
+produced plausible wrong numbers with no error anywhere: eastern cells would
+simply have reported a further power plant and less road. Caught by comparing
+against the training export rather than eyeballing the new files. Northern +
+Central covers both bboxes.
+
+**Batching the static extractors, with a hard verification rule.** Per-point
+extraction is ~2.5 s/cell, fine for 42 stations and ~100 minutes for 2388. Added
+an optional `--batch_size` to the EXISTING scripts rather than writing batched
+copies -- a second copy of a feature definition would drift, which is the same
+argument that keeps the extractors in scripts/datasets/ at all. Default 0 keeps
+the per-point path so station stages are untouched.
+
+Every batched path is verified by running it over the 42 stations and diffing
+against the committed output BEFORE it is used on the grid. That rule earned its
+place immediately: the first batched SRTM attempt used a point value with a
+`first` reducer and was off by up to 7 m, because the station script actually
+uses a 1 km buffer with a MEAN reducer. Corrected, it reproduces elevation and
+slope to 1e-9 on all 42; WorldCover likewise matches all 12 class counts exactly.
+Result: SRTM 2388 cells in 22 s instead of ~100 min.
+
+**QC thresholds are station-calibrated and some are too tight for the grid.**
+`predict_qc_srtm` hard-failed on one cell at 301.0 m against a [150, 300]
+ceiling. Not an error: every high cell is in the grid's southernmost row, the
+Aravalli ridge in south Delhi, and the bounds were set from 42 urban stations
+spanning 199.7-271.7 m. Added an optional bound override and set 350 m for the
+grid stage, which keeps the check meaningful (1000 m still fails).
+*Alternatives rejected:* suppressing the check, or widening the shared params
+and loosening it for training too.
+
+**MAIAC: a new batched extractor, adaptively chunked.** The station script
+queries ONE POINT at a time over the whole window -- 67.6 s/point measured, so
+2388 cells would be 44.8 HOURS. The batched version maps over the collection and
+reduceRegions over many cells at once, the pattern 04_extract_ndvi_raw.py already
+uses. Output schema is identical to the station extractor's, so stages 2-5
+consume it unchanged, which matters because the model was fitted on AOD those
+stages produced.
+
+Chunk size had to become adaptive. Rows per chunk swing by an order of magnitude
+across the year -- a 100-cell block returned 4659 rows in March and 67 in July,
+because the monsoon wipes out MAIAC retrievals -- so one fixed size either
+overflows in winter or wastes requests in the monsoon. November overflowed GEE's
+5000-element limit at 5114 rows. The chunk now halves on that specific error and
+retries each half. The first version retried the identical request four times
+with backoff before giving up, which was pure waste: that error is
+DETERMINISTIC, so the same request can never succeed. *Alternative rejected:*
+globally shrinking the chunk size, which would pay the winter cost in every
+month of the year.
+
+**Per-chunk resume caching** for both the OSM tiles and the MAIAC chunks. At 288
+chunks a non-resumable run is a coin flip; when the 5000-element failure killed
+the first MAIAC attempt, the 8 completed chunks were reused rather than redone.
+
 ## Pending
 
 Steps 1-5 are done -- see Completed above. Step 6 is the next one and the first

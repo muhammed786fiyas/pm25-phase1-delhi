@@ -59,7 +59,19 @@ def main():
 
             clipped = ind_gdf_utm[ind_gdf_utm.intersects(buffer_poly)]
             clipped_geom = clipped.geometry.intersection(buffer_poly)
-            industrial_area_m2 = clipped_geom.area.sum()
+            # UNION before measuring, not sum. OSM maps some industrial land
+            # more than once -- around station 5627 the estate "Okhla Ph III"
+            # appears as two identical 418,465 m2 polygons -- and summing each
+            # polygon's clipped area counts the shared land twice. Overlap is
+            # 2.6% of total industrial area in the Delhi extract, and it
+            # inflated 5 of 42 stations: 5627 read 0.4481 against a true 0.3147
+            # (+42%) and 6960 read 0.1167 against 0.0698 (+67%).
+            #
+            # This went unnoticed for 42 stations because none crossed the
+            # fraction > 1 check in 05_qc_industrial.py. The 2388-cell
+            # prediction grid, 57x the sample, produced a cell reading 1.06 --
+            # impossible for a fraction -- which is what exposed it.
+            industrial_area_m2 = clipped_geom.union_all().area
 
             rows.append({
                 "location_id": location_id,

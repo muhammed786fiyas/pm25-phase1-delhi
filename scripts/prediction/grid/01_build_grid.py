@@ -61,7 +61,7 @@ def main():
         os.makedirs(os.path.dirname(path), exist_ok=True)
 
     with open(args.params) as f:
-        params = yaml.safe_load(f)["grid"]["build"]
+        params = yaml.safe_load(f)["prediction"]["grid"]
 
     grid_km = params["grid_km"]
     coverage_km = params["coverage_radius_km"]
@@ -100,7 +100,7 @@ def main():
                 continue
             rows.append({
                 "location_id": GRID_ID_BASE + cell_index,
-                "name": f"grid_{int(grid_km)}km_r{row_index:03d}c{col_index:03d}",
+                "name": f"grid_{grid_km:g}km_r{row_index:04d}c{col_index:04d}",
                 "latitude": round(lat, 6),
                 "longitude": round(lon, 6),
                 "status": "KEEP",
