@@ -42,6 +42,30 @@ Non-GEE static covariates sourced from OpenStreetMap for Delhi Phase 1: road den
 
 ## Data notes & gotchas
 
+- **BUG FOUND AND FIXED 2026-10-09: industrial area was double-counted where OSM
+  polygons overlap.** `04_extract_industrial_area.py` computed a buffer's
+  industrial area as `clipped_geom.area.sum()`, summing each polygon's clipped
+  area independently. OSM maps some industrial land more than once -- around
+  station 5627 the estate "Okhla Ph III" appears as two identical 418,465 m2
+  polygons -- so shared land was counted twice. Overlap is 2.6% of total
+  industrial area in the Delhi extract.
+
+  It inflated the feature the model was trained on, at 5 of 42 stations:
+  5627 0.4481 -> 0.3147 (+42% as held), 6960 0.1167 -> 0.0698 (+67%),
+  5630 0.3636 -> 0.3376, 5610 0.2579 -> 0.2451, 5613 0.0415 -> 0.0385.
+
+  Why it survived QC for months: `05_qc_industrial.py` hard-fails on
+  `fraction > 1`, and with only 42 stations none ever crossed it. The 2388-cell
+  prediction grid is 57x the sample and produced a cell at 1.06, which tripped
+  the gate immediately. The QC was correct all along; it just needed a bigger
+  sample. **A QC threshold that has never fired is not evidence that it never
+  will.**
+
+  Fixed with `union_all()` before measuring. The full modelling chain was re-run
+  (see `10-LightGBM_Model.md`); spatial LOSO R2 moved 0.8031 -> 0.8018.
+
+
+
 - **First roads query (full power-plant-search bbox, `way["highway"]` over ~3 states) failed with an Overpass "Ajax Error" / parsererror** -- the server couldn't handle the data volume. Fixed by using a much smaller bbox for roads/industrial (just around the station cluster, ~2km padding beyond the outermost stations' 1km buffers) since that's all road density and industrial fraction actually need.
 - **Road density (5.6-41.4 km/km² across stations) is higher than naive intuition but not a bug** -- OSM's `highway=*` tag covers every mapped path type (motorways down to footways, service roads, parking-lot aisles), and Delhi's colonies are mapped in fine detail. All values sit under the QC ceiling (50 km/km²) and the spatial pattern is sensible: lowest at peripheral stations (Najafgarh 6.1, Alipur 8.1), highest at dense urban ones (Patparganj 41.4, Jahangirpuri 36.3).
 - **Industrial fraction lines up with known Delhi industrial geography**: Okhla Phase-2 (52.3%), Narela (46.7%), Wazirpur (27.2%), Bawana (28.1%) are all recognized industrial estates. 19/42 stations show exactly 0%, expected for residential-area monitors.

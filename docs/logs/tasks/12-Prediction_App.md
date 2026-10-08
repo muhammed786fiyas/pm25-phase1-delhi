@@ -456,6 +456,52 @@ month of the year.
 chunks a non-resumable run is a coin flip; when the 5000-element failure killed
 the first MAIAC attempt, the 8 completed chunks were reused rather than redone.
 
+### Step 6 COMPLETE -- all 23 features on the 1 km grid (2026-10-09)
+
+871,620 rows, 2388 cells x 365 days. Committed one feature group at a time so
+any single feature can be reverted independently.
+
+Cost collapsed far below the estimate, because the extractors already
+deduplicate to unique PIXELS and the reanalysis grids are coarse:
+ERA5-Land 2388 cells -> 33 pixels (2.2x station cost), ERA5 BLH -> 6 (1.5x),
+MERRA-2 -> 4 (~1x). Only MAIAC is genuinely per-point: 115 min batched against
+44.8 h per-point.
+
+Assembly reuses the training master-table builder, which gained an optional
+`--base_table` because the grid has no PM2.5 target to define its rows. A
+separate assembly script was rejected: it would have duplicated the NDVI
+merge_asof period join, a feature-defining operation. The training path was
+re-run and diffed to confirm it is untouched -- 13,641 rows, max |diff| 0.0.
+`season` is derived for the grid from SEASON_MONTHS copied verbatim from the
+CPCB script, and the resulting month-to-season mapping was verified identical
+to the training data's.
+
+**Extrapolation -- the open product question.** 1334 of 2388 cells (56%) fall
+outside the training range on at least one feature. An earlier figure of 37%
+in this log was computed over the land-use features alone and is superseded.
+Severity, as a fraction of the training range's width:
+
+| | cells | |
+|---|---|---|
+| inside range | 1054 | 44% |
+| <5% beyond (trivial) | 262 | 11% |
+| 5-25% | 487 | 20% |
+| 25-50% | 249 | 10% |
+| 50-100% | 243 | 10% |
+| >100% (no information) | 93 | 4% |
+
+So 55% are inside or trivially outside; 585 (25%) are materially extrapolating.
+`dist_to_nearest_powerplant_km` drives the worst overshoot for 537 of them,
+`slope_deg` for 206. `road_density` and `built_up_pct` have training MINIMA well
+above zero -- every CPCB station is urban -- so any genuinely rural cell is
+extrapolation by construction.
+
+LightGBM cannot extrapolate (it returns the boundary prediction) and the
+conformal interval was calibrated only on out-of-fold residuals at the 42 urban
+stations, so neither the estimate nor its interval is validated there. Flags are
+in `reports/prediction/`; how they are surfaced in the API, map and download is
+left for Muhammed.
+
 ## Pending
 
 Steps 1-5 are done -- see Completed above. Step 6 is the next one and the first

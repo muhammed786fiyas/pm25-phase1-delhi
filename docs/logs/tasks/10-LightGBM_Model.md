@@ -1,4 +1,34 @@
 # Task Log: LightGBM Model (tune + fit + validation)
+
+> **NUMBERS REVISED 2026-10-09.** Every figure below was recomputed after an
+> industrial-overlap bug was fixed in `04_extract_industrial_area.py` (it summed
+> overlapping OSM polygons instead of unioning them, inflating
+> `industrial_landuse_fraction` at 5 of 42 stations -- see `6-OSM_Features.md`).
+> The whole chain was re-run including a fresh Optuna search. The headline moves
+> from R2 0.8031 to **0.8018**; nothing about the conclusions changes.
+>
+> | spatial LOSO | was | now |
+> |---|---|---|
+> | R2 | 0.8031 | **0.8018** |
+> | within-R2 | 0.7207 | **0.7156** |
+> | RMSE ug/m3 | 33.73 | **33.84** |
+> | MAE ug/m3 | 20.76 | **20.79** |
+> | random-CV R2 | 0.882 | **0.883** |
+> | conformal q (90%) | 0.5514 | **0.5497** |
+> | stations below coverage target | 15 | **18** |
+>
+> Sensitivity variants likewise: excl_weak_aod_coupling 0.858 -> **0.8578**,
+> excl_weak_aod_from_training 0.816 -> **0.8150**. LME raw-fit 0.437 ->
+> **0.4364**, log-fit 0.423 -> **0.4213**.
+>
+> Keeping the old hyperparameters on the corrected data would have scored
+> **0.8035**, better than the re-tuned 0.8018. The re-tuned figure is kept
+> deliberately: choosing between two hyperparameter searches by their
+> spatial-LOSO score would reintroduce the test set into model selection, which
+> is exactly what the block-nested design exists to prevent. Tuning is seeded,
+> so a fresh clone reproduces 0.8018.
+
+
 _Last updated: 2026-09-17_
 
 ## Scope
