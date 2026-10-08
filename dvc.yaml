@@ -1640,3 +1640,94 @@ stages:
     outs:
       - data/prediction/processed/era5_blh/era5_blh_daily.csv
       - data/prediction/processed/era5_blh/era5_blh_daily_summary.csv
+
+  # NDVI for the grid. Already batched in the existing script -- it does one
+  # reduceRegions over every point per 5-day period -- so its cost is driven by
+  # the ~73 periods and is near-independent of how many cells there are. This
+  # corrects the claim in task log 12's original plan that NDVI would need a new
+  # region-export extractor; only MAIAC did.
+  predict_extract_ndvi_raw:
+    cmd: python scripts/datasets/static_gee/04_extract_ndvi_raw.py --stations data/prediction/processed/grid_1km_delhi.csv --output data/prediction/raw/static_gee/ndvi/ndvi_raw_periods.csv --summary_output data/prediction/raw/static_gee/ndvi/ndvi_extraction_summary.csv
+    deps:
+      - scripts/datasets/static_gee/04_extract_ndvi_raw.py
+      - data/prediction/processed/grid_1km_delhi.csv
+    params:
+      - static_gee_layers.ndvi.extract
+    outs:
+      - data/prediction/raw/static_gee/ndvi/ndvi_raw_periods.csv
+      - data/prediction/raw/static_gee/ndvi/ndvi_extraction_summary.csv
+
+  predict_qc_ndvi:
+    cmd: python scripts/datasets/static_gee/05_qc_ndvi.py --stations data/prediction/processed/grid_1km_delhi.csv --input data/prediction/raw/static_gee/ndvi/ndvi_raw_periods.csv --output data/prediction/interim/static_gee/ndvi/ndvi_qc_summary.csv
+    deps:
+      - scripts/datasets/static_gee/05_qc_ndvi.py
+      - data/prediction/raw/static_gee/ndvi/ndvi_raw_periods.csv
+      - data/prediction/processed/grid_1km_delhi.csv
+    params:
+      - static_gee_layers.ndvi.qc
+    outs:
+      - data/prediction/interim/static_gee/ndvi/ndvi_qc_summary.csv
+
+  predict_analyze_ndvi_fill_distances:
+    cmd: python scripts/datasets/static_gee/06_analyze_ndvi_fill_distances.py --input data/prediction/raw/static_gee/ndvi/ndvi_raw_periods.csv --output data/prediction/interim/static_gee/ndvi/ndvi_fill_distance_analysis.csv
+    deps:
+      - scripts/datasets/static_gee/06_analyze_ndvi_fill_distances.py
+      - data/prediction/raw/static_gee/ndvi/ndvi_raw_periods.csv
+    outs:
+      - data/prediction/interim/static_gee/ndvi/ndvi_fill_distance_analysis.csv
+
+  predict_fill_ndvi_gaps:
+    cmd: python scripts/datasets/static_gee/07_fill_ndvi_gaps.py --raw_input data/prediction/raw/static_gee/ndvi/ndvi_raw_periods.csv --distance_input data/prediction/interim/static_gee/ndvi/ndvi_fill_distance_analysis.csv --output data/prediction/processed/features/ndvi_gapfilled.csv
+    deps:
+      - scripts/datasets/static_gee/07_fill_ndvi_gaps.py
+      - data/prediction/raw/static_gee/ndvi/ndvi_raw_periods.csv
+      - data/prediction/interim/static_gee/ndvi/ndvi_fill_distance_analysis.csv
+    params:
+      - static_gee_layers.ndvi.fill
+    outs:
+      - data/prediction/processed/features/ndvi_gapfilled.csv
+
+  # MERRA-2 for the grid. Needed only as the AOD gap-fill source. MERRA-2 is
+  # ~50 km, so 2388 cells collapse onto a handful of pixels -- the cheapest
+  # source in the pipeline.
+  predict_map_cells_merra2:
+    cmd: python scripts/datasets/merra2_aod/1-map_stations_to_cells.py --stations data/prediction/processed/grid_1km_delhi.csv --outdir data/prediction/raw/merra2_aod --params params.yaml
+    deps:
+      - scripts/datasets/merra2_aod/1-map_stations_to_cells.py
+      - data/prediction/processed/grid_1km_delhi.csv
+    params:
+      - merra2_station_mapping
+    outs:
+      - data/prediction/raw/merra2_aod/station_cell_mapping.csv
+
+  predict_extract_merra2:
+    cmd: python scripts/datasets/merra2_aod/2-extract_gee_merra2.py --mapping data/prediction/raw/merra2_aod/station_cell_mapping.csv --outdir data/prediction/raw/merra2_aod --params params.yaml
+    deps:
+      - scripts/datasets/merra2_aod/2-extract_gee_merra2.py
+      - data/prediction/raw/merra2_aod/station_cell_mapping.csv
+    params:
+      - merra2_extraction
+    outs:
+      - data/prediction/raw/merra2_aod/merra2_aod_raw.csv
+
+  predict_window_qc_merra2:
+    cmd: python scripts/datasets/merra2_aod/3-window_and_qc_merra2.py --raw data/prediction/raw/merra2_aod/merra2_aod_raw.csv --mapping data/prediction/raw/merra2_aod/station_cell_mapping.csv --outdir data/prediction/interim/merra2_aod --params params.yaml
+    deps:
+      - scripts/datasets/merra2_aod/3-window_and_qc_merra2.py
+      - data/prediction/raw/merra2_aod/merra2_aod_raw.csv
+      - data/prediction/raw/merra2_aod/station_cell_mapping.csv
+    params:
+      - merra2_windowing_qc
+    outs:
+      - data/prediction/interim/merra2_aod/merra2_aod_windowed_qc.csv
+
+  predict_aggregate_merra2:
+    cmd: python scripts/datasets/merra2_aod/4-aggregate_merra2_daily.py --windowed data/prediction/interim/merra2_aod/merra2_aod_windowed_qc.csv --mapping data/prediction/raw/merra2_aod/station_cell_mapping.csv --outdir data/prediction/processed/merra2_aod --params params.yaml
+    deps:
+      - scripts/datasets/merra2_aod/4-aggregate_merra2_daily.py
+      - data/prediction/interim/merra2_aod/merra2_aod_windowed_qc.csv
+      - data/prediction/raw/merra2_aod/station_cell_mapping.csv
+    params:
+      - merra2_aggregation
+    outs:
+      - data/prediction/processed/merra2_aod/merra2_aod_daily.csv

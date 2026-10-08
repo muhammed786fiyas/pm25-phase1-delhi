@@ -3693,3 +3693,117 @@ stages:
       hash: md5
       md5: 83543b8d34134cbaf87dc21bb250eacd
       size: 256066
+  predict_map_cells_era5_blh:
+    cmd: python scripts/datasets/era5_blh/1-map_stations_to_cells.py --stations 
+      data/prediction/processed/grid_1km_delhi.csv --params params.yaml 
+      --batch_size 300 --outdir data/prediction/raw/era5_blh
+    deps:
+    - path: data/prediction/processed/grid_1km_delhi.csv
+      hash: md5
+      md5: 9ab84e51b6ee0bd4e5ae62171c6ee83b
+      size: 176200
+    - path: scripts/datasets/era5_blh/1-map_stations_to_cells.py
+      hash: md5
+      md5: 59114885500ddcd518bd09f383d8024a
+      size: 4602
+    params:
+      params.yaml:
+        era5_blh.map_stations_to_cells:
+          gee_project: internship-pm25
+          collection: ECMWF/ERA5/HOURLY
+    outs:
+    - path: data/prediction/raw/era5_blh/station_cell_mapping.csv
+      hash: md5
+      md5: e2e6247ad1be21d43b885f5b122489dc
+      size: 145179
+  predict_extract_era5_blh:
+    cmd: python scripts/datasets/era5_blh/2-extract_gee_era5blh.py --mapping 
+      data/prediction/raw/era5_blh/station_cell_mapping.csv --params params.yaml
+      --outdir data/prediction/raw/era5_blh
+    deps:
+    - path: data/prediction/raw/era5_blh/station_cell_mapping.csv
+      hash: md5
+      md5: e2e6247ad1be21d43b885f5b122489dc
+      size: 145179
+    - path: scripts/datasets/era5_blh/2-extract_gee_era5blh.py
+      hash: md5
+      md5: 35f6edca3305f84056ceb0c602e5b841
+      size: 2966
+    params:
+      params.yaml:
+        era5_blh.extract:
+          gee_project: internship-pm25
+          collection: ECMWF/ERA5/HOURLY
+          band: boundary_layer_height
+          study_start: '2025-03-01'
+          study_end: '2026-03-01'
+          chunk_months: 3
+    outs:
+    - path: data/prediction/raw/era5_blh/era5_blh_raw.csv
+      hash: md5
+      md5: 8c95b49990571c22f1430deff5a696d9
+      size: 5548415
+  predict_window_qc_era5_blh:
+    cmd: python scripts/datasets/era5_blh/3-window_and_qc_era5blh.py --raw 
+      data/prediction/raw/era5_blh/era5_blh_raw.csv --mapping 
+      data/prediction/raw/era5_blh/station_cell_mapping.csv --params params.yaml
+      --outdir data/prediction/interim/era5_blh
+    deps:
+    - path: data/prediction/raw/era5_blh/era5_blh_raw.csv
+      hash: md5
+      md5: 8c95b49990571c22f1430deff5a696d9
+      size: 5548415
+    - path: data/prediction/raw/era5_blh/station_cell_mapping.csv
+      hash: md5
+      md5: e2e6247ad1be21d43b885f5b122489dc
+      size: 145179
+    - path: scripts/datasets/era5_blh/3-window_and_qc_era5blh.py
+      hash: md5
+      md5: a5ceb1082b44201aaf743f9b592dd638
+      size: 4058
+    params:
+      params.yaml:
+        era5_blh.window_qc:
+          tolerance_degrees: 0.05
+          window_hours:
+          - 5
+          - 6
+          - 7
+          - 8
+          blh_min_m: 0
+          blh_max_m: 6000
+    outs:
+    - path: data/prediction/interim/era5_blh/era5_blh_window_summary.csv
+      hash: md5
+      md5: 06de6fb1e49c11a7cee2a320f1d5856f
+      size: 182799
+    - path: data/prediction/interim/era5_blh/era5_blh_windowed.csv
+      hash: md5
+      md5: 083416e0ff1cd93ff11e62013ee73dda
+      size: 218580519
+  predict_aggregate_era5_blh_daily:
+    cmd: python scripts/datasets/era5_blh/4-aggregate_era5blh_daily.py 
+      --windowed data/prediction/interim/era5_blh/era5_blh_windowed.csv --params
+      params.yaml --outdir data/prediction/processed/era5_blh
+    deps:
+    - path: data/prediction/interim/era5_blh/era5_blh_windowed.csv
+      hash: md5
+      md5: 083416e0ff1cd93ff11e62013ee73dda
+      size: 218580519
+    - path: scripts/datasets/era5_blh/4-aggregate_era5blh_daily.py
+      hash: md5
+      md5: 558fe5f0c8567774bcea5c33f72df5e5
+      size: 3217
+    params:
+      params.yaml:
+        era5_blh.daily_aggregation:
+          min_hours_required: 2
+    outs:
+    - path: data/prediction/processed/era5_blh/era5_blh_daily.csv
+      hash: md5
+      md5: 82c3f3949dcaf349aef0341fee551cc9
+      size: 51694065
+    - path: data/prediction/processed/era5_blh/era5_blh_daily_summary.csv
+      hash: md5
+      md5: 71f0b11a46bebc71ea5459ddbc64f6f8
+      size: 192948
