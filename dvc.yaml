@@ -1493,3 +1493,49 @@ stages:
     outs:
     - data/prediction/raw/maiac/maiac_aod_raw.csv
     - data/prediction/raw/maiac/maiac_extraction_summary.csv
+
+  # MAIAC downstream for the grid. Same four scripts as the station chain, same
+  # params -- the model was fitted on AOD these stages produced, so the grid's
+  # AOD has to come through the identical filtering, QA decode, QA filter and
+  # daily aggregation. Only the input and output paths differ.
+  predict_aod_filter_scale:
+    cmd: python scripts/datasets/maiac_aod/2-filter_and_scale_aod.py --input data/prediction/raw/maiac/maiac_aod_raw.csv --stations data/prediction/processed/grid_1km_delhi.csv --outdir data/prediction/interim/maiac_aod/filter_scale
+    deps:
+      - scripts/datasets/maiac_aod/2-filter_and_scale_aod.py
+      - data/prediction/raw/maiac/maiac_aod_raw.csv
+      - data/prediction/processed/grid_1km_delhi.csv
+    params:
+      - aod_filter_scale.scale_aod
+      - aod_filter_scale.scale_uncertainty
+      - aod_filter_scale.aod_valid_min
+      - aod_filter_scale.aod_valid_max
+      - aod_filter_scale.uncertainty_valid_min
+      - aod_filter_scale.uncertainty_valid_max
+    outs:
+      - data/prediction/interim/maiac_aod/filter_scale
+
+  predict_aod_decode_qa:
+    cmd: python scripts/datasets/maiac_aod/3-decode_qa.py --input data/prediction/interim/maiac_aod/filter_scale/maiac_aod_filtered_scaled.csv --outdir data/prediction/interim/maiac_aod/qa_decode
+    deps:
+      - scripts/datasets/maiac_aod/3-decode_qa.py
+      - data/prediction/interim/maiac_aod/filter_scale
+    outs:
+      - data/prediction/interim/maiac_aod/qa_decode
+
+  predict_aod_qa_filter:
+    cmd: python scripts/datasets/maiac_aod/4-apply_qa_filter.py --input data/prediction/interim/maiac_aod/qa_decode/maiac_aod_qa_decoded.csv --outdir data/prediction/interim/maiac_aod/qa_filter
+    deps:
+      - scripts/datasets/maiac_aod/4-apply_qa_filter.py
+      - data/prediction/interim/maiac_aod/qa_decode
+    params:
+      - aod_qa_filter.strictness
+    outs:
+      - data/prediction/interim/maiac_aod/qa_filter
+
+  predict_aod_aggregate_daily:
+    cmd: python scripts/datasets/maiac_aod/5-aggregate_aod_daily.py --input data/prediction/interim/maiac_aod/qa_filter/maiac_aod_qa_filtered.csv --outdir data/prediction/processed/maiac_aod
+    deps:
+      - scripts/datasets/maiac_aod/5-aggregate_aod_daily.py
+      - data/prediction/interim/maiac_aod/qa_filter
+    outs:
+      - data/prediction/processed/maiac_aod
