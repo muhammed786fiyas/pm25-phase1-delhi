@@ -307,6 +307,44 @@ to cells near monitors, validation study design and exposure sensitivity checks.
 aggregated products ship both `_mean` and `_min`, since a 5 km cell spans 25 different
 distances.
 
+### Step 6 (in progress) -- repo restructure: training and prediction split (2026-10-08)
+
+Done before any grid work was built on top, because it was the cheapest moment --
+the prediction tree did not exist yet, so every stage added later would have been
+another path to move.
+
+`data/` now splits at the top into `training/` and `prediction/`, each with its own
+`raw/`, `interim/`, `processed/`. The reason is a real collision rather than tidiness:
+training and prediction run the SAME extractor scripts, so both emit a
+`srtm_terrain.csv`, a `worldcover_landuse.csv`, a `road_density.csv`. Same basename,
+different meaning.
+
+`data/stations/` stays shared at the top level -- both pipelines read it, and the grid
+builder should not be reading from a folder called "training".
+
+`reports/` was deliberately NOT split. It is organised by model family, a different
+axis, and prediction produces nothing that collides with `cv_spatial_loso_folds.csv`.
+Prediction artifacts get a `reports/prediction/` sibling instead. `models/` untouched --
+prediction consumes a model, it does not produce one.
+
+Scripts: new `scripts/prediction/` as a sibling to `scripts/modeling/`. The per-source
+extractors deliberately stay in `scripts/datasets/` and are invoked with `--stations
+<grid>`; six `static_gee` scripts gained an optional `--stations` override (default None
+keeps station behaviour byte-identical, verified). They are NOT copied into
+`prediction/`, because the model was fitted on features those exact scripts produced and
+a second copy would drift.
+
+**Verification, since this touched a pipeline whose reproducibility was hard-won**:
+328 path references rewritten across dvc.yaml/params.yaml/scripts; `dvc commit -f`
+rebuilt the lock without re-running anything; **249 of 249 data file hashes identical**
+before and after (the only 4 changes were scripts edited on purpose); `dvc status` ->
+"Data and pipelines are up to date"; all 12 frozen stages intact; the app loads and
+serves unchanged. Git recorded all 29 moves as renames.
+
+The 5 km grid artifacts were deleted rather than moved -- 1 km is the target (see below),
+and what the 5 km extraction produced was never a shippable product anyway: 1 km-buffer
+features sampled every 5 km is a sparse point sample, not a 5 km areal mean.
+
 ## Pending
 
 Steps 1-5 are done -- see Completed above. Step 6 is the next one and the first

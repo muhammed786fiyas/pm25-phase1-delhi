@@ -168,14 +168,14 @@ def find_shared_cell_stations(cell_mapping_df):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--calibration_input", default="data/raw/maiac_gapfill/calibration_dataset.csv")
-    parser.add_argument("--cell_mapping", default="data/raw/merra2_aod/station_cell_mapping.csv")
-    parser.add_argument("--worldcover_input", default="data/processed/static_gee/worldcover_landuse.csv")
-    parser.add_argument("--ndvi_input", default="data/processed/static_gee/ndvi_gapfilled.csv")
-    parser.add_argument("--srtm_input", default="data/processed/static_gee/srtm_terrain.csv")
-    parser.add_argument("--road_density_input", default="data/processed/osm/road_density.csv")
-    parser.add_argument("--industrial_input", default="data/processed/osm/industrial_fraction.csv")
-    parser.add_argument("--output", default="data/interim/maiac_gapfill/calibration_variant_comparison.csv")
+    parser.add_argument("--calibration_input", default="data/training/raw/maiac_gapfill/calibration_dataset.csv")
+    parser.add_argument("--cell_mapping", default="data/training/raw/merra2_aod/station_cell_mapping.csv")
+    parser.add_argument("--worldcover_input", default="data/training/processed/static_gee/worldcover_landuse.csv")
+    parser.add_argument("--ndvi_input", default="data/training/processed/static_gee/ndvi_gapfilled.csv")
+    parser.add_argument("--srtm_input", default="data/training/processed/static_gee/srtm_terrain.csv")
+    parser.add_argument("--road_density_input", default="data/training/processed/osm/road_density.csv")
+    parser.add_argument("--industrial_input", default="data/training/processed/osm/industrial_fraction.csv")
+    parser.add_argument("--output", default="data/training/interim/maiac_gapfill/calibration_variant_comparison.csv")
     args = parser.parse_args()
 
     print("=== Loading calibration dataset ===")

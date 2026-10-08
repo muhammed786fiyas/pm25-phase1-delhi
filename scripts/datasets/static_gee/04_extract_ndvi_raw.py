@@ -47,6 +47,12 @@ def build_period_list(study_start, study_end, period_days):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--params", default=PARAMS_FILE)
+    # Optional override of the roster named in params. The prediction grid is
+    # written in the station file's exact schema (see scripts/grid/01_build_grid.py),
+    # so pointing this at a grid CSV runs the same extractor over grid cells
+    # instead of stations. Default None keeps the station behaviour unchanged.
+    parser.add_argument("--stations", default=None,
+                        help="station/grid roster CSV; defaults to params station_file")
     parser.add_argument("--output", required=True)
     parser.add_argument("--summary_output", required=True)
     args = parser.parse_args()
@@ -60,7 +66,8 @@ def main():
     ee.Initialize(project=params["gee_project"])
 
     print("=== Loading station list ===")
-    stations = pd.read_csv(params["station_file"])
+    station_file = args.stations if args.stations else params["station_file"]
+    stations = pd.read_csv(station_file)
     stations = stations[stations["status"] == "KEEP"]
     print("Stations to process:", len(stations))
 

@@ -24,7 +24,7 @@ def main():
 
     if max_distance == "NOT_SET":
         print("ERROR: max_fill_distance_periods is NOT_SET in params.yaml.")
-        print("Review data/interim/static_gee/ndvi/ndvi_fill_distance_analysis.csv and set a cap before running this stage.")
+        print("Review data/training/interim/static_gee/ndvi/ndvi_fill_distance_analysis.csv and set a cap before running this stage.")
         sys.exit(1)
 
     print("Using max_fill_distance_periods:", max_distance)

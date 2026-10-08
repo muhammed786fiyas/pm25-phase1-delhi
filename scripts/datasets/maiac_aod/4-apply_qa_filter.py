@@ -30,7 +30,7 @@ def main():
     if strictness == "NOT_SET":
         raise ValueError(
             "aod_qa_filter.strictness is still NOT_SET in params.yaml. "
-            "Review data/interim/maiac_aod/qa_decode/qa_summary.csv, "
+            "Review data/training/interim/maiac_aod/qa_decode/qa_summary.csv, "
             "pick a strictness level ('strict', 'moderate', or 'lenient'), "
             "set it in params.yaml, then rerun."
         )

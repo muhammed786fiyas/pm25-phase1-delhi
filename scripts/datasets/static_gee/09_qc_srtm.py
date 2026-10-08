@@ -10,6 +10,12 @@ PARAMS_FILE = "params.yaml"
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--params", default=PARAMS_FILE)
+    # Optional override of the roster named in params. The prediction grid is
+    # written in the station file's exact schema (see scripts/grid/01_build_grid.py),
+    # so pointing this at a grid CSV runs the same extractor over grid cells
+    # instead of stations. Default None keeps the station behaviour unchanged.
+    parser.add_argument("--stations", default=None,
+                        help="station/grid roster CSV; defaults to params station_file")
     parser.add_argument("--input", required=True)
     parser.add_argument("--output", required=True)
     args = parser.parse_args()
@@ -29,7 +35,8 @@ def main():
     print("Stations in raw file:", len(raw_df))
 
     print("=== Loading station list (source of truth) ===")
-    stations = pd.read_csv(params["station_file"])
+    station_file = args.stations if args.stations else params["station_file"]
+    stations = pd.read_csv(station_file)
     stations = stations[stations["status"] == "KEEP"]
     expected_count = len(stations)
     print("Stations expected:", expected_count)

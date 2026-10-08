@@ -779,7 +779,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", default="models/lightgbm/lightgbm_full_model.txt")
     parser.add_argument("--dataset",
-                        default="data/processed/modeling_datasets/lightgbm_ready_dataset.csv")
+                        default="data/training/processed/modeling_datasets/lightgbm_ready_dataset.csv")
     parser.add_argument("--station_file",
                         default="data/stations/cpcb_stations_delhi_status.csv")
     parser.add_argument("--metrics",

@@ -213,7 +213,7 @@ osm_layers:
   roads:
     extract:
       station_file: data/stations/cpcb_stations_delhi_status.csv
-      roads_geojson: data/raw/osm/roads.geojson
+      roads_geojson: data/training/raw/osm/roads.geojson
       buffer_radius_m: 1000
     qc:
       station_file: data/stations/cpcb_stations_delhi_status.csv
@@ -222,7 +222,7 @@ osm_layers:
   industrial:
     extract:
       station_file: data/stations/cpcb_stations_delhi_status.csv
-      industrial_geojson: data/raw/osm/industrial_landuse.geojson
+      industrial_geojson: data/training/raw/osm/industrial_landuse.geojson
       buffer_radius_m: 1000
     qc:
       station_file: data/stations/cpcb_stations_delhi_status.csv
@@ -230,7 +230,7 @@ osm_layers:
   powerplants:
     extract:
       station_file: data/stations/cpcb_stations_delhi_status.csv
-      powerplants_geojson: data/raw/osm/power_plants.geojson
+      powerplants_geojson: data/training/raw/osm/power_plants.geojson
     qc:
       station_file: data/stations/cpcb_stations_delhi_status.csv
       edge_effect_distance_km_threshold: 110
