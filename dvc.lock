@@ -2065,8 +2065,8 @@ stages:
       size: 3825
     - path: scripts/modeling/lightgbm/02_validate_lightgbm_cv.py
       hash: md5
-      md5: c129c4d802b91ccbfdc04a9bfde0617f
-      size: 33945
+      md5: 25eee103fdb4c435fc71c12a0c25b731
+      size: 35539
     params:
       params.yaml:
         modeling.lightgbm_validation:
@@ -2088,6 +2088,10 @@ stages:
       hash: md5
       md5: 61a55112dbbe6bbff5ac59cc58189efd
       size: 3992
+    - path: reports/lightgbm/primary/cv_random_oof_predictions.csv
+      hash: md5
+      md5: 5a09f5a580fb62114ad0fbf30c033776
+      size: 872098
     - path: reports/lightgbm/primary/cv_spatial_loso_aggregated.json
       hash: md5
       md5: 525d56a68279ce2bafde9f6abb2f4ee4
@@ -2096,6 +2100,10 @@ stages:
       hash: md5
       md5: 55d357416581fec0f1edcc4af19d511b
       size: 4844
+    - path: reports/lightgbm/primary/cv_spatial_loso_oof_predictions.csv
+      hash: md5
+      md5: d9c602426bc5f23423d1e4eaa5a94f8d
+      size: 872201
     - path: reports/lightgbm/primary/station_buffer_exclusions.csv
       hash: md5
       md5: e705662a0dd95e5694674363c884dd96
@@ -2295,8 +2303,8 @@ stages:
       size: 3825
     - path: scripts/modeling/lightgbm/02_validate_lightgbm_cv.py
       hash: md5
-      md5: c129c4d802b91ccbfdc04a9bfde0617f
-      size: 33945
+      md5: 25eee103fdb4c435fc71c12a0c25b731
+      size: 35539
     params:
       params.yaml:
         modeling.lightgbm_validation:
@@ -2321,6 +2329,11 @@ stages:
       md5: 45d5d0162782ae17023ca193c4bdc953
       size: 3978
     - path: 
+        reports/lightgbm/excl_weak_aod_coupling/cv_random_oof_predictions.csv
+      hash: md5
+      md5: ace3b714d786ef526c7b59bede63dbfc
+      size: 789025
+    - path: 
         reports/lightgbm/excl_weak_aod_coupling/cv_spatial_loso_aggregated.json
       hash: md5
       md5: e8f3a9d34dae276090e0d3641e9ba22a
@@ -2329,6 +2342,11 @@ stages:
       hash: md5
       md5: 6442e9efad133787c0e5a7988af89e10
       size: 4395
+    - path: 
+        reports/lightgbm/excl_weak_aod_coupling/cv_spatial_loso_oof_predictions.csv
+      hash: md5
+      md5: 6c7ca267a7ece116ee9f79a7c513e180
+      size: 788515
     - path: 
         reports/lightgbm/excl_weak_aod_coupling/station_buffer_exclusions.csv
       hash: md5
@@ -2360,8 +2378,8 @@ stages:
       size: 3825
     - path: scripts/modeling/lightgbm/02_validate_lightgbm_cv.py
       hash: md5
-      md5: c129c4d802b91ccbfdc04a9bfde0617f
-      size: 33945
+      md5: 25eee103fdb4c435fc71c12a0c25b731
+      size: 35539
     params:
       params.yaml:
         modeling.lightgbm_validation:
@@ -2387,6 +2405,11 @@ stages:
       md5: 4283b3bb55eff0edeb2cf46e217058ca
       size: 3983
     - path: 
+        reports/lightgbm/excl_weak_aod_from_training/cv_random_oof_predictions.csv
+      hash: md5
+      md5: 49a97826a41248ae80efd9ffe22b71e7
+      size: 872090
+    - path: 
         reports/lightgbm/excl_weak_aod_from_training/cv_spatial_loso_aggregated.json
       hash: md5
       md5: 6626ce14248a72b50091c51b022c63ef
@@ -2396,6 +2419,11 @@ stages:
       hash: md5
       md5: d8316c4f301d537cbbffb2b29047e2be
       size: 4842
+    - path: 
+        reports/lightgbm/excl_weak_aod_from_training/cv_spatial_loso_oof_predictions.csv
+      hash: md5
+      md5: 13943f7705381d9168ecd3bcfd96e34d
+      size: 872238
     - path: 
         reports/lightgbm/excl_weak_aod_from_training/station_buffer_exclusions.csv
       hash: md5
@@ -2453,3 +2481,27 @@ stages:
       hash: md5
       md5: 9b34b7eaffcea41420f1b8b402eff13a
       size: 4175
+  calibrate_lightgbm_conformal_intervals:
+    cmd: python scripts/modeling/lightgbm/04_calibrate_conformal_intervals.py 
+      --oof_input reports/lightgbm/primary/cv_spatial_loso_oof_predictions.csv 
+      --calibration_output reports/lightgbm/primary/conformal_calibration.json 
+      --diagnostics_output 
+      reports/lightgbm/primary/conformal_heldout_coverage.csv
+    deps:
+    - path: reports/lightgbm/primary/cv_spatial_loso_oof_predictions.csv
+      hash: md5
+      md5: d9c602426bc5f23423d1e4eaa5a94f8d
+      size: 872201
+    - path: scripts/modeling/lightgbm/04_calibrate_conformal_intervals.py
+      hash: md5
+      md5: add095d8d598fd9e2304e46716c0d7d2
+      size: 10060
+    outs:
+    - path: reports/lightgbm/primary/conformal_calibration.json
+      hash: md5
+      md5: 1e6a363247f8fc3f41d253b4b23bcee3
+      size: 3786
+    - path: reports/lightgbm/primary/conformal_heldout_coverage.csv
+      hash: md5
+      md5: 5a488a0ff06913e5ebc4240f850a8295
+      size: 2046

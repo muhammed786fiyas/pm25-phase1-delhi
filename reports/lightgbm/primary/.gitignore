@@ -5,3 +5,7 @@
 /cv_spatial_loso_aggregated.json
 /cv_random_folds.csv
 /cv_random_aggregated.json
+/cv_spatial_loso_oof_predictions.csv
+/cv_random_oof_predictions.csv
+/conformal_calibration.json
+/conformal_heldout_coverage.csv

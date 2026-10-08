@@ -14,6 +14,7 @@ from sklearn.metrics import mean_absolute_error, r2_score
 # convention: no shared utils module across scripts), must be kept in sync if
 # the feature set changes.
 ID_COLS = ["location_id", "name", "date"]
+DATE_COL = "date"
 TARGET_COL = "pm25_daily"
 GROUP_COL = "location_id"
 
@@ -252,7 +253,7 @@ def compute_within_r2_kawano(y_true, y_pred, group_keys, true_group_means, pred_
 
 
 def compute_cv_results(folds_df, oof_true_list, oof_pred_list, oof_group_keys_list,
-                       oof_fold_id_list, true_group_means_raw):
+                       oof_fold_id_list, true_group_means_raw, oof_id_list):
     # Pools every fold's out-of-fold rows together, then computes the within-R2
     # reference means and metrics from that pooled set -- both per-fold (sliced
     # back out of the pooled set) and for the headline aggregated number. This
@@ -264,6 +265,21 @@ def compute_cv_results(folds_df, oof_true_list, oof_pred_list, oof_group_keys_li
     y_pred = np.concatenate(oof_pred_list)
     group_keys = pd.concat(oof_group_keys_list, ignore_index=True)
     fold_id = np.concatenate(oof_fold_id_list)
+
+    # The per-row out-of-fold predictions, kept rather than discarded. Each row
+    # is the model's estimate at a station it never saw during that fold's
+    # training -- which is exactly the situation at an unmonitored grid cell, so
+    # these residuals are the calibration set for any prediction interval. The
+    # aggregate metrics below are summaries of this same frame; before this was
+    # written out, the individual predictions were computed and thrown away on
+    # every run.
+    oof_df = pd.concat(oof_id_list, ignore_index=True)
+    oof_df["fold"] = fold_id
+    oof_df["observed_pm25"] = y_true
+    oof_df["predicted_pm25"] = y_pred
+    oof_df["residual"] = y_true - y_pred
+    oof_df = oof_df[[GROUP_COL, DATE_COL, "fold", "observed_pm25",
+                     "predicted_pm25", "residual"]]
 
     pred_group_means_raw = compute_pred_group_means(y_pred, group_keys)
 
@@ -287,7 +303,7 @@ def compute_cv_results(folds_df, oof_true_list, oof_pred_list, oof_group_keys_li
         "rmse_ugm3": point_metrics["rmse"],
         "mae_ugm3": point_metrics["mae"],
     }
-    return folds_df, aggregated
+    return folds_df, aggregated, oof_df
 
 
 def run_spatial_loso_cv(df, exclusions, blocks_by_station, block_params, feature_cols,
@@ -300,6 +316,7 @@ def run_spatial_loso_cv(df, exclusions, blocks_by_station, block_params, feature
     # ever influenced the hyperparameters used to evaluate it.
     station_ids = sorted(int(x) for x in df[GROUP_COL].unique())
     fold_rows = []
+    oof_ids = []
     oof_true = []
     oof_pred = []
     oof_group_keys = []
@@ -339,6 +356,7 @@ def run_spatial_loso_cv(df, exclusions, blocks_by_station, block_params, feature
             "rmse_ugm3": point_metrics["rmse"],
             "mae_ugm3": point_metrics["mae"],
         })
+        oof_ids.append(test_df[[GROUP_COL, DATE_COL]].reset_index(drop=True))
         oof_true.append(y_true)
         oof_pred.append(y_pred)
         oof_group_keys.append(group_key(test_df))
@@ -350,13 +368,14 @@ def run_spatial_loso_cv(df, exclusions, blocks_by_station, block_params, feature
               f"rounds={best_iteration}")
 
     folds_df = pd.DataFrame(fold_rows)
-    folds_df, aggregated = compute_cv_results(
-        folds_df, oof_true, oof_pred, oof_group_keys, oof_fold_id, true_group_means_raw)
+    folds_df, aggregated, oof_df = compute_cv_results(
+        folds_df, oof_true, oof_pred, oof_group_keys, oof_fold_id, true_group_means_raw,
+        oof_ids)
     print("Spatial LOSO within_R2 (Kawano) by fold:")
     for row in folds_df.itertuples(index=False):
         print(f"  fold {row.fold} (station {row.held_out_station}): "
               f"within_R2={row.within_r2}")
-    return folds_df, aggregated
+    return folds_df, aggregated, oof_df
 
 
 def run_random_cv(df, params, feature_cols, n_folds, true_group_means_raw,
@@ -381,6 +400,7 @@ def run_random_cv(df, params, feature_cols, n_folds, true_group_means_raw,
     fold_assignment = pd.Series(np.arange(len(df)) % n_folds, index=shuffled_index).sort_index()
 
     fold_rows = []
+    oof_ids = []
     oof_true = []
     oof_pred = []
     oof_group_keys = []
@@ -411,6 +431,7 @@ def run_random_cv(df, params, feature_cols, n_folds, true_group_means_raw,
             "rmse_ugm3": point_metrics["rmse"],
             "mae_ugm3": point_metrics["mae"],
         })
+        oof_ids.append(test_df[[GROUP_COL, DATE_COL]].reset_index(drop=True))
         oof_true.append(y_true)
         oof_pred.append(y_pred)
         oof_group_keys.append(group_key(test_df))
@@ -421,12 +442,13 @@ def run_random_cv(df, params, feature_cols, n_folds, true_group_means_raw,
               f"rounds={best_iteration}")
 
     folds_df = pd.DataFrame(fold_rows)
-    folds_df, aggregated = compute_cv_results(
-        folds_df, oof_true, oof_pred, oof_group_keys, oof_fold_id, true_group_means_raw)
+    folds_df, aggregated, oof_df = compute_cv_results(
+        folds_df, oof_true, oof_pred, oof_group_keys, oof_fold_id, true_group_means_raw,
+        oof_ids)
     print("Random CV within_R2 (Kawano) by fold:")
     for row in folds_df.itertuples(index=False):
         print(f"  fold {row.fold}: within_R2={row.within_r2}")
-    return folds_df, aggregated
+    return folds_df, aggregated, oof_df
 
 
 def log_cv_run_to_mlflow(run_name, cv_scheme, folds_df, aggregated, folds_csv_path,
@@ -592,7 +614,7 @@ def main():
         run_name_suffix = "_" + args.run_tag
 
     print("=== Spatial LOSO CV (primary, out-of-site, block-nested hyperparameters) ===")
-    spatial_folds_df, spatial_aggregated = run_spatial_loso_cv(
+    spatial_folds_df, spatial_aggregated, spatial_oof = run_spatial_loso_cv(
         df, exclusions, blocks_by_station, block_params, feature_cols,
         true_group_means_raw, args.validation_station_fraction,
         args.early_stopping_rounds, args.random_seed, training_only_exclusions)
@@ -603,6 +625,9 @@ def main():
     with open(spatial_agg_path, "w") as f:
         json.dump(spatial_aggregated, f, indent=2)
     print(f"Wrote {spatial_agg_path}")
+    spatial_oof_path = os.path.join(args.output_dir, "cv_spatial_loso_oof_predictions.csv")
+    spatial_oof.to_csv(spatial_oof_path, index=False)
+    print(f"Wrote {spatial_oof_path}: {len(spatial_oof)} per-row out-of-fold predictions")
     print_aggregated("Spatial LOSO", spatial_aggregated)
 
     log_cv_run_to_mlflow(
@@ -627,7 +652,7 @@ def main():
     )
 
     print("=== Random CV (comparison, ignores station grouping) ===")
-    random_folds_df, random_aggregated = run_random_cv(
+    random_folds_df, random_aggregated, random_oof = run_random_cv(
         df, full_data_params, feature_cols, args.n_random_folds, true_group_means_raw,
         args.validation_row_fraction, args.early_stopping_rounds, args.random_seed,
         training_only_exclusions)
@@ -638,6 +663,9 @@ def main():
     with open(random_agg_path, "w") as f:
         json.dump(random_aggregated, f, indent=2)
     print(f"Wrote {random_agg_path}")
+    random_oof_path = os.path.join(args.output_dir, "cv_random_oof_predictions.csv")
+    random_oof.to_csv(random_oof_path, index=False)
+    print(f"Wrote {random_oof_path}: {len(random_oof)} per-row out-of-fold predictions")
     print_aggregated("Random CV", random_aggregated)
 
     log_cv_run_to_mlflow(

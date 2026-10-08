@@ -915,8 +915,10 @@ stages:
     outs:
       - reports/lightgbm/primary/station_buffer_exclusions.csv
       - reports/lightgbm/primary/cv_spatial_loso_folds.csv
+      - reports/lightgbm/primary/cv_spatial_loso_oof_predictions.csv
       - reports/lightgbm/primary/cv_spatial_loso_aggregated.json
       - reports/lightgbm/primary/cv_random_folds.csv
+      - reports/lightgbm/primary/cv_random_oof_predictions.csv
       - reports/lightgbm/primary/cv_random_aggregated.json
 
   diagnose_lightgbm_aod_coupling:
@@ -931,6 +933,15 @@ stages:
       - reports/lightgbm/diagnostics/station_aod_coupling.csv
       - reports/lightgbm/diagnostics/aod_coupling_hypothesis_test.json
 
+  calibrate_lightgbm_conformal_intervals:
+    cmd: python scripts/modeling/lightgbm/04_calibrate_conformal_intervals.py --oof_input reports/lightgbm/primary/cv_spatial_loso_oof_predictions.csv --calibration_output reports/lightgbm/primary/conformal_calibration.json --diagnostics_output reports/lightgbm/primary/conformal_heldout_coverage.csv
+    deps:
+      - scripts/modeling/lightgbm/04_calibrate_conformal_intervals.py
+      - reports/lightgbm/primary/cv_spatial_loso_oof_predictions.csv
+    outs:
+      - reports/lightgbm/primary/conformal_calibration.json
+      - reports/lightgbm/primary/conformal_heldout_coverage.csv
+
   validate_lightgbm_cv_excl_weak_aod_coupling:
     cmd: python scripts/modeling/lightgbm/02_validate_lightgbm_cv.py --input data/processed/modeling_datasets/lightgbm_ready_dataset.csv --station_file data/stations/cpcb_stations_delhi_status.csv --hyperparameters models/lightgbm/tuned_hyperparameters.json --buffer_km 2.0 --n_random_folds 42 --random_seed 42 --learning_rate 0.03 --max_boosting_rounds 3000 --early_stopping_rounds 100 --validation_station_fraction 0.15 --validation_row_fraction 0.15 --exclude_stations 5622,5630,6359,7005 --run_tag excl_weak_aod_coupling --output_dir reports/lightgbm/excl_weak_aod_coupling
     deps:
@@ -944,8 +955,10 @@ stages:
     outs:
       - reports/lightgbm/excl_weak_aod_coupling/station_buffer_exclusions.csv
       - reports/lightgbm/excl_weak_aod_coupling/cv_spatial_loso_folds.csv
+      - reports/lightgbm/excl_weak_aod_coupling/cv_spatial_loso_oof_predictions.csv
       - reports/lightgbm/excl_weak_aod_coupling/cv_spatial_loso_aggregated.json
       - reports/lightgbm/excl_weak_aod_coupling/cv_random_folds.csv
+      - reports/lightgbm/excl_weak_aod_coupling/cv_random_oof_predictions.csv
       - reports/lightgbm/excl_weak_aod_coupling/cv_random_aggregated.json
 
   validate_lightgbm_cv_excl_weak_aod_from_training:
@@ -961,8 +974,10 @@ stages:
     outs:
       - reports/lightgbm/excl_weak_aod_from_training/station_buffer_exclusions.csv
       - reports/lightgbm/excl_weak_aod_from_training/cv_spatial_loso_folds.csv
+      - reports/lightgbm/excl_weak_aod_from_training/cv_spatial_loso_oof_predictions.csv
       - reports/lightgbm/excl_weak_aod_from_training/cv_spatial_loso_aggregated.json
       - reports/lightgbm/excl_weak_aod_from_training/cv_random_folds.csv
+      - reports/lightgbm/excl_weak_aod_from_training/cv_random_oof_predictions.csv
       - reports/lightgbm/excl_weak_aod_from_training/cv_random_aggregated.json
 
   # ============================================================
