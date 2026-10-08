@@ -1731,3 +1731,76 @@ stages:
       - merra2_aggregation
     outs:
       - data/prediction/processed/merra2_aod/merra2_aod_daily.csv
+
+  # MAIAC gap-fill for the grid, producing aod_gap_filled and confidence_rmse.
+  #
+  # Calibrations are fitted PER CELL, not borrowed from the nearest station.
+  # The method is "regress this location's MAIAC on this location's MERRA-2,
+  # then use that fit where MAIAC is missing" -- so applying it to a grid cell
+  # means fitting that cell's own calibration. Borrowing a station's
+  # coefficients would introduce a spatial mismatch the method never had, and
+  # would make a cell's filled AOD depend on how far it happens to be from a
+  # monitor. Every cell has its own MAIAC and MERRA-2 series, so there is no
+  # reason to borrow.
+  #
+  # Same five scripts and params as the station chain. The model was fitted on
+  # gap-filled AOD these produced, so the grid's must come through identically.
+  predict_gapfill_build_dataset:
+    cmd: python scripts/datasets/maiac_gapfill/01_build_calibration_dataset.py --maiac_input data/prediction/processed/maiac_aod/maiac_aod_daily.csv --merra2_input data/prediction/processed/merra2_aod/merra2_aod_daily.csv --station_file data/prediction/processed/grid_1km_delhi.csv --output data/prediction/raw/maiac_gapfill/calibration_dataset.csv --summary_output data/prediction/raw/maiac_gapfill/overlap_summary.csv
+    deps:
+      - scripts/datasets/maiac_gapfill/01_build_calibration_dataset.py
+      - data/prediction/processed/maiac_aod/maiac_aod_daily.csv
+      - data/prediction/processed/merra2_aod/merra2_aod_daily.csv
+      - data/prediction/processed/grid_1km_delhi.csv
+    outs:
+      - data/prediction/raw/maiac_gapfill/calibration_dataset.csv
+      - data/prediction/raw/maiac_gapfill/overlap_summary.csv
+
+  predict_gapfill_fit_calibration:
+    cmd: python scripts/datasets/maiac_gapfill/02_fit_station_calibration.py --input data/prediction/raw/maiac_gapfill/calibration_dataset.csv --station_file data/prediction/processed/grid_1km_delhi.csv --output data/prediction/raw/maiac_gapfill/station_calibration_raw.csv --params params.yaml
+    deps:
+      - scripts/datasets/maiac_gapfill/02_fit_station_calibration.py
+      - data/prediction/raw/maiac_gapfill/calibration_dataset.csv
+      - data/prediction/processed/grid_1km_delhi.csv
+    params:
+      - maiac_gapfill.calibration
+    outs:
+      - data/prediction/raw/maiac_gapfill/station_calibration_raw.csv
+
+  predict_gapfill_qc_calibration:
+    cmd: python scripts/datasets/maiac_gapfill/03_qc_calibration.py --input data/prediction/raw/maiac_gapfill/station_calibration_raw.csv --station_file data/prediction/processed/grid_1km_delhi.csv --output data/prediction/interim/maiac_gapfill/calibration_qc_summary.csv --params params.yaml
+    deps:
+      - scripts/datasets/maiac_gapfill/03_qc_calibration.py
+      - data/prediction/raw/maiac_gapfill/station_calibration_raw.csv
+      - data/prediction/processed/grid_1km_delhi.csv
+    params:
+      - maiac_gapfill.qc
+    outs:
+      - data/prediction/interim/maiac_gapfill/calibration_qc_summary.csv
+
+  predict_gapfill_score_confidence:
+    cmd: python scripts/datasets/maiac_gapfill/04_score_confidence.py --input data/prediction/raw/maiac_gapfill/calibration_dataset.csv --residuals_output data/prediction/interim/maiac_gapfill/loocv_residuals.csv --output data/prediction/processed/maiac_gapfill/confidence_scores.csv --params params.yaml
+    deps:
+      - scripts/datasets/maiac_gapfill/04_score_confidence.py
+      - data/prediction/raw/maiac_gapfill/calibration_dataset.csv
+    params:
+      - maiac_gapfill.calibration
+      - maiac_gapfill.confidence
+    outs:
+      - data/prediction/interim/maiac_gapfill/loocv_residuals.csv
+      - data/prediction/processed/maiac_gapfill/confidence_scores.csv
+
+  predict_gapfill_apply_fill:
+    cmd: python scripts/datasets/maiac_gapfill/05_apply_gapfill.py --maiac_input data/prediction/processed/maiac_aod/maiac_aod_daily.csv --merra2_input data/prediction/processed/merra2_aod/merra2_aod_daily.csv --calibration_input data/prediction/raw/maiac_gapfill/station_calibration_raw.csv --confidence_input data/prediction/processed/maiac_gapfill/confidence_scores.csv --station_file data/prediction/processed/grid_1km_delhi.csv --output data/prediction/processed/features/maiac_aod_gapfilled.csv --summary_output data/prediction/processed/maiac_gapfill/fill_summary.csv --params params.yaml
+    deps:
+      - scripts/datasets/maiac_gapfill/05_apply_gapfill.py
+      - data/prediction/processed/maiac_aod/maiac_aod_daily.csv
+      - data/prediction/processed/merra2_aod/merra2_aod_daily.csv
+      - data/prediction/raw/maiac_gapfill/station_calibration_raw.csv
+      - data/prediction/processed/maiac_gapfill/confidence_scores.csv
+      - data/prediction/processed/grid_1km_delhi.csv
+    params:
+      - maiac_gapfill.fill
+    outs:
+      - data/prediction/processed/features/maiac_aod_gapfilled.csv
+      - data/prediction/processed/maiac_gapfill/fill_summary.csv
