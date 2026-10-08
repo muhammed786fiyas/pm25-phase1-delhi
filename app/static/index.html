@@ -56,6 +56,9 @@ button:hover{filter:brightness(1.06)}
 @media (max-width:900px){#map{height:380px}}
 .readout .big{font-size:40px;font-weight:680;letter-spacing:-0.02em;line-height:1.05}
 .readout .unit{font-size:15px;color:var(--ink2);font-weight:500}
+.readout .interval{font-size:13px;color:var(--ink2);margin-top:3px;
+  font-variant-numeric:tabular-nums}
+.readout .interval b{font-weight:650;color:var(--ink)}
 .band{display:inline-block;margin-top:6px;padding:3px 10px;border-radius:999px;
   border:1px solid var(--axis);font-size:12px;font-weight:650;color:var(--ink2)}
 dl{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;margin:14px 0 0;font-size:13px}
@@ -105,6 +108,7 @@ td.sw{width:22px;padding-right:0}
       <div class="card readout">
         <h3>Estimate</h3>
         <div><span class="big" id="val">&mdash;</span> <span class="unit">&micro;g/m&sup3;</span></div>
+        <div class="interval" id="interval"></div>
         <div class="band" id="band">no query yet</div>
         <dl id="meta"></dl>
         <div class="err" id="err"></div>
@@ -117,15 +121,19 @@ td.sw{width:22px;padding-right:0}
           <thead><tr><th></th><th>Band</th><th class="num">&micro;g/m&sup3;</th></tr></thead>
           <tbody id="legendrows"></tbody>
         </table>
-        <div class="note">Hatched cells are more than 10.6&nbsp;km from any station &mdash; a larger
-          gap than spatial-LOSO validation ever spanned, so treat them as unvalidated.
-          Coverage stops at 15&nbsp;km from a station, so the coloured area &mdash; not the dashed
-          box &mdash; is where an estimate exists.</div>
+        <div class="note">Every estimate carries a 90% prediction interval, calibrated on
+          out-of-fold errors at stations the model never trained on. Hover any cell to see it.
+          <br><br>Hatched cells are more than 10.6&nbsp;km from any station &mdash; a larger gap
+          than spatial-LOSO validation ever spanned. Coverage stops at 15&nbsp;km, so the
+          coloured area &mdash; not the dashed box &mdash; is where an estimate exists. Distance
+          is shown as context only: it was tested against prediction error and found
+          unpredictive, so it is not a confidence grade.</div>
       </div>
 
       <div class="card" style="margin-top:14px">
         <h3>Model</h3>
         <dl id="model"></dl>
+        <div class="note" id="uncert"></div>
       </div>
     </div>
   </div>
@@ -183,7 +191,10 @@ async function loadModel(){
     '<dt>MAE</dt><dd>'+m.validation.mae_ugm3+' &micro;g/m&sup3;</dd>'+
     '<dt>Features</dt><dd>'+m.n_features+'</dd>'+
     '<dt>Stations</dt><dd>'+m.n_training_stations+'</dd>'+
-    '<dt>Coverage</dt><dd>'+m.coverage_rule.max_station_distance_km+' km of a station</dd>';
+    '<dt>Coverage</dt><dd>'+m.coverage_rule.max_station_distance_km+' km of a station</dd>'+
+    '<dt>'+m.uncertainty.coverage_level_pct+'% interval</dt><dd>&plusmn;'+
+      m.uncertainty.width_pct_of_prediction+'% of estimate</dd>';
+  el('uncert').textContent = m.uncertainty.caveat;
   const d = el('date');
   d.min = m.date_window.start; d.max = m.date_window.end;
   if(!d.value) d.value = m.date_window.end;
@@ -207,7 +218,7 @@ async function loadGrid(){
   gridLayer.clearLayers();
   const dLat = g.lat_step/2, dLon = g.lon_step/2;
   g.cells.forEach(c=>{
-    const unvalidated = c.confidence === 'very low';
+    const unvalidated = c.beyond_largest_validated_gap;
     L.rectangle([[c.lat-dLat,c.lon-dLon],[c.lat+dLat,c.lon+dLon]],{
       stroke: unvalidated, color:'#898781',
       weight: unvalidated ? 1 : 0, dashArray: unvalidated ? '2 3' : null,
@@ -215,8 +226,10 @@ async function loadGrid(){
       fillOpacity: unvalidated ? 0.32 : 0.68
     }).bindTooltip(
       '<b>'+c.pm25_ugm3+' &micro;g/m&sup3;</b> &mdash; '+c.aqi_band+'<br>'+
-      '<span style="color:#898781">'+c.nearest_station_km+' km to nearest station '+
-      '&middot; confidence '+c.confidence+'</span>').addTo(gridLayer);
+      '<span style="color:#898781">'+g.interval_coverage_pct+'% interval '+
+      c.interval_lower_ugm3.toFixed(0)+'–'+
+      c.interval_upper_ugm3.toFixed(0)+' &middot; '+c.nearest_station_km+
+      ' km to nearest station</span>').addTo(gridLayer);
   });
 }
 
@@ -235,18 +248,26 @@ async function estimate(lat, lon){
     const r = await getJSON('/api/predict?lat='+lat+'&lon='+lon+'&date='+date);
     el('val').textContent = r.predicted_pm25_ugm3.toFixed(1);
     setBand(r.aqi_band, bandIndex(r.predicted_pm25_ugm3));
+    el('interval').innerHTML = r.interval.coverage_pct+'% interval <b>'+
+      r.interval.lower_ugm3.toFixed(0)+' – '+
+      r.interval.upper_ugm3.toFixed(0)+'</b> &micro;g/m&sup3;';
     el('meta').innerHTML =
-      '<dt>Confidence</dt><dd>'+r.confidence.level+'</dd>'+
-      '<dt>Nearest station</dt><dd>'+r.confidence.distance_to_nearest_station_km+' km</dd>'+
+      '<dt>Nearest station</dt><dd>'+r.provenance.distance_to_nearest_station_km+' km</dd>'+
       '<dt></dt><dd style="color:var(--muted)">'+r.nearest_station.name+'</dd>'+
-      '<dt>Observed there</dt><dd>'+r.nearest_station.observed_pm25_ugm3+' &micro;g/m&sup3;</dd>';
-    el('method').textContent = r.confidence.reason + ' — ' + r.method_note;
+      '<dt>Observed there</dt><dd>'+r.nearest_station.observed_pm25_ugm3+' &micro;g/m&sup3;</dd>'+
+      (r.provenance.beyond_largest_validated_gap
+        ? '<dt></dt><dd style="color:var(--muted)">beyond largest validated gap</dd>' : '');
+    el('method').textContent = r.method_note;
     if(pin) map.removeLayer(pin);
     pin = L.marker([lat,lon]).addTo(map)
-      .bindPopup(r.predicted_pm25_ugm3.toFixed(1)+' &micro;g/m&sup3; ('+r.aqi_band+')').openPopup();
+      .bindPopup('<b>'+r.predicted_pm25_ugm3.toFixed(1)+' &micro;g/m&sup3;</b> ('+r.aqi_band+')<br>'+
+        '<span style="color:#898781">'+r.interval.coverage_pct+'% interval '+
+        r.interval.lower_ugm3.toFixed(0)+'–'+
+        r.interval.upper_ugm3.toFixed(0)+'</span>').openPopup();
   }catch(e){
     el('val').textContent = '—';
     setBand('no estimate', null);
+    el('interval').innerHTML='';
     el('meta').innerHTML=''; el('err').textContent = e.message;
   }
 }

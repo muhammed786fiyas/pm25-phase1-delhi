@@ -56,15 +56,26 @@ DEFAULT_MAX_STATION_DISTANCE_KM = 15.0
 
 EARTH_RADIUS_KM = 6371.0
 
-# Confidence bands keyed to the actual station network, not round numbers.
-# Observed station nearest-neighbour distances: median 3.13 km, 90th pct
-# 5.91 km, max 10.57 km. So 10.57 km is the largest gap spatial-LOSO
-# validation ever had to span -- past that, a query asks for more than the
-# validation ever tested. Note the bbox corners are 12.5-23.8 km from any
-# station, so a real part of Delhi falls in the lowest band.
-CONFIDENCE_NEAR_KM = 3.0
-CONFIDENCE_MID_KM = 6.0
-CONFIDENCE_FAR_KM = 10.6
+# Uncertainty is reported as a conformal prediction interval, NOT as a
+# distance-based confidence band. An earlier version of this app graded
+# confidence by distance to the nearest station; that was measured against
+# actual per-fold error and found unsupported (r = 0.149 with RMSE, p = 0.33,
+# n = 42). Distance still gates SCOPE -- see DEFAULT_MAX_STATION_DISTANCE_KM --
+# because the absence of a correlation across the 0.67-10.6 km the network
+# spans does not license unlimited extrapolation. But it is not a confidence
+# signal and is no longer presented as one.
+#
+# The interval comes from scripts/modeling/lightgbm/04_calibrate_conformal_intervals.py:
+#   interval = prediction * (1 +/- q)
+# with q a percentile of the relative absolute residual measured on
+# spatial-LOSO out-of-fold predictions. 90% is the level served (chosen
+# 2026-10-08); the calibration file also carries 80% and 95%.
+SERVED_COVERAGE_LEVEL = "90"
+
+# 10.6 km is the largest gap spatial-LOSO validation ever spanned (the station
+# network's own maximum nearest-neighbour distance). Reported as context
+# alongside a query, not as an uncertainty estimate.
+VALIDATED_GAP_KM = 10.6
 
 # India National AQI breakpoints for 24h PM2.5 (ug/m3). Used for the
 # interpretable band shown next to the number -- far more meaningful to a
@@ -111,20 +122,14 @@ def aqi_band(value):
     return "unknown"
 
 
-def confidence_for_distance(distance_km):
-    # Reported alongside every prediction because the risk here is specific
-    # and documented: the LME produced a 422 ug/m3 RMSE at station 5598 by
-    # extrapolating into land-use space it never saw. LightGBM clamps instead
-    # of exploding, but a point unlike any training station is still outside
-    # what the validation covers.
-    if distance_km <= CONFIDENCE_NEAR_KM:
-        return "high", "within the median spacing of the station network (3.1 km)"
-    if distance_km <= CONFIDENCE_MID_KM:
-        return "moderate", "within the usual station spacing (90th percentile 5.9 km)"
-    if distance_km <= CONFIDENCE_FAR_KM:
-        return "low", "beyond typical spacing but inside the largest validated gap (10.6 km)"
-    return "very low", ("further from any station than any station is from its own "
-                        "nearest neighbour -- beyond what spatial-LOSO validation tested")
+def prediction_interval(value):
+    # Width scales with the prediction because the model's error is
+    # multiplicative: the relative residual is roughly stable across the
+    # concentration range while the absolute residual is not.
+    q = STATE["conformal_q"]
+    lower = max(0.0, value * (1.0 - q))  # negative PM2.5 is meaningless
+    upper = value * (1.0 + q)
+    return lower, upper
 
 
 def distance_to_nearest_station(lat, lon):
@@ -134,7 +139,8 @@ def distance_to_nearest_station(lat, lon):
 
 
 def load_state(model_path, dataset_path, station_path, metrics_path, grid_km,
-               max_station_distance_km=DEFAULT_MAX_STATION_DISTANCE_KM):
+               max_station_distance_km=DEFAULT_MAX_STATION_DISTANCE_KM,
+               conformal_path=None):
     booster = lgb.Booster(model_file=model_path)
 
     df = pd.read_csv(dataset_path)
@@ -147,6 +153,13 @@ def load_state(model_path, dataset_path, station_path, metrics_path, grid_km,
 
     with open(metrics_path) as f:
         metrics = json.load(f)
+
+    with open(conformal_path) as f:
+        conformal = json.load(f)
+    level = conformal["levels"][SERVED_COVERAGE_LEVEL]
+    print(f"Loaded conformal calibration: {SERVED_COVERAGE_LEVEL}% interval, "
+          f"q={level['q']:.4f} (+/- {level['width_pct_of_prediction']}% of the prediction), "
+          f"held-out coverage {100 * level['coverage_held_out_mean']:.1f}%")
 
     dates = sorted(df["date"].unique().tolist())
 
@@ -164,6 +177,8 @@ def load_state(model_path, dataset_path, station_path, metrics_path, grid_km,
         "dates": dates,
         "grid_km": grid_km,
         "max_station_distance_km": max_station_distance_km,
+        "conformal": conformal,
+        "conformal_q": level["q"],
         "model_path": model_path,
     })
 
@@ -225,6 +240,30 @@ def model_info():
         },
         "bbox": {"min_lon": BBOX_MIN_LON, "min_lat": BBOX_MIN_LAT,
                  "max_lon": BBOX_MAX_LON, "max_lat": BBOX_MAX_LAT},
+        "uncertainty": {
+            "method": "normalized conformal prediction, scaled by the prediction",
+            "formula": "interval = prediction * (1 +/- q)",
+            "coverage_level_pct": int(SERVED_COVERAGE_LEVEL),
+            "q": STATE["conformal_q"],
+            "width_pct_of_prediction": STATE["conformal"]["levels"][
+                SERVED_COVERAGE_LEVEL]["width_pct_of_prediction"],
+            "calibrated_on": STATE["conformal"]["calibration_scheme"],
+            "n_calibration_rows": STATE["conformal"]["n_calibration_rows"],
+            "coverage_held_out_mean": STATE["conformal"]["levels"][
+                SERVED_COVERAGE_LEVEL]["coverage_held_out_mean"],
+            "caveat": (
+                "Conformal prediction guarantees MARGINAL coverage -- correct on "
+                "average across all predictions -- not CONDITIONAL coverage at every "
+                "location. Pooled coverage is "
+                f"{100 * STATE['conformal']['levels'][SERVED_COVERAGE_LEVEL]['coverage_held_out_mean']:.1f}%, "
+                "but per station it ranges "
+                f"{100 * STATE['conformal']['levels'][SERVED_COVERAGE_LEVEL]['coverage_held_out_min']:.1f}% to "
+                f"{100 * STATE['conformal']['levels'][SERVED_COVERAGE_LEVEL]['coverage_held_out_max']:.1f}%, "
+                f"with {STATE['conformal']['levels'][SERVED_COVERAGE_LEVEL]['n_stations_below_target']} "
+                "of 42 stations below target. The under-covered stations are those "
+                "where column AOD tracks surface PM2.5 weakly -- a property that "
+                "cannot be computed for an unmonitored location."),
+        },
         "coverage_rule": {
             "gate": "distance_to_nearest_training_station",
             "max_station_distance_km": STATE["max_station_distance_km"],
@@ -288,14 +327,28 @@ def predict(lat: float, lon: float, date: str):
     distance_km = float(distances[nearest])
     row = preds.iloc[nearest]
     value = float(row["predicted_pm25"])
-    level, reason = confidence_for_distance(distance_km)
+    lower, upper = prediction_interval(value)
 
     return {
         "requested": {"lat": lat, "lon": lon, "date": date},
         "predicted_pm25_ugm3": round(value, 1),
         "aqi_band": aqi_band(value),
-        "confidence": {"level": level, "reason": reason,
-                       "distance_to_nearest_station_km": round(distance_km, 2)},
+        "interval": {
+            "coverage_pct": int(SERVED_COVERAGE_LEVEL),
+            "lower_ugm3": round(lower, 1),
+            "upper_ugm3": round(upper, 1),
+            "width_pct_of_prediction": STATE["conformal"]["levels"][
+                SERVED_COVERAGE_LEVEL]["width_pct_of_prediction"],
+        },
+        # Provenance, NOT uncertainty -- distance does not predict error here
+        # (r = 0.149, p = 0.33). Useful for filtering to cells near a monitor
+        # or for validation study design; the interval is the uncertainty.
+        "provenance": {
+            "distance_to_nearest_station_km": round(distance_km, 2),
+            "beyond_largest_validated_gap": bool(distance_km > VALIDATED_GAP_KM),
+            "note": ("distance is reported as context, not as a confidence measure -- "
+                     "it was tested against per-fold error and found unpredictive"),
+        },
         "nearest_station": {
             "location_id": int(row[GROUP_COL]),
             "name": str(row["name"]),
@@ -345,13 +398,15 @@ def grid(date: str):
         # cell's own AOD, meteorology or land cover.
         w = 1.0 / np.maximum(d, 0.25) ** 2
         value = float(np.sum(w * svals) / np.sum(w))
-        level, _ = confidence_for_distance(nearest_km)
+        lower, upper = prediction_interval(value)
         out.append({
             "lat": lat, "lon": lon,
             "pm25_ugm3": round(value, 1),
             "aqi_band": aqi_band(value),
+            "interval_lower_ugm3": round(lower, 1),
+            "interval_upper_ugm3": round(upper, 1),
             "nearest_station_km": round(nearest_km, 2),
-            "confidence": level,
+            "beyond_largest_validated_gap": bool(nearest_km > VALIDATED_GAP_KM),
         })
 
     return {
@@ -360,6 +415,7 @@ def grid(date: str):
         "n_cells": len(out),
         "lat_step": round(lat_step, 6),
         "lon_step": round(lon_step, 6),
+        "interval_coverage_pct": int(SERVED_COVERAGE_LEVEL),
         "synthetic": True,
         "method": "idw_from_station_predictions",
         "method_note": ("SYNTHETIC SURFACE. Inverse-distance weighting of the model's "
@@ -380,6 +436,9 @@ def main():
                         default="data/stations/cpcb_stations_delhi_status.csv")
     parser.add_argument("--metrics",
                         default="reports/lightgbm/primary/cv_spatial_loso_aggregated.json")
+    parser.add_argument("--conformal",
+                        default="reports/lightgbm/primary/conformal_calibration.json",
+                        help="output of 04_calibrate_conformal_intervals.py")
     parser.add_argument("--max_station_distance_km",
                         default=DEFAULT_MAX_STATION_DISTANCE_KM, type=float,
                         help="refuse queries further than this from any training station")
@@ -391,7 +450,7 @@ def main():
     args = parser.parse_args()
 
     load_state(args.model, args.dataset, args.station_file, args.metrics, args.grid_km,
-               args.max_station_distance_km)
+               args.max_station_distance_km, args.conformal)
 
     static_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
     app.mount("/static", StaticFiles(directory=static_dir), name="static")
