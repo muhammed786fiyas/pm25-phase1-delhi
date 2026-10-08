@@ -20,6 +20,13 @@ def main():
     parser.add_argument("--stations", required=True, help="CPCB station status CSV")
     parser.add_argument("--params", required=True, help="params.yaml path")
     parser.add_argument("--outdir", required=True)
+    # One reduceRegions call covers many points. The projection, reducer and
+    # scale are unchanged, so this alters HOW the request is sent and not WHAT
+    # is computed -- verified by running the batched path over the 42 stations
+    # and diffing the cell assignment against the committed mapping. Default 0
+    # keeps the per-point path so station stages are untouched.
+    parser.add_argument("--batch_size", type=int, default=0,
+                        help="points per reduceRegions call; 0 = one call per point")
     args = parser.parse_args()
 
     os.makedirs(args.outdir, exist_ok=True)
@@ -43,11 +50,36 @@ def main():
     pixel_lonlat = ee.Image.pixelLonLat().reproject(era5_projection)
 
     rows = []
+    batched_cells = {}
+    if args.batch_size > 0:
+        print(f"Mapping {len(stations)} points in batches of {args.batch_size}")
+        ordered = stations.reset_index(drop=True)
+        for start in range(0, len(ordered), args.batch_size):
+            block = ordered.iloc[start:start + args.batch_size]
+            features = []
+            for point_row in block.itertuples(index=False):
+                features.append(ee.Feature(
+                    ee.Geometry.Point([point_row.longitude, point_row.latitude]),
+                    {"location_id": int(point_row.location_id)}))
+            result = pixel_lonlat.reduceRegions(
+                collection=ee.FeatureCollection(features),
+                reducer=ee.Reducer.first(),
+                scale=1000,
+            ).getInfo()
+            for feature in result["features"]:
+                properties = feature["properties"]
+                batched_cells[properties["location_id"]] = (
+                    properties["longitude"], properties["latitude"])
+            print(f"  {min(start + args.batch_size, len(ordered))}/{len(ordered)}")
+
     for i in range(len(stations)):
         station = stations.iloc[i]
-        cell_lon, cell_lat = get_cell_for_station(
-            pixel_lonlat, station["longitude"], station["latitude"]
-        )
+        if args.batch_size > 0:
+            cell_lon, cell_lat = batched_cells[int(station["location_id"])]
+        else:
+            cell_lon, cell_lat = get_cell_for_station(
+                pixel_lonlat, station["longitude"], station["latitude"]
+            )
         rows.append({
             "location_id": station["location_id"],
             "name": station["name"],

@@ -1539,3 +1539,104 @@ stages:
       - data/prediction/interim/maiac_aod/qa_filter
     outs:
       - data/prediction/processed/maiac_aod
+
+  # ERA5-Land and ERA5 BLH for the grid. Same scripts and params as the station
+  # chain; only the roster and paths differ.
+  #
+  # Cheap despite 2388 cells, because reanalysis is coarse and the extractor
+  # already deduplicates to unique PIXELS: the grid collapses onto 33 ERA5-Land
+  # cells against the stations' 15, so extraction is ~2.2x the station cost
+  # rather than 57x. ERA5 (BLH) is coarser still.
+  #
+  # The mapping stage runs batched (--batch_size 300): one reduceRegions call
+  # per 300 points instead of one getInfo per point, 14 s instead of ~40 min.
+  # Verified against the committed station mapping -- cell_lat/cell_lon match to
+  # 1e-12 and the station-to-cell GROUPINGS are identical; only the arbitrary
+  # sequential cell_id label differs, since batching meets cells in a different
+  # order. cell_id is an internal join key used consistently within one mapping
+  # file, so that is safe.
+  predict_map_cells_era5_land:
+    cmd: python scripts/datasets/era5_land/1-map_stations_to_cells.py --stations data/prediction/processed/grid_1km_delhi.csv --params params.yaml --batch_size 300 --outdir data/prediction/raw/era5_land
+    deps:
+      - scripts/datasets/era5_land/1-map_stations_to_cells.py
+      - data/prediction/processed/grid_1km_delhi.csv
+    params:
+      - era5_land.map_stations_to_cells
+    outs:
+      - data/prediction/raw/era5_land/station_cell_mapping.csv
+
+  predict_extract_era5_land:
+    cmd: python scripts/datasets/era5_land/2-extract_gee_era5land.py --mapping data/prediction/raw/era5_land/station_cell_mapping.csv --params params.yaml --outdir data/prediction/raw/era5_land
+    deps:
+      - scripts/datasets/era5_land/2-extract_gee_era5land.py
+      - data/prediction/raw/era5_land/station_cell_mapping.csv
+    params:
+      - era5_land.extract
+    outs:
+      - data/prediction/raw/era5_land/era5_land_raw.csv
+
+  predict_window_qc_era5_land:
+    cmd: python scripts/datasets/era5_land/3-window_and_qc_era5land.py --raw data/prediction/raw/era5_land/era5_land_raw.csv --mapping data/prediction/raw/era5_land/station_cell_mapping.csv --params params.yaml --outdir data/prediction/interim/era5_land
+    deps:
+      - scripts/datasets/era5_land/3-window_and_qc_era5land.py
+      - data/prediction/raw/era5_land/era5_land_raw.csv
+      - data/prediction/raw/era5_land/station_cell_mapping.csv
+    params:
+      - era5_land.window_qc
+    outs:
+      - data/prediction/interim/era5_land/era5_land_windowed.csv
+      - data/prediction/interim/era5_land/era5_land_window_summary.csv
+
+  predict_aggregate_era5_land_daily:
+    cmd: python scripts/datasets/era5_land/4-aggregate_era5land_daily.py --windowed data/prediction/interim/era5_land/era5_land_windowed.csv --params params.yaml --outdir data/prediction/processed/era5_land
+    deps:
+      - scripts/datasets/era5_land/4-aggregate_era5land_daily.py
+      - data/prediction/interim/era5_land/era5_land_windowed.csv
+    params:
+      - era5_land.daily_aggregation
+    outs:
+      - data/prediction/processed/era5_land/era5_land_daily.csv
+      - data/prediction/processed/era5_land/era5_land_daily_summary.csv
+
+  predict_map_cells_era5_blh:
+    cmd: python scripts/datasets/era5_blh/1-map_stations_to_cells.py --stations data/prediction/processed/grid_1km_delhi.csv --params params.yaml --batch_size 300 --outdir data/prediction/raw/era5_blh
+    deps:
+      - scripts/datasets/era5_blh/1-map_stations_to_cells.py
+      - data/prediction/processed/grid_1km_delhi.csv
+    params:
+      - era5_blh.map_stations_to_cells
+    outs:
+      - data/prediction/raw/era5_blh/station_cell_mapping.csv
+
+  predict_extract_era5_blh:
+    cmd: python scripts/datasets/era5_blh/2-extract_gee_era5blh.py --mapping data/prediction/raw/era5_blh/station_cell_mapping.csv --params params.yaml --outdir data/prediction/raw/era5_blh
+    deps:
+      - scripts/datasets/era5_blh/2-extract_gee_era5blh.py
+      - data/prediction/raw/era5_blh/station_cell_mapping.csv
+    params:
+      - era5_blh.extract
+    outs:
+      - data/prediction/raw/era5_blh/era5_blh_raw.csv
+
+  predict_window_qc_era5_blh:
+    cmd: python scripts/datasets/era5_blh/3-window_and_qc_era5blh.py --raw data/prediction/raw/era5_blh/era5_blh_raw.csv --mapping data/prediction/raw/era5_blh/station_cell_mapping.csv --params params.yaml --outdir data/prediction/interim/era5_blh
+    deps:
+      - scripts/datasets/era5_blh/3-window_and_qc_era5blh.py
+      - data/prediction/raw/era5_blh/era5_blh_raw.csv
+      - data/prediction/raw/era5_blh/station_cell_mapping.csv
+    params:
+      - era5_blh.window_qc
+    outs:
+      - data/prediction/interim/era5_blh/era5_blh_windowed.csv
+      - data/prediction/interim/era5_blh/era5_blh_window_summary.csv
+
+  predict_aggregate_era5_blh_daily:
+    cmd: python scripts/datasets/era5_blh/4-aggregate_era5blh_daily.py --windowed data/prediction/interim/era5_blh/era5_blh_windowed.csv --params params.yaml --outdir data/prediction/processed/era5_blh
+    deps:
+      - scripts/datasets/era5_blh/4-aggregate_era5blh_daily.py
+      - data/prediction/interim/era5_blh/era5_blh_windowed.csv
+    params:
+      - era5_blh.daily_aggregation
+    outs:
+      - data/prediction/processed/era5_blh/era5_blh_daily.csv
+      - data/prediction/processed/era5_blh/era5_blh_daily_summary.csv
