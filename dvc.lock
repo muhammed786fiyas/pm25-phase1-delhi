@@ -3807,3 +3807,118 @@ stages:
       hash: md5
       md5: 71f0b11a46bebc71ea5459ddbc64f6f8
       size: 192948
+  predict_map_cells_merra2:
+    cmd: python scripts/datasets/merra2_aod/1-map_stations_to_cells.py 
+      --stations data/prediction/processed/grid_1km_delhi.csv --outdir 
+      data/prediction/raw/merra2_aod --params params.yaml
+    deps:
+    - path: data/prediction/processed/grid_1km_delhi.csv
+      hash: md5
+      md5: 9ab84e51b6ee0bd4e5ae62171c6ee83b
+      size: 176200
+    - path: scripts/datasets/merra2_aod/1-map_stations_to_cells.py
+      hash: md5
+      md5: 78125cd8fd6ef73f187f7cf36faea716
+      size: 3346
+    params:
+      params.yaml:
+        merra2_station_mapping:
+          gee_project: internship-pm25
+          collection: NASA/GSFC/MERRA/aer/2
+          aot_band: TOTEXTTAU
+          test_date_start: '2025-06-01'
+          test_date_end: '2025-06-02'
+    outs:
+    - path: data/prediction/raw/merra2_aod/station_cell_mapping.csv
+      hash: md5
+      md5: 34b8e89c552e3763d4e38418e00a1385
+      size: 152292
+  predict_extract_merra2:
+    cmd: python scripts/datasets/merra2_aod/2-extract_gee_merra2.py --mapping 
+      data/prediction/raw/merra2_aod/station_cell_mapping.csv --outdir 
+      data/prediction/raw/merra2_aod --params params.yaml
+    deps:
+    - path: data/prediction/raw/merra2_aod/station_cell_mapping.csv
+      hash: md5
+      md5: 34b8e89c552e3763d4e38418e00a1385
+      size: 152292
+    - path: scripts/datasets/merra2_aod/2-extract_gee_merra2.py
+      hash: md5
+      md5: 0a398284a63241cd14ea5dfc69c51b27
+      size: 2213
+    params:
+      params.yaml:
+        merra2_extraction:
+          gee_project: internship-pm25
+          collection: NASA/GSFC/MERRA/aer/2
+          aot_band: TOTEXTTAU
+          date_start: '2025-03-01'
+          date_end: '2026-03-01'
+          scale_meters: 1000
+    outs:
+    - path: data/prediction/raw/merra2_aod/merra2_aod_raw.csv
+      hash: md5
+      md5: 68c7a8389df050cfa3819ec69380a0a0
+      size: 2902056
+  predict_window_qc_merra2:
+    cmd: python scripts/datasets/merra2_aod/3-window_and_qc_merra2.py --raw 
+      data/prediction/raw/merra2_aod/merra2_aod_raw.csv --mapping 
+      data/prediction/raw/merra2_aod/station_cell_mapping.csv --outdir 
+      data/prediction/interim/merra2_aod --params params.yaml
+    deps:
+    - path: data/prediction/raw/merra2_aod/merra2_aod_raw.csv
+      hash: md5
+      md5: 68c7a8389df050cfa3819ec69380a0a0
+      size: 2902056
+    - path: data/prediction/raw/merra2_aod/station_cell_mapping.csv
+      hash: md5
+      md5: 34b8e89c552e3763d4e38418e00a1385
+      size: 152292
+    - path: scripts/datasets/merra2_aod/3-window_and_qc_merra2.py
+      hash: md5
+      md5: c8cc0ef2a512851c11bae62c007a8f36
+      size: 3900
+    params:
+      params.yaml:
+        merra2_windowing_qc:
+          aot_band: TOTEXTTAU
+          overpass_hours_utc:
+          - 5
+          - 6
+          - 7
+          totexttau_min: 0.0
+          totexttau_max: 5.0
+          coord_tolerance_degrees: 0.05
+    outs:
+    - path: data/prediction/interim/merra2_aod/merra2_aod_windowed_qc.csv
+      hash: md5
+      md5: 0a995e1ce91c60a3887c589ce976fb1d
+      size: 529389
+  predict_aggregate_merra2:
+    cmd: python scripts/datasets/merra2_aod/4-aggregate_merra2_daily.py 
+      --windowed data/prediction/interim/merra2_aod/merra2_aod_windowed_qc.csv 
+      --mapping data/prediction/raw/merra2_aod/station_cell_mapping.csv --outdir
+      data/prediction/processed/merra2_aod --params params.yaml
+    deps:
+    - path: data/prediction/interim/merra2_aod/merra2_aod_windowed_qc.csv
+      hash: md5
+      md5: 0a995e1ce91c60a3887c589ce976fb1d
+      size: 529389
+    - path: data/prediction/raw/merra2_aod/station_cell_mapping.csv
+      hash: md5
+      md5: 34b8e89c552e3763d4e38418e00a1385
+      size: 152292
+    - path: scripts/datasets/merra2_aod/4-aggregate_merra2_daily.py
+      hash: md5
+      md5: 42dbab3f3e1cffe410e0a0ca61657388
+      size: 1772
+    params:
+      params.yaml:
+        merra2_aggregation:
+          aot_band: TOTEXTTAU
+          min_hours_required: 2
+    outs:
+    - path: data/prediction/processed/merra2_aod/merra2_aod_daily.csv
+      hash: md5
+      md5: 998cf3e1de69078856dad0c7c81e4f61
+      size: 82239789
