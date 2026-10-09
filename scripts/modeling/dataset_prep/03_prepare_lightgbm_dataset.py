@@ -2,6 +2,8 @@ import argparse
 import os
 import pandas as pd
 
+TARGET_COL = "pm25_daily"
+
 # LightGBM is unaffected by collinearity, so we only drop the 3 WorldCover
 # columns that are literally 0% at every one of the 42 Delhi stations (no
 # information at all) -- water_pct and wetland_herbaceous_pct are kept since
@@ -17,7 +19,7 @@ def drop_rows_with_zero_target(df):
     # truth reading regardless of model type (a wrong label is a wrong label,
     # whether a linear model or a tree learns from it)
     before = len(df)
-    df = df[df["pm25_daily"] > 0].copy()
+    df = df[df[TARGET_COL] > 0].copy()
     print(f"Dropped {before - len(df)} rows with pm25_daily <= 0 (before: {before}, after: {len(df)})")
     return df
 
@@ -46,8 +48,21 @@ def main():
     df = pd.read_csv(args.input)
     print(f"Loaded master table: {len(df)} rows")
 
+    # The PREDICTION grid has no pm25_daily -- that is what is being predicted.
+    # Everything else here (the WorldCover drops, the negative-AOD clip, the
+    # column set and its order) must apply identically to the grid, because the
+    # booster was fitted on exactly this shape. Reusing this script rather than
+    # writing a prediction-only copy is what guarantees that.
+    has_target = TARGET_COL in df.columns
+    if not has_target:
+        print(f"No {TARGET_COL} column -- preparing a feature-only table "
+              f"(prediction grid)")
+
     if args.drop_zero_target_rows == "true":
-        df = drop_rows_with_zero_target(df)
+        if has_target:
+            df = drop_rows_with_zero_target(df)
+        else:
+            print("Skipping zero-target row drop: no target column")
 
     if args.clip_negative_aod_to_zero == "true":
         df = clip_negative_aod(df)
@@ -55,8 +70,9 @@ def main():
     worldcover_keep_cols = [col for col in df.columns if col.endswith("_pct")
                             and col not in WORLDCOVER_DROP_COLS]
 
-    lgbm_cols = ["location_id", "name", "date", "season", "pm25_daily",
-                 "aod_055", "aod_gap_filled", "confidence_rmse"] + \
+    target_cols = [TARGET_COL] if has_target else []
+    lgbm_cols = ["location_id", "name", "date", "season"] + target_cols + \
+                ["aod_055", "aod_gap_filled", "confidence_rmse"] + \
                 MET_COLS + ["ndvi_mean", "ndvi_gap_filled"] + \
                 worldcover_keep_cols + TERRAIN_COLS + OSM_COLS
     df = df[lgbm_cols]

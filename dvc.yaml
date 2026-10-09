@@ -1832,3 +1832,66 @@ stages:
       - data/prediction/processed/features/powerplant_distance.csv
     outs:
       - data/prediction/processed/modeling_datasets/master_feature_table.csv
+
+  # Inference over the grid, plus the checks that make it trustworthy.
+  predict_prepare_grid_features:
+    cmd: python scripts/modeling/dataset_prep/03_prepare_lightgbm_dataset.py --input data/prediction/processed/modeling_datasets/master_feature_table.csv --output data/prediction/processed/modeling_datasets/lightgbm_ready_grid.csv --drop_zero_target_rows true --clip_negative_aod_to_zero true
+    deps:
+      - scripts/modeling/dataset_prep/03_prepare_lightgbm_dataset.py
+      - data/prediction/processed/modeling_datasets/master_feature_table.csv
+    outs:
+      - data/prediction/processed/modeling_datasets/lightgbm_ready_grid.csv
+
+  # Tests whether being unusual predicts worse conformal coverage, using the 42
+  # stations' measured held-out coverage. Result decides whether extrapolating
+  # cells can be given an adjusted interval or only a flag.
+  predict_test_extrapolation_coverage:
+    cmd: python scripts/prediction/inference/00_test_extrapolation_vs_coverage.py --dataset data/training/processed/modeling_datasets/lightgbm_ready_dataset.csv --coverage reports/lightgbm/primary/conformal_heldout_coverage.csv --output reports/prediction/extrapolation_vs_coverage.csv --summary_output reports/prediction/extrapolation_vs_coverage.json
+    deps:
+      - scripts/prediction/inference/00_test_extrapolation_vs_coverage.py
+      - data/training/processed/modeling_datasets/lightgbm_ready_dataset.csv
+      - reports/lightgbm/primary/conformal_heldout_coverage.csv
+    outs:
+      - reports/prediction/extrapolation_vs_coverage.csv
+      - reports/prediction/extrapolation_vs_coverage.json
+
+  predict_grid:
+    cmd: python scripts/prediction/inference/01_predict_grid.py --grid_features data/prediction/processed/modeling_datasets/lightgbm_ready_grid.csv --model models/lightgbm/lightgbm_full_model.txt --conformal reports/lightgbm/primary/conformal_calibration.json --extrapolation reports/prediction/grid_extrapolation_severity.csv --output data/prediction/processed/grid_predictions.parquet --summary_output reports/prediction/grid_prediction_summary.json
+    deps:
+      - scripts/prediction/inference/01_predict_grid.py
+      - data/prediction/processed/modeling_datasets/lightgbm_ready_grid.csv
+      - models/lightgbm/lightgbm_full_model.txt
+      - reports/lightgbm/primary/conformal_calibration.json
+      - reports/prediction/grid_extrapolation_severity.csv
+    outs:
+      - data/prediction/processed/grid_predictions.parquet
+      - reports/prediction/grid_prediction_summary.json
+
+  # End-to-end gate: the cell containing a station must predict what the
+  # station predicts. Grid cells have no ground truth, so this is the only
+  # test that exercises all 23 features, every join, the gap-fill, the NDVI
+  # period mapping and the season assignment at once.
+  predict_check_station_agreement:
+    cmd: python scripts/prediction/inference/02_check_station_agreement.py --station_features data/training/processed/modeling_datasets/lightgbm_ready_dataset.csv --station_file data/stations/cpcb_stations_delhi_status.csv --grid data/prediction/processed/grid_1km_delhi.csv --grid_predictions data/prediction/processed/grid_predictions.parquet --model models/lightgbm/lightgbm_full_model.txt --output reports/prediction/station_cell_agreement.csv --summary_output reports/prediction/station_cell_agreement.json
+    deps:
+      - scripts/prediction/inference/02_check_station_agreement.py
+      - data/prediction/processed/grid_predictions.parquet
+      - data/training/processed/modeling_datasets/lightgbm_ready_dataset.csv
+      - data/prediction/processed/grid_1km_delhi.csv
+      - models/lightgbm/lightgbm_full_model.txt
+    outs:
+      - reports/prediction/station_cell_agreement.csv
+      - reports/prediction/station_cell_agreement.json
+
+  # Characterises the grid against the training envelope. Run as a stage, not
+  # by hand: a hand-run script produces no DVC-generated .gitignore, which is
+  # how a 390 MB output got committed to git earlier in this work.
+  predict_flag_extrapolation:
+    cmd: python scripts/prediction/features/03_flag_extrapolation.py --training data/training/processed/modeling_datasets/lightgbm_ready_dataset.csv --grid data/prediction/processed/modeling_datasets/master_feature_table.csv --severity_output reports/prediction/grid_extrapolation_severity.csv --by_feature_output reports/prediction/grid_extrapolation_by_feature.csv
+    deps:
+      - scripts/prediction/features/03_flag_extrapolation.py
+      - data/training/processed/modeling_datasets/lightgbm_ready_dataset.csv
+      - data/prediction/processed/modeling_datasets/master_feature_table.csv
+    outs:
+      - reports/prediction/grid_extrapolation_severity.csv
+      - reports/prediction/grid_extrapolation_by_feature.csv

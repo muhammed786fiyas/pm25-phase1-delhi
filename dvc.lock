@@ -1558,8 +1558,8 @@ stages:
       size: 6657899
     - path: scripts/modeling/dataset_prep/03_prepare_lightgbm_dataset.py
       hash: md5
-      md5: d6e45198aafcaf1f4bcdab698e9b9606
-      size: 4070
+      md5: 61146e0fd273ec53e18895b4bd10bd5b
+      size: 4818
     params:
       params.yaml:
         modeling.lightgbm_prep:
@@ -4273,3 +4273,161 @@ stages:
       hash: md5
       md5: a2ff43271d91bc0bba62475084fc8418
       size: 410530439
+  predict_test_extrapolation_coverage:
+    cmd: python 
+      scripts/prediction/inference/00_test_extrapolation_vs_coverage.py 
+      --dataset 
+      data/training/processed/modeling_datasets/lightgbm_ready_dataset.csv 
+      --coverage reports/lightgbm/primary/conformal_heldout_coverage.csv 
+      --output reports/prediction/extrapolation_vs_coverage.csv --summary_output
+      reports/prediction/extrapolation_vs_coverage.json
+    deps:
+    - path: data/training/processed/modeling_datasets/lightgbm_ready_dataset.csv
+      hash: md5
+      md5: 45f4facf69f6bc1bbda784ff20dfecf5
+      size: 5322602
+    - path: reports/lightgbm/primary/conformal_heldout_coverage.csv
+      hash: md5
+      md5: eb191d0ced99446fd026731c322abcb0
+      size: 2044
+    - path: scripts/prediction/inference/00_test_extrapolation_vs_coverage.py
+      hash: md5
+      md5: 769bd58080f764a5fbced3d973f06652
+      size: 10320
+    outs:
+    - path: reports/prediction/extrapolation_vs_coverage.csv
+      hash: md5
+      md5: 2e9683c3902a82a07d76badfaee386e6
+      size: 1893
+    - path: reports/prediction/extrapolation_vs_coverage.json
+      hash: md5
+      md5: 37e518a417cd59ee548c754c75ffc09c
+      size: 1685
+  predict_grid:
+    cmd: python scripts/prediction/inference/01_predict_grid.py --grid_features 
+      data/prediction/processed/modeling_datasets/lightgbm_ready_grid.csv 
+      --model models/lightgbm/lightgbm_full_model.txt --conformal 
+      reports/lightgbm/primary/conformal_calibration.json --extrapolation 
+      reports/prediction/grid_extrapolation_severity.csv --output 
+      data/prediction/processed/grid_predictions.parquet --summary_output 
+      reports/prediction/grid_prediction_summary.json
+    deps:
+    - path: data/prediction/processed/modeling_datasets/lightgbm_ready_grid.csv
+      hash: md5
+      md5: 456e2b73b945a85e292ef991ac96de59
+      size: 326469787
+    - path: models/lightgbm/lightgbm_full_model.txt
+      hash: md5
+      md5: ba6d5040dded488e0f21721daa2ed054
+      size: 1468159
+    - path: reports/lightgbm/primary/conformal_calibration.json
+      hash: md5
+      md5: b0e886a48001ff1cb511c1056dcfb034
+      size: 3784
+    - path: reports/prediction/grid_extrapolation_severity.csv
+      hash: md5
+      md5: bb5b73971b00f6ad848d2577896035b3
+      size: 87769
+    - path: scripts/prediction/inference/01_predict_grid.py
+      hash: md5
+      md5: c93154ffdb3384bd9e499f19eeb94667
+      size: 6506
+    outs:
+    - path: data/prediction/processed/grid_predictions.parquet
+      hash: md5
+      md5: e03f4267f048e71c15d105dd292edcc9
+      size: 5643905
+    - path: reports/prediction/grid_prediction_summary.json
+      hash: md5
+      md5: 40becb9858363e46dd5832fe4f882604
+      size: 369
+  predict_check_station_agreement:
+    cmd: python scripts/prediction/inference/02_check_station_agreement.py 
+      --station_features 
+      data/training/processed/modeling_datasets/lightgbm_ready_dataset.csv 
+      --station_file data/stations/cpcb_stations_delhi_status.csv --grid 
+      data/prediction/processed/grid_1km_delhi.csv --grid_predictions 
+      data/prediction/processed/grid_predictions.parquet --model 
+      models/lightgbm/lightgbm_full_model.txt --output 
+      reports/prediction/station_cell_agreement.csv --summary_output 
+      reports/prediction/station_cell_agreement.json
+    deps:
+    - path: data/prediction/processed/grid_1km_delhi.csv
+      hash: md5
+      md5: 9ab84e51b6ee0bd4e5ae62171c6ee83b
+      size: 176200
+    - path: data/prediction/processed/grid_predictions.parquet
+      hash: md5
+      md5: e03f4267f048e71c15d105dd292edcc9
+      size: 5643905
+    - path: data/training/processed/modeling_datasets/lightgbm_ready_dataset.csv
+      hash: md5
+      md5: 45f4facf69f6bc1bbda784ff20dfecf5
+      size: 5322602
+    - path: models/lightgbm/lightgbm_full_model.txt
+      hash: md5
+      md5: ba6d5040dded488e0f21721daa2ed054
+      size: 1468159
+    - path: scripts/prediction/inference/02_check_station_agreement.py
+      hash: md5
+      md5: b5212b3ef0ab068426502b08620aea4e
+      size: 7878
+    outs:
+    - path: reports/prediction/station_cell_agreement.csv
+      hash: md5
+      md5: 05782deecea4f93411d83b23206cc694
+      size: 1932160
+    - path: reports/prediction/station_cell_agreement.json
+      hash: md5
+      md5: dbe142329cbb0d07c8a911b55d8c9313
+      size: 679
+  predict_prepare_grid_features:
+    cmd: python scripts/modeling/dataset_prep/03_prepare_lightgbm_dataset.py 
+      --input 
+      data/prediction/processed/modeling_datasets/master_feature_table.csv 
+      --output 
+      data/prediction/processed/modeling_datasets/lightgbm_ready_grid.csv 
+      --drop_zero_target_rows true --clip_negative_aod_to_zero true
+    deps:
+    - path: data/prediction/processed/modeling_datasets/master_feature_table.csv
+      hash: md5
+      md5: a2ff43271d91bc0bba62475084fc8418
+      size: 410530439
+    - path: scripts/modeling/dataset_prep/03_prepare_lightgbm_dataset.py
+      hash: md5
+      md5: 61146e0fd273ec53e18895b4bd10bd5b
+      size: 4818
+    outs:
+    - path: data/prediction/processed/modeling_datasets/lightgbm_ready_grid.csv
+      hash: md5
+      md5: 456e2b73b945a85e292ef991ac96de59
+      size: 326469787
+  predict_flag_extrapolation:
+    cmd: python scripts/prediction/features/03_flag_extrapolation.py --training 
+      data/training/processed/modeling_datasets/lightgbm_ready_dataset.csv 
+      --grid 
+      data/prediction/processed/modeling_datasets/master_feature_table.csv 
+      --severity_output reports/prediction/grid_extrapolation_severity.csv 
+      --by_feature_output reports/prediction/grid_extrapolation_by_feature.csv
+    deps:
+    - path: data/prediction/processed/modeling_datasets/master_feature_table.csv
+      hash: md5
+      md5: a2ff43271d91bc0bba62475084fc8418
+      size: 410530439
+    - path: data/training/processed/modeling_datasets/lightgbm_ready_dataset.csv
+      hash: md5
+      md5: 45f4facf69f6bc1bbda784ff20dfecf5
+      size: 5322602
+    - path: scripts/prediction/features/03_flag_extrapolation.py
+      hash: md5
+      md5: 8d3dbefe873ee0c19ca43c03ba7502a0
+      size: 6157
+    outs:
+    - path: reports/prediction/grid_extrapolation_by_feature.csv
+      hash: md5
+      md5: 011f3b2c4f30094cc89165c848b64ca9
+      size: 1332
+    - path: reports/prediction/grid_extrapolation_severity.csv
+      hash: md5
+      md5: ca08fbe71a1d1062438dd3715898bccc
+      size: 92564
