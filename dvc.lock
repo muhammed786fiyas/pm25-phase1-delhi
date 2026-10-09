@@ -4326,8 +4326,8 @@ stages:
       size: 3784
     - path: reports/prediction/grid_extrapolation_severity.csv
       hash: md5
-      md5: bb5b73971b00f6ad848d2577896035b3
-      size: 87769
+      md5: ca08fbe71a1d1062438dd3715898bccc
+      size: 92564
     - path: scripts/prediction/inference/01_predict_grid.py
       hash: md5
       md5: c93154ffdb3384bd9e499f19eeb94667
