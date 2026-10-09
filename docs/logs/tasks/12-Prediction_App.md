@@ -676,6 +676,87 @@ year at 1 km is 326 MB as CSV, which is why parquet is the default and the UI
 defaults to one month -- 871,620 rows is a surprising thing to hand someone who
 just clicked Download.
 
+### UI rework -- multi-resolution map and an About page (2026-10-09)
+
+Muhammed's request: let the map show every resolution, and strip the main
+screen back because it had become a wall of prose with awkward gaps.
+
+**Multi-resolution map.** `/api/grid` takes `resolution_km` and serves 1, 2, 5
+or 10 km from the aggregated frames, rectangle size derived per level:
+2388 / 605 / 105 / 29 cells at +/-55.0% / 29.5% / 16.3% / 13.4%.
+
+**The main screen is now map, readout, compact AQI legend and four model
+numbers.** Everything explanatory moved to `/about.html`: validation including
+the station-agreement check, what the interval does and does not promise, the
+marginal-vs-conditional limitation, why distance is not a confidence grade,
+where the model extrapolates and why the interval is not widened there, the
+areal-mean trap with the worked example, the three AOD provenance cases, and
+sources. Feature pickers collapsed behind a disclosure instead of showing 21
+checkboxes by default. The page went from 608 lines of mostly prose to a
+22 KB screen plus a 13 KB reference page.
+
+**One deliberate departure from "move the warnings out".** Explanations moved;
+warnings that change what the CURRENT number means stayed inline, shown only
+when they apply. There are two: switching to a coarse resolution (the interval
+tightens, and the reason is that the quantity changed from a point to an area
+average, not that the data improved), and querying a cell outside the training
+range. Both are one line and link to the full account. Muhammed's point that
+these already ship with downloads is right, but someone reading the map may
+never download anything, and the misreading happens at the moment the number
+changes.
+
+`/about.html` is routed explicitly, since StaticFiles is mounted at `/static`
+and the bare path would otherwise 404.
+
+### UI fixes and the reset control (2026-10-09)
+
+Two bugs Muhammed found, and one addition.
+
+**The extrapolation warning never cleared.** Clicking a flagged cell showed it;
+clicking a valid one left it on screen, so a cell inside the training range
+appeared to be outside it. A stale warning is worse than none, because it makes
+the flag untrustworthy everywhere. The cause was a missing else, but the fix
+needed care: the context strip has two independent sources, and the resolution
+warning must survive a point query while the point warning must not survive a
+valid click. They are now separate state, re-rendered together. Verified by
+driving the real page and reading the strip after each of seven actions.
+
+**Table headers were left-aligned over right-aligned numbers.** The rule was
+`td.num{text-align:right}`, which targets `td` only, so `th.num` stayed left and
+the two read as unrelated columns. Now `td.num,th.num`, applied in index.html
+too so the next table added there does not inherit it.
+
+**Reset-view control**, under the zoom buttons. `fitBounds` with
+`animate:false` -- the flag is load-bearing, not stylistic: an animated reset
+can fail to land, and did exactly that under test, with the click reaching the
+handler but the view not moving. `HOME_BOUNDS` is defined once and used for
+both the initial view and the reset so they cannot drift.
+
+The icon colour is deliberately not themed with `var(--ink)`: Leaflet's
+controls keep a white background in dark mode, so an `--ink` colour rendered
+the glyph white-on-white and it vanished. It matches Leaflet's own `#333`.
+
+`window.map` is now exposed. A top-level `const` is not a window property, so
+the map was unreachable from the console -- a nuisance on a local research tool
+and the reason the UI could not be tested from outside.
+
+**Testing Leaflet here is harder than it looks, and four approaches gave
+confident wrong answers before one worked.** Recorded because they will recur:
+
+- a synthetic double-click to zoom ALSO fires the map click handler, which runs
+  a prediction and drops a pin, so the comparison measured page state;
+- comparing screenshots conflated tile loading with view changes;
+- the map pane's CSS transform does not change on pure zoom, only on pan, so it
+  is useless as a zoom indicator;
+- reading zoom from tile URLs is unreliable because Leaflet keeps stale tiles
+  during transitions;
+- and Leaflet's animated zoom does not complete under headless Chrome's virtual
+  clock at all, which made the zoom-in BUTTON look broken and sent the
+  diagnosis after the wrong fault.
+
+Only setting the view with `animate:false` and reading `map.getZoom()` directly
+measured what it claimed to.
+
 ## Pending
 
 **The 10-step plan is complete.** Steps 1-9 are in Completed above. Step 10 --
@@ -687,11 +768,6 @@ What remains is unforced work, not blockers.
 
 **Decisions left with Muhammed:**
 
-- **Multi-resolution map view.** The map serves 1 km only. Tying resolution to
-  zoom would let a zoomed-out view draw the 105 five-kilometre cells instead of
-  2388, but the areal-mean caveat then has to survive the transition: a user
-  zooming out would see tighter intervals without necessarily realising the
-  quantity changed. Worth doing only if that can be made obvious.
 - **How prominent the extrapolation flag should be.** Currently red hatching
   plus a note. An alternative is refusing to serve the 93 cells that are more
   than a full training-range width beyond, which is defensible but withholds
@@ -715,11 +791,6 @@ What remains is unforced work, not blockers.
 
 **Not started, and deliberately so:** deployment beyond localhost. The scope
 agreed was a local demo for the internship.
-
-**Multi-resolution map view** -- 2,554 rectangles will make Leaflet's default SVG
-renderer sluggish (it degrades past roughly a thousand vector features). Use
-`preferCanvas: true` and tie resolution to zoom level, so all 2,554 are never rendered at
-once.
 
 **Unverified**: CPCB/OpenAQ redistribution terms, and the ODbL Produced Work vs
 Derivative Database question for the OSM-derived columns.
