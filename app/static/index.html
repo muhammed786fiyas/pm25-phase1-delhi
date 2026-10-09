@@ -66,6 +66,13 @@ button:hover{filter:brightness(1.06)}
   background:var(--surface)}
 @media (max-width:920px){#map{height:400px}}
 .leaflet-container{background:var(--surface)}
+/* Deliberately NOT themed with var(--ink). Leaflet's controls keep a white
+   background in dark mode, so an --ink colour renders white-on-white and the
+   icon vanishes. Matching Leaflet's own #333 keeps it visible in both themes
+   and consistent with the zoom buttons above it. */
+.reset-view a{font-size:16px;line-height:26px;text-align:center;
+  font-weight:400;color:#333;text-decoration:none}
+.reset-view a:hover{background:#f4f4f4;color:#000}
 
 /* Context strip: appears only when something about the current view needs
    saying. Permanent prose lives on the About page; this is for warnings that
@@ -250,8 +257,43 @@ function colorFor(v){ return RAMP[bandIndex(v)]; }
 // preferCanvas because the 1 km grid is 2388 rectangles. Leaflet's default SVG
 // renderer makes a DOM node per feature and becomes sluggish past roughly a
 // thousand; canvas draws them all into one element.
-const map = L.map('map',{zoomControl:true, preferCanvas:true}).fitBounds(
-  [[28.4126,76.8381],[28.8814,77.3477]]);
+// Held once so the reset control and the initial view cannot drift apart.
+const HOME_BOUNDS = [[28.4126,76.8381],[28.8814,77.3477]];
+const map = L.map('map',{zoomControl:true, preferCanvas:true}).fitBounds(HOME_BOUNDS);
+
+// Reset view, sitting directly under the zoom buttons because that is where
+// someone who has just zoomed too far will look for it.
+const ResetView = L.Control.extend({
+  options:{position:'topleft'},
+  onAdd: function(){
+    const c = L.DomUtil.create('div','leaflet-bar reset-view');
+    const a = L.DomUtil.create('a','',c);
+    a.href = '#';
+    a.title = 'Reset the map to all of Delhi';
+    a.setAttribute('role','button');
+    a.setAttribute('aria-label','Reset map view');
+    a.innerHTML = '&#8962;';
+    // Without these the click also pans the map underneath and the anchor
+    // jumps the page to the top.
+    L.DomEvent.disableClickPropagation(c);
+    L.DomEvent.on(a,'click',L.DomEvent.preventDefault);
+    // animate:false is deliberate and load-bearing, not a style choice.
+    // fitBounds animates by default, and an animated reset can simply fail to
+    // land -- it did exactly that under test, leaving the map where it was.
+    // A reset should also arrive immediately rather than play a transition.
+    L.DomEvent.on(a,'click',function(){
+      map.fitBounds(HOME_BOUNDS,{animate:false});
+    });
+    return c;
+  }
+});
+map.addControl(new ResetView());
+
+// Exposed deliberately. A top-level `const` is not a window property, so
+// without this the map is unreachable from the browser console -- which is a
+// real nuisance on a local research tool, and makes the UI untestable from
+// outside. Harmless: the app is local-only and read-only.
+window.map = map;
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
   {maxZoom:18, attribution:'&copy; OpenStreetMap'}).addTo(map);
 let gridLayer = L.layerGroup().addTo(map);
