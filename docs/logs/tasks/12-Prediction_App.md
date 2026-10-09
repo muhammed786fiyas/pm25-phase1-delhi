@@ -563,26 +563,158 @@ the gap a satellite model exists to fill.
 **Leaflet runs with preferCanvas**: 2388 rectangles would make the default SVG
 renderer sluggish, since it creates a DOM node per feature.
 
+### Step 8 COMPLETE -- aggregation with measured interval shrinkage (2026-10-09)
+
+Coarse products at 2, 5 and 10 km, as areal means of the 1 km grid.
+
+**rho re-measured on all 42 stations.** rho is the same-day correlation between
+two locations' prediction errors. It decides how much an areal mean's interval
+may shrink, because averaging N cells helps only as far as their errors are
+independent: `shrinkage = sqrt((1 + (N-1)*rho) / N)`.
+
+Measured on spatial-LOSO out-of-fold RELATIVE residuals (relative because the
+served interval is multiplicative) across all 861 station pairs:
+
+    rho = 0.0500, bootstrap 95% CI [0.0219, 0.0852]
+
+against the previously published 0.032, so the old aggregation table was
+optimistic.
+
+**Three findings, and one corrected a recommendation I had already given.**
+
+1. rho is higher than published: 0.050, not 0.032.
+2. I expected re-running on all 42 folds to fix the thin close-pair sample. It
+   did not -- there are STILL exactly 8 pairs under 2 km. The constraint was
+   never the number of folds; it is Delhi's station geometry, where only 12 of
+   42 stations have a neighbour within 2 km.
+3. **rho does not decay with distance** (slope +0.0003/km, p = 0.62). Stations
+   1 km and 40 km apart share the same correlation, so this is a WHOLE-DAY
+   effect rather than a local one: on 2025-05-22, 35 of 38 stations erred in
+   the same direction by a mean of -29%, against 60% / -3% on a typical day.
+   Something regional the model cannot see.
+
+Finding 3 then overturned my own recommendation. I had argued for the
+close-pair rho of 0.130 because it was "the right distance" for aggregating
+adjacent cells. But if rho does not vary with distance, close pairs are not
+better targeted -- they measure the same quantity with n=8 instead of n=861.
+Bootstrapped over STATIONS (pairs sharing a station are dependent, so a
+pair-level CI is several times too narrow), 0.130 falls outside the honest
+interval. Using it would have meant choosing a value the data's own CI
+excludes -- the same error as inventing a widening factor for extrapolating
+cells.
+
+**Decision (Muhammed): the point estimate, with the CI carried through.**
+Every coarse row ships `interval_shrinkage` plus the shrinkage at both CI
+bounds, so the uncertainty in the shrinkage is visible rather than a point
+estimate being presented as exact.
+
+| grid | cells | shrinkage | interval | CI range |
+|---|---|---|---|---|
+| 1 km | 1 | 1.000 | +/-55.0% | -- |
+| 2 km | 4 | 0.536 | +/-29.5% | 0.527-0.548 |
+| 5 km | 25 | 0.297 | +/-16.3% | 0.247-0.349 |
+| 10 km | 100 | 0.244 | +/-13.4% | 0.180-0.309 |
+
+Partial cells at the coverage edge get shrinkage from the number of cells
+ACTUALLY averaged, not the full block count -- a 2-cell edge block given the
+25-cell shrinkage would overstate its precision.
+
+**A floor exists, and it is a design finding.** Because rho is a whole-day
+effect it cannot be averaged away, so shrinkage tends to sqrt(rho) = 0.224
+rather than zero as N grows. 10 km already sits at 0.244. **Aggregating beyond
+about 5 km buys very little precision** -- worth offering for file size, not
+for accuracy.
+
+### Step 9 COMPLETE -- gridded downloads, products 2 and 3 (2026-10-09)
+
+`/api/download/grid` with `/preview` and `/columns`, at 1, 2, 5 and 10 km, in
+zip (default), parquet or csv.
+
+**Product 2 (1 km, WITH features) is reproducible, and that was verified rather
+than claimed.** Downloaded a day's file, re-ran the booster on the shipped
+feature columns, and all 2388 rows reproduce `pm25_predicted_ugm3` to within
+0.005 ug/m3 -- which is only the 2dp rounding in the stored value. That
+property is the entire reason the native-resolution product ships features.
+
+**Product 3 (2/5/10 km) ships NO features, and the omission is the feature.**
+LightGBM is nonlinear, so `mean(f(x)) != f(mean(x))`. Supplying averaged
+features beside averaged predictions would invite a researcher to re-run the
+model and get a different answer, with nothing to say which was right. Not
+shipping them makes the mistake impossible rather than merely documented.
+
+**THE AREAL-MEAN CAVEAT is the most important thing in these products.** A
+coarse interval is narrower -- +/-16% at 5 km against +/-55% at 1 km -- and the
+natural misreading is that the coarse product is simply better data.
+
+A real 5 km cell on 2025-12-15 makes the problem concrete. It reports 282.9
+ug/m3 with a 90% interval of 237-329. Inside it, the 25 one-kilometre
+predictions range from 201 to 327 -- a 126 ug/m3 spread, with the lowest cell
+falling outside the 5 km interval entirely.
+
+So a user who reads "283, give or take 45" as a statement about their street is
+wrong, and the data looks like it supports them. The +/-16% describes how well
+the AVERAGE across 25 km2 is known. Individual streets vary for real reasons:
+one is beside a highway, another backs onto parkland.
+
+For a point question the honest answer is the 1 km value with its +/-55%. The
+coarse product is better only if the question genuinely is about an area
+average -- regional exposure, or comparing districts.
+
+The warning therefore appears in three places, because one is not enough:
+`ATTRIBUTION.txt` in every coarse bundle (so it travels with the file even if
+passed on), the `/columns` response (for anyone scripting), and the UI note.
+This is the same class of problem as the AOD provenance flag: a number that is
+correct but easy to misread, where the fix is making the misreading hard rather
+than trusting people to know.
+
+Extrapolation carries through at every resolution -- 1 km ships
+`outside_training_range`, `worst_overshoot_frac` and `worst_feature` per cell;
+coarse products ship `fraction_outside_training_range`.
+
+Sizes, one week: 1 km 719 KB parquet / 6.6 MB csv; 5 km 25 KB / 66 KB. A full
+year at 1 km is 326 MB as CSV, which is why parquet is the default and the UI
+defaults to one month -- 871,620 rows is a surprising thing to hand someone who
+just clicked Download.
+
 ## Pending
 
-Steps 1-5 are done -- see Completed above. Step 6 is the next one and the first
-expensive one.
+**The 10-step plan is complete.** Steps 1-9 are in Completed above. Step 10 --
+"decide whether 1 km is affordable" -- is moot: 1 km was built, and the answer
+turned out to be yes, because the extractors deduplicate to unique pixels and
+only MAIAC is genuinely per-point (115 min batched against a projected 44.8 h).
 
-**Step 6** -- grid feature extraction at 5 km to prove the vertical slice before
-committing GEE time. Static features and ERA5/MERRA-2 reuse the existing scripts with a
-grid CSV substituted for the station file; **MAIAC AOD and NDVI need new region-export
-extractors** because point-sampling 2,554 cells x 365 days is ~932k extractions, 62x the
-station pipeline.
+What remains is unforced work, not blockers.
 
-**Step 7** -- wire the real grid in: `method` becomes `grid_cell`, `/api/grid` drops
-`synthetic: true`, stub banner removed.
+**Decisions left with Muhammed:**
 
-**Step 8** -- grid aggregation plus per-level interval calibration.
+- **Multi-resolution map view.** The map serves 1 km only. Tying resolution to
+  zoom would let a zoomed-out view draw the 105 five-kilometre cells instead of
+  2388, but the areal-mean caveat then has to survive the transition: a user
+  zooming out would see tighter intervals without necessarily realising the
+  quantity changed. Worth doing only if that can be made obvious.
+- **How prominent the extrapolation flag should be.** Currently red hatching
+  plus a note. An alternative is refusing to serve the 93 cells that are more
+  than a full training-range width beyond, which is defensible but withholds
+  estimates a researcher might legitimately want.
 
-**Step 9** -- grid download with feature and date selection and a size preview.
+**Known limitations, documented rather than fixed:**
 
-**Step 10** -- decide whether 1 km is affordable, with measured throughput rather than
-estimates.
+- **The conformal interval guarantees MARGINAL coverage, not conditional.**
+  Pooled held-out coverage is 89.9%, but per station it ranges 72.0% to 99.1%
+  with 18 of 42 below target. The worst-covered station is 5598, the land-use
+  outlier. Fixing this would need q = 1.049 (+/-105%), nearly doubling every
+  interval.
+- **rho's close-pair sample cannot be improved** without more monitors. 8 pairs
+  under 2 km is what Delhi's network provides, and more folds do not help.
+- **585 of 2388 cells are materially outside the training range**, 93 of them
+  beyond any information the model has. Flagged everywhere, not corrected --
+  whether unusualness predicts worse coverage was tested and found unsupported.
+- **CPCB/OpenAQ redistribution terms** and the ODbL Produced Work vs Derivative
+  Database question for the OSM-derived columns: still unverified, flagged
+  rather than asserted since the first download product shipped.
+
+**Not started, and deliberately so:** deployment beyond localhost. The scope
+agreed was a local demo for the internship.
 
 **Multi-resolution map view** -- 2,554 rectangles will make Leaflet's default SVG
 renderer sluggish (it degrades past roughly a thousand vector features). Use
