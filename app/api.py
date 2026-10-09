@@ -314,7 +314,8 @@ def distance_to_nearest_station(lat, lon):
 
 def load_state(model_path, dataset_path, station_path, metrics_path, grid_km,
                max_station_distance_km=DEFAULT_MAX_STATION_DISTANCE_KM,
-               conformal_path=None, oof_path=None):
+               conformal_path=None, oof_path=None,
+               grid_predictions_path=None, grid_cells_path=None):
     booster = lgb.Booster(model_file=model_path)
 
     df = pd.read_csv(dataset_path)
@@ -345,13 +346,54 @@ def load_state(model_path, dataset_path, station_path, metrics_path, grid_km,
     print(f"Loaded stations: {len(stations)} KEEP")
     print(f"Date window: {dates[0]} to {dates[-1]} ({len(dates)} dates)")
 
+    # The real 1 km grid. Predictions are precomputed by
+    # scripts/prediction/inference/01_predict_grid.py and validated against the
+    # stations (correlation 0.9901, median difference -0.110 ug/m3) before being
+    # served -- see reports/prediction/station_cell_agreement.json.
+    grid_cells = pd.read_csv(grid_cells_path)
+    grid_cells = grid_cells[grid_cells["status"] == "KEEP"][
+        [GROUP_COL, "latitude", "longitude", "dist_to_nearest_station_km"]]
+    grid_preds = pd.read_parquet(grid_predictions_path)
+    print(f"Loaded grid: {len(grid_cells)} cells, {len(grid_preds)} predictions, "
+          f"{grid_preds['date'].nunique()} dates")
+    n_flagged = int(grid_preds.groupby(GROUP_COL)["materially_outside"].first().sum())
+    print(f"  {n_flagged} cells materially outside the training feature range")
+
+    # Indexed by date so a request is a dict lookup rather than a scan of
+    # 871,620 rows.
+    grid_by_date = {d: g for d, g in grid_preds.groupby("date", sort=False)}
+
+    # Cell coordinates as arrays, for the nearest-cell lookup on every point
+    # query.
+    cell_lat = grid_cells["latitude"].to_numpy()
+    cell_lon = grid_cells["longitude"].to_numpy()
+    cell_ids = grid_cells[GROUP_COL].to_numpy()
+
     STATE.update({
+        "grid_cells": grid_cells,
+        "grid_by_date": grid_by_date,
+        "cell_lat": cell_lat,
+        "cell_lon": cell_lon,
+        "cell_ids": cell_ids,
+        "grid_dates": sorted(grid_preds["date"].unique().tolist()),
+        # Cell size in degrees, derived from the grid itself so the map's
+        # rectangles match the cells exactly.
+        "grid_lat_step": float(np.diff(np.unique(cell_lat)).min()),
+        "grid_lon_step": float(np.diff(np.unique(cell_lon)).min()),
         "booster": booster,
         "df": df,
         "feature_cols": feature_cols,
         "stations": stations,
         "metrics": metrics,
+        # What the API can answer for is what the GRID covers, which is 365
+        # days. The station dataset has 346: the other 19 are days when no
+        # monitor reported a usable PM2.5 value, so they never entered
+        # training. The grid has full meteorology and AOD on those days and
+        # the model can predict them perfectly well -- refusing them would
+        # withhold estimates for a gap in the GROUND TRUTH, which is exactly
+        # the gap a satellite model exists to fill.
         "dates": dates,
+        "station_dates": dates,
         "grid_km": grid_km,
         "max_station_distance_km": max_station_distance_km,
         "oof": oof,
@@ -382,6 +424,34 @@ def station_predictions_for_date(date):
     return out.dropna(subset=["latitude", "longitude"])
 
 
+def nearest_station_record(lat, lon, date):
+    # Context only: what the closest monitor actually measured that day. Useful
+    # for judging an estimate against ground truth; never the estimate itself.
+    preds = station_predictions_for_date(date)
+    if preds is None or len(preds) == 0:
+        return None
+    d = haversine_km(lat, lon, preds["latitude"].values, preds["longitude"].values)
+    i = int(np.argmin(d))
+    row = preds.iloc[i]
+    observed = row.get("observed_pm25")
+    return {
+        "location_id": int(row[GROUP_COL]),
+        "name": str(row["name"]),
+        "distance_km": round(float(d[i]), 2),
+        "observed_pm25_ugm3": (None if observed is None or pd.isna(observed)
+                               else round(float(observed), 1)),
+        "model_prediction_ugm3": round(float(row["predicted_pm25"]), 1),
+    }
+
+
+def nearest_cell(lat, lon):
+    # The cell CONTAINING the point, found as the nearest cell centre. At 1 km
+    # spacing that is at most ~700 m away, and the two are the same cell.
+    d = haversine_km(lat, lon, STATE["cell_lat"], STATE["cell_lon"])
+    i = int(np.argmin(d))
+    return int(STATE["cell_ids"][i]), float(d[i])
+
+
 def build_grid_cells(grid_km, margin_km):
     # Cell centres on a regular lat/lon grid approximating grid_km spacing,
     # seeded over the bbox expanded by margin_km so coverage can extend past
@@ -407,8 +477,11 @@ def model_info():
         "n_features": len(STATE["feature_cols"]),
         "features": STATE["feature_cols"],
         "n_training_stations": len(STATE["stations"]),
-        "date_window": {"start": STATE["dates"][0], "end": STATE["dates"][-1],
-                        "n_dates": len(STATE["dates"])},
+        "date_window": {"start": STATE["grid_dates"][0],
+                        "end": STATE["grid_dates"][-1],
+                        "n_dates": len(STATE["grid_dates"]),
+                        "n_dates_without_station_data": len(
+                            set(STATE["grid_dates"]) - set(STATE["station_dates"]))},
         "validation": {
             "scheme": "spatial leave-one-station-out, 2km buffer exclusion, 42 folds",
             "r2": round(m["r2"], 4),
@@ -467,18 +540,27 @@ def stations():
 
 @app.get("/api/dates")
 def dates():
-    return {"start": STATE["dates"][0], "end": STATE["dates"][-1],
-            "n_dates": len(STATE["dates"]), "dates": STATE["dates"]}
+    servable = STATE["grid_dates"]
+    station_only = sorted(set(servable) - set(STATE["station_dates"]))
+    return {"start": servable[0], "end": servable[-1],
+            "n_dates": len(servable), "dates": servable,
+            "n_dates_without_station_data": len(station_only),
+            "dates_without_station_data": station_only,
+            "note": ("every date the grid covers is servable. The dates listed in "
+                     "dates_without_station_data had no usable monitor reading, so "
+                     "they are absent from the training set -- but the satellite and "
+                     "meteorology inputs exist, so the model predicts them normally")}
 
 
 @app.get("/api/predict")
 def predict(lat: float, lon: float, date: str):
-    if date not in STATE["dates"]:
+    if date not in STATE["grid_by_date"]:
         return JSONResponse(status_code=422, content={
             "error": "date_out_of_window",
             "message": (f"No satellite or meteorology data for {date}. This model covers "
-                        f"{STATE['dates'][0]} to {STATE['dates'][-1]}."),
-            "date_window": {"start": STATE["dates"][0], "end": STATE["dates"][-1]},
+                        f"{STATE['grid_dates'][0]} to {STATE['grid_dates'][-1]}."),
+            "date_window": {"start": STATE["grid_dates"][0],
+                            "end": STATE["grid_dates"][-1]},
         })
 
     gate_km = distance_to_nearest_station(lat, lon)
@@ -493,19 +575,27 @@ def predict(lat: float, lon: float, date: str):
             "max_station_distance_km": STATE["max_station_distance_km"],
         })
 
-    preds = station_predictions_for_date(date)
-    if preds is None or len(preds) == 0:
+    # The model's prediction for the 1 km cell containing this point -- not
+    # the nearest station's value. Serving the nearest station would make the
+    # model pointless anywhere between stations, which is most of Delhi.
+    cell_id, cell_km = nearest_cell(lat, lon)
+    day = STATE["grid_by_date"].get(date)
+    if day is None:
         return JSONResponse(status_code=503, content={
             "error": "no_rows_for_date",
-            "message": f"No station feature rows available for {date}.",
+            "message": f"No grid predictions available for {date}.",
         })
+    row = day[day[GROUP_COL] == cell_id]
+    if len(row) == 0:
+        return JSONResponse(status_code=503, content={
+            "error": "no_prediction_for_cell",
+            "message": f"Cell {cell_id} has no prediction for {date}.",
+        })
+    row = row.iloc[0]
+    value = float(row["predicted_pm25_ugm3"])
 
-    distances = haversine_km(lat, lon, preds["latitude"].values, preds["longitude"].values)
-    nearest = int(np.argmin(distances))
-    distance_km = float(distances[nearest])
-    row = preds.iloc[nearest]
-    value = float(row["predicted_pm25"])
-    lower, upper = prediction_interval(value)
+    station_km = distance_to_nearest_station(lat, lon)
+    nearest_station = nearest_station_record(lat, lon, date)
 
     return {
         "requested": {"lat": lat, "lon": lon, "date": date},
@@ -513,94 +603,109 @@ def predict(lat: float, lon: float, date: str):
         "aqi_band": aqi_band(value),
         "interval": {
             "coverage_pct": int(SERVED_COVERAGE_LEVEL),
-            "lower_ugm3": round(lower, 1),
-            "upper_ugm3": round(upper, 1),
+            "lower_ugm3": round(float(row["pm25_lower_90_ugm3"]), 1),
+            "upper_ugm3": round(float(row["pm25_upper_90_ugm3"]), 1),
             "width_pct_of_prediction": STATE["conformal"]["levels"][
                 SERVED_COVERAGE_LEVEL]["width_pct_of_prediction"],
+        },
+        "cell": {
+            "location_id": cell_id,
+            "grid_km": 1.0,
+            "point_to_cell_centre_km": round(cell_km, 3),
+        },
+        # Whether this cell's features fall outside the range the model was
+        # trained on. LightGBM cannot extrapolate -- it returns the boundary
+        # prediction -- and the interval was calibrated only at the 42 urban
+        # stations, so neither is validated here. The interval is NOT widened:
+        # whether unusualness predicts worse coverage was tested against the
+        # stations' measured coverage and found unsupported, so any widening
+        # factor would be invented. See reports/prediction/.
+        "training_range": {
+            "outside": bool(row["outside_training_range"]),
+            "materially_outside": bool(row["materially_outside"]),
+            "worst_feature": (None if not bool(row["outside_training_range"])
+                              else str(row["worst_feature"])),
+            "overshoot_range_widths": round(float(row["worst_overshoot_frac"]), 3),
+            "note": ("this cell's features fall outside the range the model was "
+                     "trained on; the interval's coverage was measured at monitored "
+                     "urban locations and is unverified here"
+                     if bool(row["materially_outside"]) else
+                     "this cell's features fall inside the range the model was "
+                     "trained on"),
         },
         # Provenance, NOT uncertainty -- distance does not predict error here
         # (r = 0.149, p = 0.33). Useful for filtering to cells near a monitor
         # or for validation study design; the interval is the uncertainty.
         "provenance": {
-            "distance_to_nearest_station_km": round(distance_km, 2),
-            "beyond_largest_validated_gap": bool(distance_km > VALIDATED_GAP_KM),
+            "distance_to_nearest_station_km": round(station_km, 2),
+            "beyond_largest_validated_gap": bool(station_km > VALIDATED_GAP_KM),
             "note": ("distance is reported as context, not as a confidence measure -- "
                      "it was tested against per-fold error and found unpredictive"),
         },
-        "nearest_station": {
-            "location_id": int(row[GROUP_COL]),
-            "name": str(row["name"]),
-            "latitude": float(row["latitude"]),
-            "longitude": float(row["longitude"]),
-            "observed_pm25_ugm3": round(float(row["observed_pm25"]), 1),
-        },
-        # Honest about what this endpoint currently is. Once the per-cell
-        # feature grid exists this becomes a real grid-cell prediction and the
-        # method changes to "grid_cell".
-        "method": "nearest_station_proxy",
-        "method_note": ("STUB: returns the model's prediction at the nearest station, not "
-                        "at the requested point. Real per-point prediction needs the 1km "
-                        "feature grid, which is not built yet."),
+        "nearest_station": nearest_station,
+        "method": "grid_cell",
+        "method_note": ("the model's prediction for the 1 km cell containing this "
+                        "point, from its own AOD, meteorology, vegetation and land "
+                        "cover"),
     }
 
 
 @app.get("/api/grid")
 def grid(date: str):
-    if date not in STATE["dates"]:
+    if date not in STATE["grid_by_date"]:
         return JSONResponse(status_code=422, content={
             "error": "date_out_of_window",
             "message": (f"This model covers {STATE['dates'][0]} to {STATE['dates'][-1]}."),
         })
 
-    preds = station_predictions_for_date(date)
-    if preds is None or len(preds) == 0:
+    day = STATE["grid_by_date"].get(date)
+    if day is None or len(day) == 0:
         return JSONResponse(status_code=503, content={"error": "no_rows_for_date"})
 
-    # Grid is seeded over the bbox plus a margin, then filtered to cells inside
-    # the coverage cutoff -- so the coloured area on the map IS exactly the area
-    # the API will answer for, instead of a rectangle that disagrees with it.
-    cells, lat_step, lon_step = build_grid_cells(STATE["grid_km"],
-                                                 STATE["max_station_distance_km"])
-    slat = preds["latitude"].values
-    slon = preds["longitude"].values
-    svals = preds["predicted_pm25"].values
+    # Real per-cell model output. Every cell's value comes from its OWN AOD,
+    # meteorology, vegetation and land cover -- not from interpolating station
+    # values. Validated against the stations before being served: the cell
+    # containing a station predicts what the station predicts, correlation
+    # 0.9901, median difference -0.110 ug/m3 across 13,595 station-days.
+    cells = STATE["grid_cells"]
+    merged = day.merge(cells, on=GROUP_COL, how="inner")
 
     out = []
-    for lat, lon in cells:
-        d = haversine_km(lat, lon, slat, slon)
-        nearest_km = float(d.min())
-        if nearest_km > STATE["max_station_distance_km"]:
-            continue
-        # Inverse distance weighting, power 2. A real interpolation method, but
-        # NOT the model predicting at this cell -- the model never saw this
-        # cell's own AOD, meteorology or land cover.
-        w = 1.0 / np.maximum(d, 0.25) ** 2
-        value = float(np.sum(w * svals) / np.sum(w))
-        lower, upper = prediction_interval(value)
+    for row in merged.itertuples(index=False):
         out.append({
-            "lat": lat, "lon": lon,
-            "pm25_ugm3": round(value, 1),
-            "aqi_band": aqi_band(value),
-            "interval_lower_ugm3": round(lower, 1),
-            "interval_upper_ugm3": round(upper, 1),
-            "nearest_station_km": round(nearest_km, 2),
-            "beyond_largest_validated_gap": bool(nearest_km > VALIDATED_GAP_KM),
+            "lat": round(float(row.latitude), 5),
+            "lon": round(float(row.longitude), 5),
+            "pm25_ugm3": round(float(row.predicted_pm25_ugm3), 1),
+            "aqi_band": aqi_band(float(row.predicted_pm25_ugm3)),
+            "interval_lower_ugm3": round(float(row.pm25_lower_90_ugm3), 1),
+            "interval_upper_ugm3": round(float(row.pm25_upper_90_ugm3), 1),
+            "nearest_station_km": round(float(row.dist_to_nearest_station_km), 2),
+            "beyond_largest_validated_gap": bool(
+                row.dist_to_nearest_station_km > VALIDATED_GAP_KM),
+            # Cells whose features fall outside the training range. Shown so a
+            # viewer can see WHERE the model is extrapolating, rather than
+            # being given a uniformly confident surface.
+            "outside_training_range": bool(row.materially_outside),
         })
 
+    n_outside = sum(1 for c in out if c["outside_training_range"])
     return {
         "date": date,
         "grid_km": STATE["grid_km"],
         "n_cells": len(out),
-        "lat_step": round(lat_step, 6),
-        "lon_step": round(lon_step, 6),
+        "lat_step": round(STATE["grid_lat_step"], 6),
+        "lon_step": round(STATE["grid_lon_step"], 6),
         "interval_coverage_pct": int(SERVED_COVERAGE_LEVEL),
-        "synthetic": True,
-        "method": "idw_from_station_predictions",
-        "method_note": ("SYNTHETIC SURFACE. Inverse-distance weighting of the model's "
-                        "42 station predictions -- a placeholder for UI review. It is NOT "
-                        "the model predicting per cell; that needs the per-cell feature "
-                        "grid (MAIAC AOD, ERA5, NDVI, land cover per 1km cell), which is "
-                        "not built yet."),
+        "n_cells_outside_training_range": n_outside,
+        "method": "grid_cell",
+        "method_note": ("each cell is the model's own prediction from that cell's "
+                        "AOD, meteorology, vegetation and land cover"),
+        "training_range_note": (
+            f"{n_outside} of {len(out)} cells have features outside the range the "
+            f"model was trained on -- every CPCB station is urban, so rural cells "
+            f"are extrapolation by construction. LightGBM returns the boundary "
+            f"prediction there, and the interval's coverage was measured only at "
+            f"stations, so neither is validated for those cells."),
         "cells": out,
     }
 
@@ -784,6 +889,11 @@ def main():
                         default="data/stations/cpcb_stations_delhi_status.csv")
     parser.add_argument("--metrics",
                         default="reports/lightgbm/primary/cv_spatial_loso_aggregated.json")
+    parser.add_argument("--grid_predictions",
+                        default="data/prediction/processed/grid_predictions.parquet",
+                        help="output of scripts/prediction/inference/01_predict_grid.py")
+    parser.add_argument("--grid_cells",
+                        default="data/prediction/processed/grid_1km_delhi.csv")
     parser.add_argument("--conformal",
                         default="reports/lightgbm/primary/conformal_calibration.json",
                         help="output of 04_calibrate_conformal_intervals.py")
@@ -795,15 +905,18 @@ def main():
     parser.add_argument("--max_station_distance_km",
                         default=DEFAULT_MAX_STATION_DISTANCE_KM, type=float,
                         help="refuse queries further than this from any training station")
-    parser.add_argument("--grid_km", default=5.0, type=float,
-                        help="grid spacing for the /api/grid surface. 5km while the "
-                             "surface is synthetic; 1km once the real feature grid exists")
+    # Reporting only now: the served grid is whatever resolution
+    # grid_predictions.parquet was built at, and the actual cell size is read
+    # back from the cell coordinates. Kept so /api/grid can state its spacing.
+    parser.add_argument("--grid_km", default=1.0, type=float,
+                        help="nominal spacing of the served grid, for reporting")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", default=8000, type=int)
     args = parser.parse_args()
 
     load_state(args.model, args.dataset, args.station_file, args.metrics, args.grid_km,
-               args.max_station_distance_km, args.conformal, args.oof)
+               args.max_station_distance_km, args.conformal, args.oof,
+               args.grid_predictions, args.grid_cells)
 
     static_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
     app.mount("/static", StaticFiles(directory=static_dir), name="static")

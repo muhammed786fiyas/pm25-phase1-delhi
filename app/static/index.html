@@ -106,9 +106,9 @@ button.link:hover{text-decoration:underline}
     <b>Retrospective, not live.</b> This estimates PM2.5 for a past date in the study window
     (2025-03-01 to 2026-02-28). It cannot report current air quality &mdash; its inputs are
     ERA5 reanalysis (~5 day latency) and MAIAC AOD (1&ndash;3 day latency).
-    <br><b>Surface is a placeholder.</b> The coloured grid interpolates the model's 42 station
-    predictions; it is not yet the model predicting per cell. Point estimates return the
-    nearest station's prediction.
+    <br><b>Outside the training range in places.</b> Every CPCB monitor is urban, so rural
+    cells sit beyond anything the model was trained on. Those are drawn hatched: the model
+    returns its boundary estimate there and the interval was never validated for them.
   </div>
 
   <div class="controls card">
@@ -140,13 +140,18 @@ button.link:hover{text-decoration:underline}
           <thead><tr><th></th><th>Band</th><th class="num">&micro;g/m&sup3;</th></tr></thead>
           <tbody id="legendrows"></tbody>
         </table>
-        <div class="note">Every estimate carries a 90% prediction interval, calibrated on
-          out-of-fold errors at stations the model never trained on. Hover any cell to see it.
-          <br><br>Hatched cells are more than 10.6&nbsp;km from any station &mdash; a larger gap
-          than spatial-LOSO validation ever spanned. Coverage stops at 15&nbsp;km, so the
-          coloured area &mdash; not the dashed box &mdash; is where an estimate exists. Distance
-          is shown as context only: it was tested against prediction error and found
-          unpredictive, so it is not a confidence grade.</div>
+        <div class="note">Each cell is the model's own 1&nbsp;km prediction, from that cell's
+          AOD, meteorology, vegetation and land cover &mdash; not interpolated from stations.
+          Validated against the monitors: the cell containing a station predicts what the
+          station predicts (correlation 0.990, median difference &minus;0.11&nbsp;&micro;g/m&sup3;).
+          <br><br>Every estimate carries a 90% prediction interval, calibrated on out-of-fold
+          errors at stations the model never trained on. Hover any cell to see it.
+          <br><br><b>Red hatching</b> marks cells whose features fall outside the range the
+          model was trained on. Every CPCB monitor is urban, so rural cells are extrapolation
+          by construction: the model returns its boundary estimate and the interval's coverage
+          was never measured there. <b>Grey hatching</b> marks cells more than 10.6&nbsp;km from
+          any station, a larger gap than validation ever spanned. Distance itself is context
+          only &mdash; it was tested against prediction error and found unpredictive.</div>
       </div>
 
       <div class="card" style="margin-top:14px">
@@ -214,7 +219,10 @@ el('legendrows').innerHTML = RAMP.map((c,i)=>
   '<tr><td class="sw"><span class="chip" style="background:'+c+'"></span></td>'+
   '<td>'+BANDS[i]+'</td><td class="num">'+RANGES[i]+'</td></tr>').join('');
 
-const map = L.map('map',{zoomControl:true}).fitBounds(
+// preferCanvas because the grid is 2388 rectangles. Leaflet's default SVG
+// renderer makes a DOM node per feature and becomes sluggish past roughly a
+// thousand; canvas draws them all into one element.
+const map = L.map('map',{zoomControl:true, preferCanvas:true}).fitBounds(
   [[BBOX.minLat,BBOX.minLon],[BBOX.maxLat,BBOX.maxLon]]);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
   {maxZoom:17, attribution:'&copy; OpenStreetMap'}).addTo(map);
@@ -277,18 +285,29 @@ async function loadGrid(){
   gridLayer.clearLayers();
   const dLat = g.lat_step/2, dLon = g.lon_step/2;
   g.cells.forEach(c=>{
-    const unvalidated = c.beyond_largest_validated_gap;
+    // Two different caveats, deliberately not merged. A cell can be close to a
+    // monitor and still be unlike every monitor (rural land cover a few km
+    // out), or far from one yet ordinary. Extrapolation is the stronger
+    // warning -- it says the model has no information, not merely that the
+    // distance is untested -- so it drives the hatching.
+    const extrapolating = c.outside_training_range;
+    const farFromStation = c.beyond_largest_validated_gap;
+    const caution = extrapolating || farFromStation;
     L.rectangle([[c.lat-dLat,c.lon-dLon],[c.lat+dLat,c.lon+dLon]],{
-      stroke: unvalidated, color:'#898781',
-      weight: unvalidated ? 1 : 0, dashArray: unvalidated ? '2 3' : null,
+      stroke: caution, color: extrapolating ? '#7E1A14' : '#898781',
+      weight: caution ? 1 : 0, dashArray: caution ? '2 3' : null,
       fillColor: colorFor(c.pm25_ugm3),
-      fillOpacity: unvalidated ? 0.32 : 0.68
+      fillOpacity: extrapolating ? 0.28 : (farFromStation ? 0.4 : 0.7)
     }).bindTooltip(
       '<b>'+c.pm25_ugm3+' &micro;g/m&sup3;</b> &mdash; '+c.aqi_band+'<br>'+
       '<span style="color:#898781">'+g.interval_coverage_pct+'% interval '+
       c.interval_lower_ugm3.toFixed(0)+'–'+
       c.interval_upper_ugm3.toFixed(0)+' &middot; '+c.nearest_station_km+
-      ' km to nearest station</span>').addTo(gridLayer);
+      ' km to nearest station</span>'+
+      (extrapolating
+        ? '<br><span style="color:#E93F33">outside the training range &mdash; '+
+          'estimate and interval unvalidated here</span>' : '')
+      ).addTo(gridLayer);
   });
 }
 
@@ -316,7 +335,13 @@ async function estimate(lat, lon){
       '<dt>Observed there</dt><dd>'+r.nearest_station.observed_pm25_ugm3+' &micro;g/m&sup3;</dd>'+
       (r.provenance.beyond_largest_validated_gap
         ? '<dt></dt><dd style="color:var(--muted)">beyond largest validated gap</dd>' : '');
-    el('method').textContent = r.method_note;
+    el('method').innerHTML = r.method_note +
+      (r.training_range && r.training_range.materially_outside
+        ? '<br><br><b style="color:#E93F33">Outside the training range.</b> ' +
+          r.training_range.note + ' (worst: ' + r.training_range.worst_feature +
+          ', ' + r.training_range.overshoot_range_widths +
+          ' range-widths beyond).'
+        : '');
     if(pin) map.removeLayer(pin);
     pin = L.marker([lat,lon]).addTo(map)
       .bindPopup('<b>'+r.predicted_pm25_ugm3.toFixed(1)+' &micro;g/m&sup3;</b> ('+r.aqi_band+')<br>'+
