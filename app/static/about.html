@@ -42,7 +42,9 @@ p{margin:0 0 12px}
 table{border-collapse:collapse;width:100%;font-size:13.5px;margin:12px 0}
 th,td{text-align:left;padding:5px 8px;border-bottom:1px solid var(--grid)}
 th{color:var(--muted);font-weight:600}
-td.num{text-align:right;font-variant-numeric:tabular-nums}
+/* th too, not just td -- a right-aligned column under a left-aligned header
+   reads as two separate columns. */
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 code{font:13px ui-monospace,SFMono-Regular,Menlo,monospace;
   background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:1px 5px}
 ul{margin:0 0 12px;padding-left:20px}

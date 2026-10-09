@@ -91,7 +91,7 @@ dt{color:var(--muted)} dd{margin:0;text-align:right;font-variant-numeric:tabular
 table{border-collapse:collapse;width:100%;font-size:12px}
 th,td{text-align:left;padding:3px 6px;border-bottom:1px solid var(--grid)}
 th{color:var(--muted);font-weight:600}
-td.num{text-align:right;font-variant-numeric:tabular-nums}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 td.sw{width:20px;padding-right:0}
 .chip{display:block;width:14px;height:14px;border-radius:4px;border:1px solid var(--border)}
 
@@ -265,9 +265,28 @@ async function getJSON(url){
   return j;
 }
 
-function showCtx(html){
-  if(html){ el('ctx').innerHTML = html; el('ctx').classList.add('on'); }
-  else { el('ctx').classList.remove('on'); }
+// The context strip has two independent sources and they must not clobber
+// each other: the resolution warning persists while a coarse map is selected,
+// while the extrapolation warning is per-query and has to clear the moment a
+// valid cell is clicked. Holding them separately and re-rendering is the only
+// way both can appear, disappear and coexist correctly.
+const ctxState = { resolution: '', point: '' };
+
+function renderCtx(){
+  const parts = [ctxState.resolution, ctxState.point].filter(Boolean);
+  const box = el('ctx');
+  if(parts.length){
+    box.innerHTML = parts.join('<br><br>');
+    box.classList.add('on');
+  } else {
+    box.classList.remove('on');
+    box.innerHTML = '';
+  }
+}
+
+function setCtx(source, html){
+  ctxState[source] = html || '';
+  renderCtx();
 }
 
 async function loadModel(){
@@ -338,7 +357,7 @@ async function loadGrid(){
   // Only shown when it changes what the number means. Switching to a coarse
   // resolution tightens the interval, and the reason is not that the data got
   // better -- the quantity changed from a point to an area average.
-  showCtx(g.areal_mean_warning
+  setCtx('resolution', g.areal_mean_warning
     ? '<b>'+g.grid_km+'&nbsp;km view:</b> '+g.areal_mean_warning
     : '');
 }
@@ -372,15 +391,19 @@ async function estimate(lat, lon){
         r.aqi_band+')').openPopup();
     // A per-point warning, shown only when this particular cell is one the
     // model has no information for.
-    if(r.training_range && r.training_range.materially_outside){
-      showCtx('<b>This cell is outside the training range.</b> '+
-        r.training_range.note+' Worst feature: '+r.training_range.worst_feature+'. '+
-        '<a href="/about.html#extrapolation" style="color:inherit">Why this matters &rarr;</a>');
-    }
+    // Always set it, even to empty -- otherwise a warning from a previous
+    // query survives onto a cell it does not apply to, which is worse than
+    // not warning at all.
+    setCtx('point', (r.training_range && r.training_range.materially_outside)
+      ? '<b>This cell is outside the training range.</b> ' +
+        r.training_range.note + ' Worst feature: ' + r.training_range.worst_feature +
+        '. <a href="/about.html#extrapolation" style="color:inherit">Why this matters &rarr;</a>'
+      : '');
   }catch(e){
     el('val').textContent = '—';
     setBand('no estimate', null);
     el('interval').innerHTML=''; el('meta').innerHTML='';
+    setCtx('point', '');
     el('err').textContent = e.message;
   }
 }
