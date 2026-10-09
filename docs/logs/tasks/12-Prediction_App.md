@@ -784,8 +784,12 @@ check found, which is why the rule was worth following:
   on `wetland_herbaceous_pct`) is also the worst-covered station at the 90%
   level (0.720) -- the two facts were recorded separately and the connection
   had not been made anywhere;
-- "LightGBM beats the LME" was quantified for the first time by merging the
-  two fold tables: **40 of 42 folds on both R2 and RMSE**;
+- "LightGBM beats the LME on 40 of 42" was RE-verified on the corrected data
+  by merging the two fold tables, and holds on both R2 and RMSE. Not a new
+  finding -- the `delhi-phase1-v21` tag message already carried "winning on 40
+  of 42 stations" at the pre-fix numbers, which I had forgotten while writing
+  the summary and claimed as a first. Worth recording because the count
+  surviving the industrial-overlap fix unchanged is itself the useful fact;
 - the Duan correction's awkward result was restated honestly -- it removes bias
   in the back-transformed mean (factor 1.132) but made spatial-LOSO RMSE
   slightly WORSE in 4 of 5 variants, which is a thing to volunteer rather than
