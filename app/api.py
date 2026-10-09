@@ -35,6 +35,16 @@ DATE_COL = "date"
 SEASON_COL = "season"
 SEASON_CATEGORIES = ["summer", "monsoon", "post_monsoon", "winter"]
 
+# Same mapping as scripts/datasets/cpcb/6-trim_and_season.py, which assigns
+# season for the training data. Must stay in sync: season is a model feature,
+# so a different month boundary would be a different feature.
+SEASON_FOR_MONTH = {
+    3: "summer", 4: "summer", 5: "summer",
+    6: "monsoon", 7: "monsoon", 8: "monsoon", 9: "monsoon",
+    10: "post_monsoon", 11: "post_monsoon",
+    12: "winter", 1: "winter", 2: "winter",
+}
+
 # Delhi NCR bounding box -- the box the station roster was drawn from
 # (scripts/datasets/cpcb/cpcb_fetcher.py CITY_BBOX["delhi"]). Used to frame the
 # map and seed the grid, but NOT as the coverage gate -- see below.
@@ -188,6 +198,67 @@ COLUMN_DICTIONARY = [
      "OpenStreetMap, ODbL"),
 ]
 
+# Columns every grid download carries, whatever resolution.
+GRID_ID_COLS = ["location_id", "latitude", "longitude", "date", "season"]
+GRID_MODEL_COLS = ["pm25_predicted_ugm3", "pm25_lower_90_ugm3", "pm25_upper_90_ugm3"]
+
+# Resolutions offered. 1 km is the native grid and the only one that ships
+# features; the rest are areal means of it.
+GRID_RESOLUTIONS = [1, 2, 5, 10]
+
+GRID_DICTIONARY = [
+    ("location_id", "-",
+     "grid cell identifier. 1 km cells are numbered from 900000; coarse cells "
+     "use their row/column in the coarse lattice", "derived"),
+    ("coarse_row", "-", "row index of the coarse cell in its own lattice", "derived"),
+    ("coarse_col", "-", "column index of the coarse cell in its own lattice", "derived"),
+    ("latitude", "degrees north", "cell centre, WGS84", "derived"),
+    ("longitude", "degrees east", "cell centre, WGS84", "derived"),
+    ("date", "YYYY-MM-DD", "calendar date, India Standard Time", "-"),
+    ("season", "-", "summer / monsoon / post_monsoon / winter", "derived"),
+    ("pm25_predicted_ugm3", "ug/m3",
+     "MODEL ESTIMATE of daily mean PM2.5. Not a measurement. At 1 km this is "
+     "the model applied to this cell's own features; at coarser resolutions it "
+     "is the MEAN of the constituent 1 km predictions", "LightGBM model"),
+    ("pm25_lower_90_ugm3", "ug/m3", "lower bound of the 90% prediction interval",
+     "normalized conformal calibration"),
+    ("pm25_upper_90_ugm3", "ug/m3", "upper bound of the 90% prediction interval",
+     "normalized conformal calibration"),
+    ("n_cells_averaged", "-",
+     "how many 1 km cells were averaged into this coarse cell. Less than the "
+     "full block at the edge of the coverage area, which is why the interval "
+     "shrinkage varies", "derived"),
+    ("interval_shrinkage", "-",
+     "factor the 1 km interval was multiplied by for this cell: "
+     "sqrt((1 + (N-1)*rho) / N) with rho = 0.050, the measured same-day "
+     "correlation between locations' prediction errors", "derived"),
+    ("interval_shrinkage_rho_low", "-",
+     "the same factor at the lower bound of rho's 95% CI (0.0219) -- a tighter "
+     "interval than served", "derived"),
+    ("interval_shrinkage_rho_high", "-",
+     "the same factor at the upper bound of rho's 95% CI (0.0852) -- a wider "
+     "interval than served. The served value uses the point estimate; these two "
+     "show how much the shrinkage itself is uncertain", "derived"),
+    ("dist_to_nearest_station_km", "km",
+     "distance to the nearest CPCB monitor. Context and provenance, NOT a "
+     "confidence measure -- it was tested against per-fold prediction error and "
+     "found unpredictive (r = 0.149, p = 0.33)", "derived"),
+    ("outside_training_range", "true/false",
+     "the cell's features fall outside the range the model was trained on. "
+     "LightGBM cannot extrapolate, so it returns its boundary estimate, and the "
+     "interval's coverage was measured only at monitored urban locations",
+     "derived"),
+    ("worst_overshoot_frac", "-",
+     "how far outside the training range, as a fraction of that range's width. "
+     "0.1 is marginal; 1.0 means a full training-range width beyond, where the "
+     "model has no information", "derived"),
+    ("worst_feature", "-", "which feature is furthest outside the training range",
+     "derived"),
+    ("fraction_outside_training_range", "-",
+     "share of the constituent 1 km cells that are materially outside the "
+     "training range", "derived"),
+]
+
 ATTRIBUTION_TEXT = """Delhi PM2.5 satellite-ground calibration -- Phase 1
 ================================================================
 
@@ -315,7 +386,9 @@ def distance_to_nearest_station(lat, lon):
 def load_state(model_path, dataset_path, station_path, metrics_path, grid_km,
                max_station_distance_km=DEFAULT_MAX_STATION_DISTANCE_KM,
                conformal_path=None, oof_path=None,
-               grid_predictions_path=None, grid_cells_path=None):
+               grid_predictions_path=None, grid_cells_path=None,
+               grid_features_path=None, aggregated_dir=None,
+               aggregation_summary_path=None):
     booster = lgb.Booster(model_file=model_path)
 
     df = pd.read_csv(dataset_path)
@@ -369,7 +442,58 @@ def load_state(model_path, dataset_path, station_path, metrics_path, grid_km,
     cell_lon = grid_cells["longitude"].to_numpy()
     cell_ids = grid_cells[GROUP_COL].to_numpy()
 
+    # Download frames, assembled once at startup. The 1 km product joins the
+    # predictions to the feature table so model(features) reproduces
+    # pm25_predicted_ugm3 exactly -- that reproducibility is the whole point of
+    # shipping features at native resolution.
+    grid_download_1km = None
+    grid_download_coarse = {}
+    aggregation = None
+    if grid_features_path is not None:
+        feats = pd.read_csv(grid_features_path)
+        base = grid_preds.rename(columns={
+            "predicted_pm25_ugm3": "pm25_predicted_ugm3"})
+        grid_download_1km = feats.merge(
+            base[[GROUP_COL, DATE_COL, "pm25_predicted_ugm3",
+                  "pm25_lower_90_ugm3", "pm25_upper_90_ugm3",
+                  "outside_training_range", "worst_overshoot_frac",
+                  "worst_feature"]],
+            on=[GROUP_COL, DATE_COL], how="inner")
+        grid_download_1km = grid_download_1km.merge(
+            grid_cells[[GROUP_COL, "latitude", "longitude",
+                        "dist_to_nearest_station_km"]],
+            on=GROUP_COL, how="left")
+        print(f"Grid download (1 km): {len(grid_download_1km)} rows, "
+              f"{len(grid_download_1km.columns)} columns")
+
+    if aggregated_dir is not None and os.path.isdir(aggregated_dir):
+        for km in GRID_RESOLUTIONS:
+            if km == 1:
+                continue
+            path = os.path.join(aggregated_dir,
+                                f"grid_predictions_{km}km.parquet")
+            if not os.path.exists(path):
+                continue
+            frame = pd.read_parquet(path)
+            frame = frame.rename(columns={"pm25_ugm3": "pm25_predicted_ugm3"})
+            # A stable id for the coarse cell, so a download can be joined back
+            # to the map and to other dates.
+            frame["location_id"] = (frame["coarse_row"].astype(str) + "_"
+                                    + frame["coarse_col"].astype(str))
+            frame["season"] = frame[DATE_COL].map(
+                lambda d: SEASON_FOR_MONTH[int(str(d)[5:7])])
+            grid_download_coarse[km] = frame
+            print(f"Grid download ({km} km): {len(frame)} rows, "
+                  f"{frame.groupby(['coarse_row', 'coarse_col']).ngroups} cells")
+
+    if aggregation_summary_path is not None and os.path.exists(aggregation_summary_path):
+        with open(aggregation_summary_path) as f:
+            aggregation = json.load(f)
+
     STATE.update({
+        "grid_download_1km": grid_download_1km,
+        "grid_download_coarse": grid_download_coarse,
+        "aggregation": aggregation,
         "grid_cells": grid_cells,
         "grid_by_date": grid_by_date,
         "cell_lat": cell_lat,
@@ -880,6 +1004,252 @@ def download_stations(date_from: str = None, date_to: str = None,
                     headers={"Content-Disposition": f'attachment; filename="{stem}.zip"'})
 
 
+
+# ---------------------------------------------------------------------------
+# Grid downloads: products 2 and 3.
+#
+# Product 2 is the 1 km grid WITH features, so model(features) reproduces the
+# supplied prediction exactly -- the fully reproducible product.
+#
+# Product 3 is the coarser grids, which are areal means of product 2 and ship
+# WITHOUT features. That is deliberate, not an omission: LightGBM is nonlinear,
+# so mean(f(x)) != f(mean(x)). Shipping coarse features beside coarse
+# predictions would invite a researcher to re-run the model on them and get a
+# different answer, with nothing to say which was right. Not shipping them
+# makes the mistake impossible.
+# ---------------------------------------------------------------------------
+
+def grid_resolution_frame(resolution_km):
+    if resolution_km == 1:
+        return STATE["grid_download_1km"]
+    return STATE["grid_download_coarse"][resolution_km]
+
+
+def selectable_grid_features():
+    # The model features, minus the ones always included anyway.
+    always = set(GRID_ID_COLS) | set(DOWNLOAD_PROVENANCE_COLS)
+    return [c for c in STATE["feature_cols"] if c not in always]
+
+
+def build_grid_download(resolution_km, date_from, date_to, features):
+    df = grid_resolution_frame(resolution_km)
+    rows = df[(df[DATE_COL] >= date_from) & (df[DATE_COL] <= date_to)].copy()
+
+    if resolution_km == 1:
+        keep = list(GRID_ID_COLS) + list(GRID_MODEL_COLS) + [
+            "dist_to_nearest_station_km", "outside_training_range",
+            "worst_overshoot_frac", "worst_feature"]
+        keep = keep + list(DOWNLOAD_PROVENANCE_COLS) + list(features)
+    else:
+        # No features at coarse resolution -- see the note above.
+        keep = ["location_id", "latitude", "longitude", DATE_COL, "season"] + \
+               list(GRID_MODEL_COLS) + [
+            "n_cells_averaged", "interval_shrinkage",
+            "interval_shrinkage_rho_low", "interval_shrinkage_rho_high",
+            "dist_to_nearest_station_km", "fraction_outside_training_range"]
+
+    seen = set()
+    keep = [c for c in keep if c in rows.columns and not (c in seen or seen.add(c))]
+    return rows[keep]
+
+
+def grid_attribution_text(resolution_km):
+    extra = []
+    if resolution_km == 1:
+        extra.append(
+            "RESOLUTION: 1 km, the model's native grid. Every covariate is a\n"
+            "1 km-buffer statistic and MAIAC AOD is a 1 km product, so this is the\n"
+            "only resolution whose features mean what the model was fitted on.\n"
+            "Because the features are included, re-running the model on them\n"
+            "reproduces pm25_predicted_ugm3 exactly.")
+    else:
+        agg = STATE["aggregation"]
+        level = next((x for x in agg["levels"] if x["grid_km"] == resolution_km), None)
+        extra.append(
+            f"RESOLUTION: {resolution_km} km, the MEAN of up to "
+            f"{resolution_km * resolution_km} one-kilometre predictions.\n"
+            "\n"
+            "NO FEATURES ARE INCLUDED, deliberately. LightGBM is nonlinear, so the\n"
+            "model applied to averaged features does not equal the average of the\n"
+            "model's predictions. Supplying coarse features beside coarse\n"
+            "predictions would invite a reproduction attempt that could not\n"
+            "succeed. For features, download the 1 km product.\n"
+            "\n"
+            "THE INTERVAL APPLIES TO THE AREAL MEAN, NOT TO ANY POINT INSIDE THE\n"
+            "CELL. This is the easiest thing to misread in this dataset. A 5 km\n"
+            f"interval of about +/-{100 * STATE['conformal']['levels']['90']['q'] * (level['shrinkage_full_block'] if level else 1):.0f}% "
+            "is NOT a more precise estimate for a street inside\n"
+            "that cell -- it is a more precise estimate of the average across the\n"
+            "whole cell. For a point, use the 1 km product and its wider interval.")
+    return ATTRIBUTION_TEXT + "\n\n" + "\n".join(extra) + "\n"
+
+
+@app.get("/api/download/grid/columns")
+def download_grid_columns(resolution_km: int = 1):
+    if resolution_km not in GRID_RESOLUTIONS:
+        return JSONResponse(status_code=422, content={
+            "error": "bad_resolution",
+            "message": f"resolution_km must be one of {GRID_RESOLUTIONS}"})
+    agg = STATE["aggregation"]
+    level = next((x for x in agg["levels"] if x["grid_km"] == resolution_km), None)
+    body = {
+        "resolution_km": resolution_km,
+        "native_resolution": resolution_km == 1,
+        "always_included": {
+            "identifiers": GRID_ID_COLS,
+            "model": GRID_MODEL_COLS,
+            "provenance": ["dist_to_nearest_station_km"],
+        },
+        "dictionary": [{"column": n, "units": u, "meaning": d, "source": sc}
+                       for n, u, d, sc in GRID_DICTIONARY],
+    }
+    if resolution_km == 1:
+        body["selectable_features"] = selectable_grid_features()
+        body["features_note"] = (
+            "the 1 km product ships features, so model(features) reproduces "
+            "pm25_predicted_ugm3 exactly")
+        body["always_included"]["aod_provenance"] = list(DOWNLOAD_PROVENANCE_COLS)
+        body["always_included"]["extrapolation"] = [
+            "outside_training_range", "worst_overshoot_frac", "worst_feature"]
+    else:
+        body["selectable_features"] = []
+        body["features_note"] = (
+            "coarse products ship NO features. LightGBM is nonlinear, so "
+            "mean(f(x)) != f(mean(x)) -- supplying averaged features beside "
+            "averaged predictions would invite a reproduction that cannot "
+            "succeed. Use the 1 km product for features.")
+        body["always_included"]["aggregation"] = [
+            "n_cells_averaged", "interval_shrinkage",
+            "interval_shrinkage_rho_low", "interval_shrinkage_rho_high"]
+        body["always_included"]["extrapolation"] = [
+            "fraction_outside_training_range"]
+        body["interval_note"] = (
+            "the interval applies to the AREAL MEAN over the cell, not to any "
+            "point inside it")
+        if level:
+            body["interval_shrinkage"] = {
+                "full_block": level["shrinkage_full_block"],
+                "at_rho_ci_low": level["shrinkage_rho_low"],
+                "at_rho_ci_high": level["shrinkage_rho_high"],
+                "rho": agg["rho"],
+                "rho_ci": [agg["rho_ci_low"], agg["rho_ci_high"]],
+            }
+    return body
+
+
+@app.get("/api/download/grid/preview")
+def download_grid_preview(resolution_km: int = 1, date_from: str = None,
+                          date_to: str = None, features: str = None):
+    if resolution_km not in GRID_RESOLUTIONS:
+        return JSONResponse(status_code=422, content={
+            "error": "bad_resolution",
+            "message": f"resolution_km must be one of {GRID_RESOLUTIONS}"})
+    dates = STATE["grid_dates"]
+    date_from = date_from or dates[0]
+    date_to = date_to or dates[-1]
+    chosen, unknown = ([], []) if resolution_km != 1 else parse_grid_features(features)
+    frame = build_grid_download(resolution_km, date_from, date_to, chosen)
+    csv_bytes = estimate_csv_bytes(frame)
+    return {
+        "resolution_km": resolution_km,
+        "date_from": date_from, "date_to": date_to,
+        "n_rows": len(frame),
+        "n_columns": len(frame.columns),
+        "n_cells": int(frame["location_id"].nunique()) if len(frame) else 0,
+        "columns": list(frame.columns),
+        "unknown_features_ignored": unknown,
+        "estimated_size": {
+            "csv_mb": round(csv_bytes / 1e6, 2),
+            "parquet_mb": round(csv_bytes / 1e6 * 0.10, 2),
+        },
+    }
+
+
+def parse_grid_features(features):
+    available = selectable_grid_features()
+    if features is None or features.strip() == "" or features.strip().lower() == "all":
+        return available, []
+    if features.strip().lower() == "none":
+        return [], []
+    asked = [f.strip() for f in features.split(",") if f.strip()]
+    chosen = [f for f in asked if f in available]
+    unknown = [f for f in asked if f not in available]
+    return chosen, unknown
+
+
+def estimate_csv_bytes(frame):
+    if len(frame) == 0:
+        return 0
+    sample = frame.head(2000)
+    buf = io.StringIO()
+    sample.to_csv(buf, index=False)
+    return int(len(buf.getvalue()) / len(sample) * len(frame))
+
+
+@app.get("/api/download/grid")
+def download_grid(resolution_km: int = 1, date_from: str = None,
+                  date_to: str = None, features: str = None,
+                  format: str = "zip"):
+    if resolution_km not in GRID_RESOLUTIONS:
+        return JSONResponse(status_code=422, content={
+            "error": "bad_resolution",
+            "message": f"resolution_km must be one of {GRID_RESOLUTIONS}"})
+    if format not in ("zip", "csv", "parquet"):
+        return JSONResponse(status_code=422, content={
+            "error": "bad_format", "message": "format must be zip, csv or parquet"})
+    dates = STATE["grid_dates"]
+    date_from = date_from or dates[0]
+    date_to = date_to or dates[-1]
+    chosen, _ = ([], []) if resolution_km != 1 else parse_grid_features(features)
+    frame = build_grid_download(resolution_km, date_from, date_to, chosen)
+    stem = f"delhi_pm25_grid_{resolution_km}km_{date_from}_{date_to}"
+
+    if format == "csv":
+        buf = io.StringIO()
+        frame.to_csv(buf, index=False)
+        return Response(content=buf.getvalue(), media_type="text/csv; charset=utf-8",
+                        headers={"content-disposition":
+                                 f'attachment; filename="{stem}.csv"'})
+    if format == "parquet":
+        buf = io.BytesIO()
+        frame.to_parquet(buf, index=False)
+        return Response(content=buf.getvalue(), media_type="application/octet-stream",
+                        headers={"content-disposition":
+                                 f'attachment; filename="{stem}.parquet"'})
+
+    # ZIP is the default so the data cannot travel without its dictionary and
+    # attribution -- a CSV separated from its provenance is the real failure
+    # mode, and for the coarse products the areal-mean caveat travels with it.
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        pq = io.BytesIO()
+        frame.to_parquet(pq, index=False)
+        zf.writestr(f"{stem}.parquet", pq.getvalue())
+        csv_buf = io.StringIO()
+        frame.to_csv(csv_buf, index=False)
+        zf.writestr(f"{stem}.csv", csv_buf.getvalue())
+        zf.writestr("DATA_DICTIONARY.txt",
+                    grid_data_dictionary_text(list(frame.columns)))
+        zf.writestr("ATTRIBUTION.txt", grid_attribution_text(resolution_km))
+    return Response(content=buf.getvalue(), media_type="application/zip",
+                    headers={"content-disposition":
+                             f'attachment; filename="{stem}.zip"'})
+
+
+def grid_data_dictionary_text(columns):
+    lines = ["COLUMN DICTIONARY", "=" * 70, ""]
+    known = {n: (u, d, sc) for n, u, d, sc in GRID_DICTIONARY}
+    known.update({n: (u, d, sc) for n, u, d, sc in COLUMN_DICTIONARY})
+    for col in columns:
+        unit, desc, src = known.get(col, ("-", "(undocumented)", "-"))
+        lines.append(col)
+        lines.append(f"  units  : {unit}")
+        lines.append(f"  meaning: {desc}")
+        lines.append(f"  source : {src}")
+        lines.append("")
+    return "\n".join(lines)
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", default="models/lightgbm/lightgbm_full_model.txt")
@@ -894,6 +1264,15 @@ def main():
                         help="output of scripts/prediction/inference/01_predict_grid.py")
     parser.add_argument("--grid_cells",
                         default="data/prediction/processed/grid_1km_delhi.csv")
+    parser.add_argument("--grid_features",
+                        default="data/prediction/processed/modeling_datasets/"
+                                "lightgbm_ready_grid.csv",
+                        help="1 km feature table, shipped with the native-resolution "
+                             "download so model(features) reproduces the prediction")
+    parser.add_argument("--aggregated_dir",
+                        default="data/prediction/processed/aggregated")
+    parser.add_argument("--aggregation_summary",
+                        default="reports/prediction/aggregation_summary.json")
     parser.add_argument("--conformal",
                         default="reports/lightgbm/primary/conformal_calibration.json",
                         help="output of 04_calibrate_conformal_intervals.py")
@@ -916,7 +1295,9 @@ def main():
 
     load_state(args.model, args.dataset, args.station_file, args.metrics, args.grid_km,
                args.max_station_distance_km, args.conformal, args.oof,
-               args.grid_predictions, args.grid_cells)
+               args.grid_predictions, args.grid_cells,
+               args.grid_features, args.aggregated_dir,
+               args.aggregation_summary)
 
     static_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
     app.mount("/static", StaticFiles(directory=static_dir), name="static")

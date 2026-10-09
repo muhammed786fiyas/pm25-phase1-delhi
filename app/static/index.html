@@ -194,6 +194,49 @@ button.link:hover{text-decoration:underline}
       <button id="dgo">Download</button>
     </div>
   </div>
+
+  <div class="card dl" style="margin-top:14px">
+    <h3>Download gridded estimates</h3>
+    <p class="dlsub">Model estimates across Delhi, with no measured values &mdash; every
+      number here is a prediction. 1&nbsp;km is the native resolution and ships the
+      features, so re-running the model on them reproduces the estimate exactly. Coarser
+      grids are averages of those 1&nbsp;km cells.</p>
+
+    <div class="dlrow">
+      <div class="f"><label for="gres">Resolution</label>
+        <select id="gres">
+          <option value="1">1 km &mdash; native, with features</option>
+          <option value="2">2 km &mdash; averaged</option>
+          <option value="5">5 km &mdash; averaged</option>
+          <option value="10">10 km &mdash; averaged</option>
+        </select>
+      </div>
+      <div class="f"><label for="gfrom">From</label><input id="gfrom" type="date"></div>
+      <div class="f"><label for="gto">To</label><input id="gto" type="date"></div>
+      <div class="f"><label for="gfmt">Format</label>
+        <select id="gfmt">
+          <option value="zip">ZIP &mdash; parquet + CSV + docs</option>
+          <option value="parquet">Parquet only</option>
+          <option value="csv">CSV only</option>
+        </select>
+      </div>
+    </div>
+
+    <div id="gfeatwrap">
+      <div class="feathead">
+        <span>Features</span>
+        <span><button class="link" id="gall">select all</button> &middot;
+              <button class="link" id="gnone">none</button></span>
+      </div>
+      <div class="featgrid" id="gfeatlist"></div>
+    </div>
+    <div class="note" id="gnote"></div>
+
+    <div class="dlfoot">
+      <div class="prev" id="gprev">&nbsp;</div>
+      <button id="ggo">Download</button>
+    </div>
+  </div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
@@ -265,6 +308,15 @@ async function loadModel(){
   });
   if(!el('dfrom').value) el('dfrom').value = m.date_window.start;
   if(!el('dto').value)   el('dto').value   = m.date_window.end;
+  ['gfrom','gto'].forEach(id => {
+    const x = el(id);
+    x.min = m.date_window.start; x.max = m.date_window.end;
+  });
+  // The grid download defaults to one month rather than the full year: a year
+  // of 1 km data is 871,620 rows, which is a surprising thing to hand someone
+  // who just clicked Download.
+  if(!el('gfrom').value) el('gfrom').value = m.date_window.end.slice(0,8) + '01';
+  if(!el('gto').value)   el('gto').value   = m.date_window.end;
 }
 
 async function loadStations(){
@@ -454,9 +506,101 @@ el('dgo').addEventListener('click', () => {
     '&format=' + el('dfmt').value;
 });
 
+// ---- gridded download ----
+function gridFeatures(){
+  return [...document.querySelectorAll('#gfeatlist input:checked')].map(c=>c.value);
+}
+
+function gridQuery(){
+  const res = el('gres').value;
+  const q = new URLSearchParams({
+    resolution_km: res,
+    date_from: el('gfrom').value, date_to: el('gto').value,
+  });
+  // Features exist only at native resolution. Coarser grids are areal means
+  // and deliberately carry none -- see the note the API returns.
+  if(res === '1') q.set('features', gridFeatures().join(',') || 'none');
+  return q;
+}
+
+async function refreshGridPreview(){
+  el('gprev').textContent = 'counting' + '\u2026';
+  try {
+    const p = await getJSON('/api/download/grid/preview?' + gridQuery());
+    const size = el('gfmt').value === 'csv' ? p.estimated_size.csv_mb
+                                            : p.estimated_size.parquet_mb;
+    el('gprev').innerHTML = '<b>' + p.n_rows.toLocaleString() + '</b> rows &times; <b>' +
+      p.n_columns + '</b> columns, ' + p.n_cells.toLocaleString() +
+      ' cells &middot; about <b>' +
+      (size < 0.01 ? '<0.01' : size.toFixed(2)) + ' MB</b>';
+  } catch(e){ el('gprev').textContent = e.message; }
+}
+
+let gridTimer = null;
+function queueGridPreview(){
+  clearTimeout(gridTimer); gridTimer = setTimeout(refreshGridPreview, 180);
+}
+
+async function loadGridColumns(){
+  const res = el('gres').value;
+  const c = await getJSON('/api/download/grid/columns?resolution_km=' + res);
+  const meanings = {};
+  c.dictionary.forEach(d => { meanings[d.column] = d.meaning + ' [' + d.units + ']'; });
+
+  if(c.selectable_features.length){
+    el('gfeatwrap').style.display = '';
+    el('gfeatlist').innerHTML = c.selectable_features.map(f =>
+      '<label title="' + (meanings[f] || '').replace(/"/g,'&quot;') + '">' +
+      '<input type="checkbox" value="' + f + '" checked>' + f + '</label>').join('');
+    el('gfeatlist').addEventListener('change', queueGridPreview);
+  } else {
+    el('gfeatwrap').style.display = 'none';
+  }
+
+  const a = c.always_included;
+  let note = '<b>Always included:</b> ' + a.identifiers.join(', ') + '; ' +
+    a.model.join(', ') + '; ' + a.provenance.join(', ') + '.';
+  if(a.extrapolation) note += ' Plus ' + a.extrapolation.join(', ') + '.';
+  if(a.aggregation) note += ' Plus ' + a.aggregation.join(', ') + '.';
+  note += '<br><br>' + c.features_note;
+  if(c.interval_note){
+    const sh = c.interval_shrinkage;
+    note += '<br><br><b style="color:#E93F33">' + c.interval_note + '.</b> ' +
+      'This cell averages up to ' + (res*res) + ' one-kilometre predictions, so its ' +
+      'interval is ' + (sh.full_block*100).toFixed(0) + '% of the 1&nbsp;km width. ' +
+      'That makes it a sharper estimate of the average across ' + (res*res) +
+      '&nbsp;km&sup2; &mdash; not a sharper estimate for any street inside it. ' +
+      'The shrinkage rests on a measured error correlation of ' +
+      sh.rho.toFixed(3) + ' (95% CI ' + sh.rho_ci[0].toFixed(3) + '&ndash;' +
+      sh.rho_ci[1].toFixed(3) + '), which would give ' +
+      (sh.at_rho_ci_low*100).toFixed(0) + '&ndash;' + (sh.at_rho_ci_high*100).toFixed(0) +
+      '% instead; both bounds ship in the file.';
+  }
+  el('gnote').innerHTML = note;
+}
+
+el('gres').addEventListener('change', async () => {
+  await loadGridColumns(); refreshGridPreview();
+});
+el('gfmt').addEventListener('change', refreshGridPreview);
+el('gfrom').addEventListener('change', queueGridPreview);
+el('gto').addEventListener('change', queueGridPreview);
+el('gall').addEventListener('click', () => {
+  document.querySelectorAll('#gfeatlist input').forEach(c=>{c.checked=true;});
+  queueGridPreview();
+});
+el('gnone').addEventListener('click', () => {
+  document.querySelectorAll('#gfeatlist input').forEach(c=>{c.checked=false;});
+  queueGridPreview();
+});
+el('ggo').addEventListener('click', () => {
+  window.location = '/api/download/grid?' + gridQuery() + '&format=' + el('gfmt').value;
+});
+
 (async function(){
   await loadModel(); await loadStations(); await loadGrid();
   await loadColumns(); await refreshPreview();
+  await loadGridColumns(); await refreshGridPreview();
 })()
   .catch(function(e){ el('err').textContent = 'Startup failed: '+e.message; });
 </script>
