@@ -502,6 +502,67 @@ stations, so neither the estimate nor its interval is validated there. Flags are
 in `reports/prediction/`; how they are surfaced in the API, map and download is
 left for Muhammed.
 
+### Step 7 COMPLETE -- the real grid is served (2026-10-09)
+
+The app serves the model's own per-cell prediction. The synthetic IDW surface
+and the nearest-station proxy are both gone.
+
+**Inference.** 871,620 predictions precomputed by
+`scripts/prediction/inference/01_predict_grid.py` and stored as parquet (~5 MB).
+Precomputed rather than per-request: the booster is deterministic, the output
+is a DVC-tracked artifact that can be diffed, and the API serves it straight
+from a date-indexed dict. The script hard-fails if the feature matrix does not
+exactly match the booster's feature names and order -- silently reordered
+features would give plausible-looking wrong numbers, the failure least likely
+to be noticed.
+
+Predictions are physically sensible: 12.9-440.2 ug/m3, no negatives, overall
+mean 86.7 against the stations' observed 86.9, and the seasonal ordering is
+right for Delhi (monsoon 37.9, summer 66.8, winter 137.3, post-monsoon 139.5).
+
+**The validation that matters.** Grid cells have no ground truth, so the only
+end-to-end test is whether the cell CONTAINING a station predicts what the
+station predicts, using the same booster. That exercises all 23 features, every
+join, the gap-fill, the NDVI period mapping and the season assignment at once.
+
+| | |
+|---|---|
+| correlation | 0.9901 |
+| mean difference | -0.228 ug/m3 |
+| median difference | -0.110 ug/m3 |
+| median abs difference | 2.678 ug/m3 (4.05%) |
+
+Across 13,595 station-days. The near-zero bias is the informative part: a
+mis-joined feature or shifted date would show as a systematic offset, not
+scatter. The scatter present is expected -- cell centres sit up to 640 m from
+their station and every covariate is a 1 km buffer statistic, so the two
+describe genuinely different ground. Worst agreement is Jahangirpuri
+(14.8 ug/m3 median), a dense heterogeneous area where 640 m changes the land
+cover.
+
+**Point queries return the containing cell** (Muhammed, 2026-10-09): "that's
+why we build a model -- if we are giving the value of the nearest cell why do
+we need a model". Connaught Place reads 204.5 ug/m3 from its own cell while the
+monitor 2.6 km away observed 223.8 and the model predicts 206.9 there. The
+station is still reported as context for judging the estimate, never as the
+estimate.
+
+**Extrapolation is surfaced, not hidden.** 585 of 2388 cells carry the flag
+through both endpoints, are drawn with red hatching, and the readout names the
+offending feature and how far beyond the training range it sits. Red hatching
+(extrapolation) is kept SEPARATE from grey hatching (more than 10.6 km from a
+station) because they are different claims: a cell can be close to a monitor
+yet unlike every monitor, or far from one yet ordinary.
+
+**All 365 dates are servable**, up from 346. The other 19 are days when no
+monitor reported a usable reading, so they never entered training -- but the
+satellite and meteorology inputs exist and the model predicts them normally.
+Refusing them would withhold estimates for a gap in the GROUND TRUTH, which is
+the gap a satellite model exists to fill.
+
+**Leaflet runs with preferCanvas**: 2388 rectangles would make the default SVG
+renderer sluggish, since it creates a DOM node per feature.
+
 ## Pending
 
 Steps 1-5 are done -- see Completed above. Step 6 is the next one and the first
