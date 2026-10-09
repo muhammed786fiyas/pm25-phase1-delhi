@@ -4431,3 +4431,70 @@ stages:
       hash: md5
       md5: ca08fbe71a1d1062438dd3715898bccc
       size: 92564
+  predict_measure_residual_correlation:
+    cmd: python scripts/prediction/inference/03_measure_residual_correlation.py 
+      --oof reports/lightgbm/primary/cv_spatial_loso_oof_predictions.csv 
+      --station_file data/stations/cpcb_stations_delhi_status.csv --pairs_output
+      reports/prediction/residual_correlation_pairs.csv --summary_output 
+      reports/prediction/residual_correlation.json
+    deps:
+    - path: data/stations/cpcb_stations_delhi_status.csv
+      hash: md5
+      md5: 9b34b7eaffcea41420f1b8b402eff13a
+      size: 4175
+    - path: reports/lightgbm/primary/cv_spatial_loso_oof_predictions.csv
+      hash: md5
+      md5: fccb717957a2d7fcbabc008235e3aa63
+      size: 872204
+    - path: scripts/prediction/inference/03_measure_residual_correlation.py
+      hash: md5
+      md5: 9843217ca09ee1a58ba29b8a077eee4f
+      size: 11660
+    outs:
+    - path: reports/prediction/residual_correlation.json
+      hash: md5
+      md5: 75057f48533f82c81e68a5f6b1b0eaca
+      size: 3018
+    - path: reports/prediction/residual_correlation_pairs.csv
+      hash: md5
+      md5: c96521c1387cc9c8b0d69739109a315f
+      size: 49001
+  predict_aggregate_grid:
+    cmd: python scripts/prediction/inference/04_aggregate_grid.py 
+      --grid_predictions data/prediction/processed/grid_predictions.parquet 
+      --grid_cells data/prediction/processed/grid_1km_delhi.csv --correlation 
+      reports/prediction/residual_correlation.json --conformal 
+      reports/lightgbm/primary/conformal_calibration.json --levels 2,5,10 
+      --outdir data/prediction/processed/aggregated --summary_output 
+      reports/prediction/aggregation_summary.json
+    deps:
+    - path: data/prediction/processed/grid_1km_delhi.csv
+      hash: md5
+      md5: 9ab84e51b6ee0bd4e5ae62171c6ee83b
+      size: 176200
+    - path: data/prediction/processed/grid_predictions.parquet
+      hash: md5
+      md5: e03f4267f048e71c15d105dd292edcc9
+      size: 5643905
+    - path: reports/lightgbm/primary/conformal_calibration.json
+      hash: md5
+      md5: b0e886a48001ff1cb511c1056dcfb034
+      size: 3784
+    - path: reports/prediction/residual_correlation.json
+      hash: md5
+      md5: 75057f48533f82c81e68a5f6b1b0eaca
+      size: 3018
+    - path: scripts/prediction/inference/04_aggregate_grid.py
+      hash: md5
+      md5: d48ed00d3d618a3bdd6d60280f37bd1b
+      size: 8826
+    outs:
+    - path: data/prediction/processed/aggregated
+      hash: md5
+      md5: d9a567beb892ca35401af168aa6bd66e.dir
+      size: 2283498
+      nfiles: 3
+    - path: reports/prediction/aggregation_summary.json
+      hash: md5
+      md5: a251c81f5c25c2efa86d52afbee9e4f9
+      size: 2020

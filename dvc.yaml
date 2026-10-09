@@ -1895,3 +1895,29 @@ stages:
     outs:
       - reports/prediction/grid_extrapolation_severity.csv
       - reports/prediction/grid_extrapolation_by_feature.csv
+
+  # rho: the same-day correlation between two locations' prediction errors.
+  # Decides how much a coarse cell's interval may shrink, so it is measured
+  # rather than assumed -- underestimating it would make coarse intervals look
+  # tighter than they are.
+  predict_measure_residual_correlation:
+    cmd: python scripts/prediction/inference/03_measure_residual_correlation.py --oof reports/lightgbm/primary/cv_spatial_loso_oof_predictions.csv --station_file data/stations/cpcb_stations_delhi_status.csv --pairs_output reports/prediction/residual_correlation_pairs.csv --summary_output reports/prediction/residual_correlation.json
+    deps:
+      - scripts/prediction/inference/03_measure_residual_correlation.py
+      - reports/lightgbm/primary/cv_spatial_loso_oof_predictions.csv
+      - data/stations/cpcb_stations_delhi_status.csv
+    outs:
+      - reports/prediction/residual_correlation_pairs.csv
+      - reports/prediction/residual_correlation.json
+
+  predict_aggregate_grid:
+    cmd: python scripts/prediction/inference/04_aggregate_grid.py --grid_predictions data/prediction/processed/grid_predictions.parquet --grid_cells data/prediction/processed/grid_1km_delhi.csv --correlation reports/prediction/residual_correlation.json --conformal reports/lightgbm/primary/conformal_calibration.json --levels 2,5,10 --outdir data/prediction/processed/aggregated --summary_output reports/prediction/aggregation_summary.json
+    deps:
+      - scripts/prediction/inference/04_aggregate_grid.py
+      - data/prediction/processed/grid_predictions.parquet
+      - data/prediction/processed/grid_1km_delhi.csv
+      - reports/prediction/residual_correlation.json
+      - reports/lightgbm/primary/conformal_calibration.json
+    outs:
+      - data/prediction/processed/aggregated
+      - reports/prediction/aggregation_summary.json

@@ -5,3 +5,6 @@
 /station_cell_agreement.json
 /grid_extrapolation_severity.csv
 /grid_extrapolation_by_feature.csv
+/residual_correlation_pairs.csv
+/residual_correlation.json
+/aggregation_summary.json
