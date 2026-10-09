@@ -757,6 +757,55 @@ confident wrong answers before one worked.** Recorded because they will recur:
 Only setting the view with `animate:false` and reading `map.getZoom()` directly
 measured what it claimed to.
 
+### docs/PROJECT_SUMMARY.md -- the presentable account (2026-10-09)
+
+Muhammed's request: the task logs have everything but are too long and carry
+too much incidental detail to revise from. He needed one document he could read
+before presenting the project or sitting an interview.
+
+**Organised by what someone will ASK, not by what happened when.** The task
+logs are already chronological; a second chronology would have been a shorter
+copy of the same thing. So: a one-paragraph version with the single number to
+lead with, then problem, data, features, modelling, validation, uncertainty,
+the product, a decisions table, problems-and-how-found, limitations, likely
+questions with answers, and a numbers cheat-sheet.
+
+**Every figure was read out of `reports/` rather than from the logs or from
+memory**, because he will be quoting them under pressure. Five things that
+check found, which is why the rule was worth following:
+
+- the Geofabrik loss was garbled in my first draft (I had written "57 power
+  plants, 24% of roads"; the artifact says 112 against 170 with all 57 east of
+  lon 77.36 missing, and 76% of training's roads RETAINED in the strip);
+- a set of coverage-by-unusualness-band figures I had carried in my head could
+  not be reproduced from `extrapolation_vs_coverage.csv` at all, so they were
+  replaced with the median split that IS in the JSON (89.6% vs 90.2%, p = 0.78);
+- the station driving the extrapolation correlation (5598, 102 range-widths out
+  on `wetland_herbaceous_pct`) is also the worst-covered station at the 90%
+  level (0.720) -- the two facts were recorded separately and the connection
+  had not been made anywhere;
+- "LightGBM beats the LME" was quantified for the first time by merging the
+  two fold tables: **40 of 42 folds on both R2 and RMSE**;
+- the Duan correction's awkward result was restated honestly -- it removes bias
+  in the back-transformed mean (factor 1.132) but made spatial-LOSO RMSE
+  slightly WORSE in 4 of 5 variants, which is a thing to volunteer rather than
+  be caught by.
+
+**One number computed fresh:** the top six features carry 87.7% of total gain
+(season plus four meteorological variables plus AOD), against 7.8% for all 13
+static land-use features combined. That pairing answers "why not add more
+land-use features" in one line and is now the stated answer.
+
+Interview questions were chosen as the ones the project's own weak points
+invite, so each has a real answer: is 0.80 good (the comparable figure matters
+more than the absolute), why not deep learning, how the grid can be validated
+without ground truth, why distance was removed as a confidence measure, whether
+the coarse products are better data, and what the weakest part is. The last one
+is answered rather than deflected: conditional coverage, where the interval can
+drop to 72% at a single station, and the stations where it fails are the
+weakly-AOD-coupled ones -- a property that cannot be computed for an
+unmonitored cell, which is exactly where it would be needed.
+
 ## Pending
 
 **The 10-step plan is complete.** Steps 1-9 are in Completed above. Step 10 --
