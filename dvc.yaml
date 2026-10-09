@@ -1804,3 +1804,31 @@ stages:
     outs:
       - data/prediction/processed/features/maiac_aod_gapfilled.csv
       - data/prediction/processed/maiac_gapfill/fill_summary.csv
+
+  # Grid feature matrix. Built with the SAME script as the training master
+  # table, which gained an optional --base_table because the grid has no PM2.5
+  # target to define its rows. A separate assembly script was rejected: it would
+  # have duplicated the NDVI merge_asof period join, a feature-defining
+  # operation.
+  #
+  # Wired as a proper stage rather than run by hand. Running it by hand was a
+  # real mistake: with no DVC stage there was no DVC-generated .gitignore, so
+  # the 390 MB output was swept into a git commit by `git add data/prediction/`
+  # and GitHub rejected the push. DVC owns the output here, so it is tracked in
+  # the cache and ignored by git.
+  predict_build_master_table:
+    cmd: python scripts/modeling/dataset_prep/01_build_master_table.py --station_file data/prediction/processed/grid_1km_delhi.csv --base_table data/prediction/processed/era5_land/era5_land_daily.csv --aod data/prediction/processed/features/maiac_aod_gapfilled.csv --era5_land data/prediction/processed/era5_land/era5_land_daily.csv --era5_blh data/prediction/processed/era5_blh/era5_blh_daily.csv --ndvi data/prediction/processed/features/ndvi_gapfilled.csv --worldcover data/prediction/processed/features/worldcover_landuse.csv --srtm data/prediction/processed/features/srtm_terrain.csv --roads data/prediction/processed/features/road_density.csv --industrial data/prediction/processed/features/industrial_fraction.csv --powerplants data/prediction/processed/features/powerplant_distance.csv --output data/prediction/processed/modeling_datasets/master_feature_table.csv
+    deps:
+      - scripts/modeling/dataset_prep/01_build_master_table.py
+      - data/prediction/processed/grid_1km_delhi.csv
+      - data/prediction/processed/era5_land/era5_land_daily.csv
+      - data/prediction/processed/era5_blh/era5_blh_daily.csv
+      - data/prediction/processed/features/maiac_aod_gapfilled.csv
+      - data/prediction/processed/features/ndvi_gapfilled.csv
+      - data/prediction/processed/features/worldcover_landuse.csv
+      - data/prediction/processed/features/srtm_terrain.csv
+      - data/prediction/processed/features/road_density.csv
+      - data/prediction/processed/features/industrial_fraction.csv
+      - data/prediction/processed/features/powerplant_distance.csv
+    outs:
+      - data/prediction/processed/modeling_datasets/master_feature_table.csv
