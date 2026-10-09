@@ -15,10 +15,9 @@
   --accent:#2a78d6;
   /* CPCB National AQI band colours, for instant domain recognition.
      Severe darkened from the official #AF2D24 to #7E1A14: those two reds are
-     the commonest bands in Delhi winter (53%/47% of cells on 2025-12-15) yet
-     were only dE 12.6 apart; this widens them to 24.1. Every colour is paired
-     with a text label in the readout, tooltip and legend, so identity never
-     rests on colour alone. */
+     the commonest bands in Delhi winter yet were only dE 12.6 apart; this
+     widens them to 24.1. Every colour is paired with a text label in the
+     readout, tooltip and legend, so identity never rests on colour alone. */
   --aqi1:#55A84F; --aqi2:#A3C853; --aqi3:#FFF833;
   --aqi4:#F29C33; --aqi5:#E93F33; --aqi6:#7E1A14;
 }
@@ -34,94 +33,122 @@
 *{box-sizing:border-box}
 body{margin:0;background:var(--plane);color:var(--ink);
   font:14px/1.5 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-.wrap{max-width:1180px;margin:0 auto;padding:16px}
-h1{font-size:19px;margin:0 0 2px;letter-spacing:-0.01em}
-.sub{color:var(--ink2);font-size:13px;margin:0 0 12px}
-.banner{background:var(--warn-bg);color:var(--warn-ink);border:1px solid var(--warn-line);
-  border-radius:8px;padding:10px 12px;font-size:13px;margin-bottom:14px}
-.banner b{font-weight:650}
-.card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px}
-.controls{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:14px}
+.wrap{max-width:1180px;margin:0 auto;padding:18px 16px 40px}
+
+header{display:flex;align-items:baseline;justify-content:space-between;
+  gap:16px;flex-wrap:wrap;margin-bottom:4px}
+h1{font-size:19px;margin:0;letter-spacing:-0.01em}
+.sub{color:var(--muted);font-size:13px;margin:2px 0 0}
+a.about{font-size:13px;color:var(--accent);text-decoration:none;white-space:nowrap}
+a.about:hover{text-decoration:underline}
+
+.card{background:var(--surface);border:1px solid var(--border);
+  border-radius:10px;padding:14px}
+.card h3{font-size:11px;color:var(--muted);text-transform:uppercase;
+  letter-spacing:.04em;margin:0 0 10px}
+
+.controls{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin:14px 0}
 .f{display:flex;flex-direction:column;gap:4px}
 .f label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
-input,button{font:inherit;border-radius:7px;border:1px solid var(--axis);padding:7px 10px;
-  background:var(--surface);color:var(--ink)}
-input{width:122px}
-button{cursor:pointer;border-color:var(--accent);background:var(--accent);color:#fff;font-weight:600}
-button.ghost{background:var(--surface);color:var(--ink);border-color:var(--axis);font-weight:500}
+input,button,select{font:inherit;border-radius:7px;border:1px solid var(--axis);
+  padding:7px 10px;background:var(--surface);color:var(--ink)}
+input{width:112px}
+button{cursor:pointer;border-color:var(--accent);background:var(--accent);
+  color:#fff;font-weight:600}
+button.ghost{background:var(--surface);color:var(--ink);border-color:var(--axis);
+  font-weight:500}
 button:hover{filter:brightness(1.06)}
-.cols{display:grid;grid-template-columns:1fr 330px;gap:14px}
-@media (max-width:900px){.cols{grid-template-columns:1fr}}
-#map{height:520px;border-radius:10px;border:1px solid var(--border);background:var(--surface)}
-@media (max-width:900px){#map{height:380px}}
-.readout .big{font-size:40px;font-weight:680;letter-spacing:-0.02em;line-height:1.05}
+.spacer{flex:1}
+
+.cols{display:grid;grid-template-columns:1fr 300px;gap:14px;align-items:start}
+@media (max-width:920px){.cols{grid-template-columns:1fr}}
+#map{height:560px;border-radius:10px;border:1px solid var(--border);
+  background:var(--surface)}
+@media (max-width:920px){#map{height:400px}}
+.leaflet-container{background:var(--surface)}
+
+/* Context strip: appears only when something about the current view needs
+   saying. Permanent prose lives on the About page; this is for warnings that
+   are true right now and change what the number means. */
+.ctx{margin-top:10px;padding:9px 12px;border-radius:8px;font-size:12.5px;
+  background:var(--warn-bg);color:var(--warn-ink);border:1px solid var(--warn-line);
+  display:none}
+.ctx.on{display:block}
+.ctx b{font-weight:650}
+
+.readout .big{font-size:38px;font-weight:680;letter-spacing:-0.02em;line-height:1.05}
 .readout .unit{font-size:15px;color:var(--ink2);font-weight:500}
 .readout .interval{font-size:13px;color:var(--ink2);margin-top:3px;
   font-variant-numeric:tabular-nums}
 .readout .interval b{font-weight:650;color:var(--ink)}
-.band{display:inline-block;margin-top:6px;padding:3px 10px;border-radius:999px;
+.band{display:inline-block;margin-top:8px;padding:3px 10px;border-radius:999px;
   border:1px solid var(--axis);font-size:12px;font-weight:650;color:var(--ink2)}
-dl{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;margin:14px 0 0;font-size:13px}
-dt{color:var(--muted)} dd{margin:0;text-align:right}
-.note{margin-top:12px;padding-top:12px;border-top:1px solid var(--grid);
-  font-size:12px;color:var(--muted)}
-.legend h3,.readout h3,.card h3{font-size:11px;color:var(--muted);text-transform:uppercase;
-  letter-spacing:.04em;margin:0 0 4px}
+dl{display:grid;grid-template-columns:auto 1fr;gap:5px 12px;margin:12px 0 0;font-size:12.5px}
+dt{color:var(--muted)} dd{margin:0;text-align:right;font-variant-numeric:tabular-nums}
 .err{color:#a01b1b;font-size:13px;margin-top:8px}
 @media (prefers-color-scheme: dark){.err{color:#ff8a8a}}
-table{border-collapse:collapse;width:100%;font-size:12px;margin-top:8px}
+
+table{border-collapse:collapse;width:100%;font-size:12px}
 th,td{text-align:left;padding:3px 6px;border-bottom:1px solid var(--grid)}
 th{color:var(--muted);font-weight:600}
 td.num{text-align:right;font-variant-numeric:tabular-nums}
-td.sw{width:22px;padding-right:0}
-.chip{display:block;width:16px;height:16px;border-radius:4px;border:1px solid var(--border)}
-.leaflet-container{background:var(--surface)}
-.dl .dlsub{color:var(--ink2);font-size:13px;margin:2px 0 12px;max-width:70ch}
-.dlrow{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:14px}
-.dlrow select{font:inherit;border-radius:7px;border:1px solid var(--axis);padding:7px 10px;
-  background:var(--surface);color:var(--ink)}
-.feathead{display:flex;justify-content:space-between;align-items:baseline;
-  font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;
-  margin-bottom:7px}
-.featgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(205px,1fr));
-  gap:2px 14px}
-.featgrid label{display:flex;gap:7px;align-items:center;font-size:13px;
-  color:var(--ink2);cursor:pointer;padding:2px 0}
-.featgrid input[type=checkbox]{width:auto;margin:0;accent-color:var(--accent)}
-button.link{background:none;border:none;padding:0;color:var(--accent);font-weight:600;
-  font-size:11px;text-transform:uppercase;letter-spacing:.04em;cursor:pointer}
-button.link:hover{text-decoration:underline}
-.dlfoot{display:flex;justify-content:space-between;align-items:center;gap:14px;
-  margin-top:14px;padding-top:12px;border-top:1px solid var(--grid)}
+td.sw{width:20px;padding-right:0}
+.chip{display:block;width:14px;height:14px;border-radius:4px;border:1px solid var(--border)}
+
+.dlgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
+@media (max-width:920px){.dlgrid{grid-template-columns:1fr}}
+.dlrow{display:flex;flex-wrap:wrap;gap:9px;align-items:flex-end;margin-bottom:10px}
+.dlrow input{width:132px}
+.dlsub{color:var(--ink2);font-size:12.5px;margin:0 0 11px}
+.dlfoot{display:flex;justify-content:space-between;align-items:center;gap:12px;
+  margin-top:12px;padding-top:11px;border-top:1px solid var(--grid)}
 .dlfoot .prev{font-size:12px;color:var(--ink2);font-variant-numeric:tabular-nums}
 .dlfoot .prev b{color:var(--ink);font-weight:650}
+details.feat{margin-top:4px}
+details.feat summary{font-size:11px;color:var(--muted);text-transform:uppercase;
+  letter-spacing:.04em;cursor:pointer;outline:none}
+details.feat summary:hover{color:var(--ink2)}
+.featgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));
+  gap:1px 12px;margin-top:8px}
+.featgrid label{display:flex;gap:6px;align-items:center;font-size:12.5px;
+  color:var(--ink2);cursor:pointer;padding:1px 0}
+.featgrid input[type=checkbox]{width:auto;margin:0;accent-color:var(--accent)}
+.hint{font-size:12px;color:var(--muted);margin-top:9px}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>Delhi PM2.5 Estimator</h1>
-  <p class="sub">Satellite-to-ground calibration, Phase 1 &mdash; LightGBM on MAIAC AOD, ERA5 meteorology and land-use covariates.</p>
+  <header>
+    <div>
+      <h1>Delhi PM2.5 Estimator</h1>
+      <p class="sub">Satellite-to-ground calibration &mdash; retrospective estimates for
+        2025-03-01 to 2026-02-28</p>
+    </div>
+    <a class="about" href="/about.html">About this data &amp; its limits &rarr;</a>
+  </header>
 
-  <div class="banner">
-    <b>Retrospective, not live.</b> This estimates PM2.5 for a past date in the study window
-    (2025-03-01 to 2026-02-28). It cannot report current air quality &mdash; its inputs are
-    ERA5 reanalysis (~5 day latency) and MAIAC AOD (1&ndash;3 day latency).
-    <br><b>Outside the training range in places.</b> Every CPCB monitor is urban, so rural
-    cells sit beyond anything the model was trained on. Those are drawn hatched: the model
-    returns its boundary estimate there and the interval was never validated for them.
-  </div>
-
-  <div class="controls card">
+  <div class="controls">
     <div class="f"><label for="date">Date</label><input id="date" type="date"></div>
     <div class="f"><label for="lat">Latitude</label><input id="lat" type="number" step="0.0001" placeholder="28.6139"></div>
     <div class="f"><label for="lon">Longitude</label><input id="lon" type="number" step="0.0001" placeholder="77.2090"></div>
     <button id="go">Estimate</button>
     <button id="loc" class="ghost">Use my location</button>
-    <button id="reload" class="ghost">Refresh map</button>
+    <div class="spacer"></div>
+    <div class="f"><label for="res">Map resolution</label>
+      <select id="res">
+        <option value="1">1 km</option>
+        <option value="2">2 km</option>
+        <option value="5">5 km</option>
+        <option value="10">10 km</option>
+      </select>
+    </div>
   </div>
 
   <div class="cols">
-    <div><div id="map"></div></div>
+    <div>
+      <div id="map"></div>
+      <div class="ctx" id="ctx"></div>
+    </div>
 
     <div>
       <div class="card readout">
@@ -131,110 +158,77 @@ button.link:hover{text-decoration:underline}
         <div class="band" id="band">no query yet</div>
         <dl id="meta"></dl>
         <div class="err" id="err"></div>
-        <div class="note" id="method"></div>
       </div>
 
-      <div class="card legend" style="margin-top:14px">
-        <h3>National AQI band (PM2.5)</h3>
-        <table>
-          <thead><tr><th></th><th>Band</th><th class="num">&micro;g/m&sup3;</th></tr></thead>
-          <tbody id="legendrows"></tbody>
-        </table>
-        <div class="note">Each cell is the model's own 1&nbsp;km prediction, from that cell's
-          AOD, meteorology, vegetation and land cover &mdash; not interpolated from stations.
-          Validated against the monitors: the cell containing a station predicts what the
-          station predicts (correlation 0.990, median difference &minus;0.11&nbsp;&micro;g/m&sup3;).
-          <br><br>Every estimate carries a 90% prediction interval, calibrated on out-of-fold
-          errors at stations the model never trained on. Hover any cell to see it.
-          <br><br><b>Red hatching</b> marks cells whose features fall outside the range the
-          model was trained on. Every CPCB monitor is urban, so rural cells are extrapolation
-          by construction: the model returns its boundary estimate and the interval's coverage
-          was never measured there. <b>Grey hatching</b> marks cells more than 10.6&nbsp;km from
-          any station, a larger gap than validation ever spanned. Distance itself is context
-          only &mdash; it was tested against prediction error and found unpredictive.</div>
+      <div class="card" style="margin-top:14px">
+        <h3>National AQI band</h3>
+        <table><tbody id="legendrows"></tbody></table>
       </div>
 
       <div class="card" style="margin-top:14px">
         <h3>Model</h3>
         <dl id="model"></dl>
-        <div class="note" id="uncert"></div>
+        <div class="hint"><a class="about" href="/about.html#validation">How this was
+          validated &rarr;</a></div>
       </div>
     </div>
   </div>
 
-  <div class="card dl" style="margin-top:14px">
-    <h3>Download station data</h3>
-    <p class="dlsub">Measured daily PM2.5 at all 42 CPCB stations, each row paired with the
-      model&rsquo;s out-of-sample estimate and its 90% prediction interval. This is the only
-      download that carries measured values &mdash; the gridded products are model estimates
-      throughout.</p>
-
-    <div class="dlrow">
-      <div class="f"><label for="dfrom">From</label><input id="dfrom" type="date"></div>
-      <div class="f"><label for="dto">To</label><input id="dto" type="date"></div>
-      <div class="f"><label for="dfmt">Format</label>
-        <select id="dfmt">
-          <option value="zip">ZIP &mdash; parquet + CSV + docs</option>
-          <option value="parquet">Parquet only</option>
-          <option value="csv">CSV only</option>
-        </select>
+  <div class="dlgrid">
+    <div class="card">
+      <h3>Download &mdash; station measurements</h3>
+      <p class="dlsub">Measured PM2.5 at 42 CPCB monitors, each row paired with the
+        model&rsquo;s out-of-sample estimate. The only product with ground truth.</p>
+      <div class="dlrow">
+        <div class="f"><label for="dfrom">From</label><input id="dfrom" type="date"></div>
+        <div class="f"><label for="dto">To</label><input id="dto" type="date"></div>
+        <div class="f"><label for="dfmt">Format</label>
+          <select id="dfmt">
+            <option value="zip">ZIP</option>
+            <option value="parquet">Parquet</option>
+            <option value="csv">CSV</option>
+          </select></div>
+      </div>
+      <details class="feat">
+        <summary>Choose features</summary>
+        <div class="featgrid" id="featlist"></div>
+      </details>
+      <div class="dlfoot">
+        <div class="prev" id="dprev">&nbsp;</div>
+        <button id="dgo">Download</button>
       </div>
     </div>
 
-    <div class="feathead">
-      <span>Features</span>
-      <span><button class="link" id="fall">select all</button> &middot;
-            <button class="link" id="fnone">none</button></span>
-    </div>
-    <div class="featgrid" id="featlist"></div>
-    <div class="note" id="always"></div>
-
-    <div class="dlfoot">
-      <div class="prev" id="dprev">&nbsp;</div>
-      <button id="dgo">Download</button>
-    </div>
-  </div>
-
-  <div class="card dl" style="margin-top:14px">
-    <h3>Download gridded estimates</h3>
-    <p class="dlsub">Model estimates across Delhi, with no measured values &mdash; every
-      number here is a prediction. 1&nbsp;km is the native resolution and ships the
-      features, so re-running the model on them reproduces the estimate exactly. Coarser
-      grids are averages of those 1&nbsp;km cells.</p>
-
-    <div class="dlrow">
-      <div class="f"><label for="gres">Resolution</label>
-        <select id="gres">
-          <option value="1">1 km &mdash; native, with features</option>
-          <option value="2">2 km &mdash; averaged</option>
-          <option value="5">5 km &mdash; averaged</option>
-          <option value="10">10 km &mdash; averaged</option>
-        </select>
+    <div class="card">
+      <h3>Download &mdash; gridded estimates</h3>
+      <p class="dlsub">Model estimates across Delhi. Every value is a prediction, not a
+        measurement. 1&nbsp;km ships the features and reproduces exactly.</p>
+      <div class="dlrow">
+        <div class="f"><label for="gres">Resolution</label>
+          <select id="gres">
+            <option value="1">1 km</option>
+            <option value="2">2 km</option>
+            <option value="5">5 km</option>
+            <option value="10">10 km</option>
+          </select></div>
+        <div class="f"><label for="gfrom">From</label><input id="gfrom" type="date"></div>
+        <div class="f"><label for="gto">To</label><input id="gto" type="date"></div>
+        <div class="f"><label for="gfmt">Format</label>
+          <select id="gfmt">
+            <option value="zip">ZIP</option>
+            <option value="parquet">Parquet</option>
+            <option value="csv">CSV</option>
+          </select></div>
       </div>
-      <div class="f"><label for="gfrom">From</label><input id="gfrom" type="date"></div>
-      <div class="f"><label for="gto">To</label><input id="gto" type="date"></div>
-      <div class="f"><label for="gfmt">Format</label>
-        <select id="gfmt">
-          <option value="zip">ZIP &mdash; parquet + CSV + docs</option>
-          <option value="parquet">Parquet only</option>
-          <option value="csv">CSV only</option>
-        </select>
+      <details class="feat" id="gfeatwrap">
+        <summary>Choose features</summary>
+        <div class="featgrid" id="gfeatlist"></div>
+      </details>
+      <div class="hint" id="gnote"></div>
+      <div class="dlfoot">
+        <div class="prev" id="gprev">&nbsp;</div>
+        <button id="ggo">Download</button>
       </div>
-    </div>
-
-    <div id="gfeatwrap">
-      <div class="feathead">
-        <span>Features</span>
-        <span><button class="link" id="gall">select all</button> &middot;
-              <button class="link" id="gnone">none</button></span>
-      </div>
-      <div class="featgrid" id="gfeatlist"></div>
-    </div>
-    <div class="note" id="gnote"></div>
-
-    <div class="dlfoot">
-      <div class="prev" id="gprev">&nbsp;</div>
-      <button id="ggo">Download</button>
     </div>
   </div>
 </div>
@@ -243,38 +237,23 @@ button.link:hover{text-decoration:underline}
 <script>
 const RAMP   = ['#55A84F','#A3C853','#FFF833','#F29C33','#E93F33','#7E1A14'];
 const BANDS  = ['Good','Satisfactory','Moderate','Poor','Very Poor','Severe'];
+const CUTS   = [30,60,90,120,250];
 const RANGES = ['0-30','30-60','60-90','90-120','120-250','250+'];
-const BREAKS = [30,60,90,120,250];
-// Ink that stays legible on each band fill: yellow and the light greens need dark text.
-const ONBAND = ['#ffffff','#0b0b0b','#0b0b0b','#0b0b0b','#ffffff','#ffffff'];
-const BBOX = {minLat:28.4126, minLon:76.8381, maxLat:28.8814, maxLon:77.3477};
 
+function el(id){ return document.getElementById(id); }
 function bandIndex(v){
-  for(let i=0;i<BREAKS.length;i++) if(v < BREAKS[i]) return i;
+  for(let i=0;i<CUTS.length;i++) if(v<=CUTS[i]) return i;
   return 5;
 }
 function colorFor(v){ return RAMP[bandIndex(v)]; }
-function el(id){ return document.getElementById(id); }
 
-// Legend rows carry swatch + band name + numeric range, so colour is never
-// the only cue -- which is also the relief the low-contrast yellow requires.
-el('legendrows').innerHTML = RAMP.map((c,i)=>
-  '<tr><td class="sw"><span class="chip" style="background:'+c+'"></span></td>'+
-  '<td>'+BANDS[i]+'</td><td class="num">'+RANGES[i]+'</td></tr>').join('');
-
-// preferCanvas because the grid is 2388 rectangles. Leaflet's default SVG
+// preferCanvas because the 1 km grid is 2388 rectangles. Leaflet's default SVG
 // renderer makes a DOM node per feature and becomes sluggish past roughly a
 // thousand; canvas draws them all into one element.
 const map = L.map('map',{zoomControl:true, preferCanvas:true}).fitBounds(
-  [[BBOX.minLat,BBOX.minLon],[BBOX.maxLat,BBOX.maxLon]]);
+  [[28.4126,76.8381],[28.8814,77.3477]]);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-  {maxZoom:17, attribution:'&copy; OpenStreetMap'}).addTo(map);
-// Framing only. Coverage is gated on distance to the nearest station, so the
-// coloured cells -- not this rectangle -- show where the API will answer.
-L.rectangle([[BBOX.minLat,BBOX.minLon],[BBOX.maxLat,BBOX.maxLon]],
-  {color:'#898781',weight:1,fill:false,dashArray:'4 3'})
- .bindTooltip('Station-roster bounding box (framing only)').addTo(map);
-
+  {maxZoom:18, attribution:'&copy; OpenStreetMap'}).addTo(map);
 let gridLayer = L.layerGroup().addTo(map);
 let stationLayer = L.layerGroup().addTo(map);
 let pin = null;
@@ -286,37 +265,35 @@ async function getJSON(url){
   return j;
 }
 
+function showCtx(html){
+  if(html){ el('ctx').innerHTML = html; el('ctx').classList.add('on'); }
+  else { el('ctx').classList.remove('on'); }
+}
+
 async function loadModel(){
   const m = await getJSON('/api/model-info');
   el('model').innerHTML =
     '<dt>Spatial LOSO R&sup2;</dt><dd>'+m.validation.r2+'</dd>'+
-    '<dt>RMSE</dt><dd>'+m.validation.rmse_ugm3+' &micro;g/m&sup3;</dd>'+
-    '<dt>MAE</dt><dd>'+m.validation.mae_ugm3+' &micro;g/m&sup3;</dd>'+
-    '<dt>Features</dt><dd>'+m.n_features+'</dd>'+
+    '<dt>RMSE</dt><dd>'+m.validation.rmse_ugm3+'</dd>'+
     '<dt>Stations</dt><dd>'+m.n_training_stations+'</dd>'+
-    '<dt>Coverage</dt><dd>'+m.coverage_rule.max_station_distance_km+' km of a station</dd>'+
-    '<dt>'+m.uncertainty.coverage_level_pct+'% interval</dt><dd>&plusmn;'+
-      m.uncertainty.width_pct_of_prediction+'% of estimate</dd>';
-  el('uncert').textContent = m.uncertainty.caveat;
+    '<dt>Interval</dt><dd>'+m.uncertainty.coverage_level_pct+'% &plusmn;'+
+      m.uncertainty.width_pct_of_prediction+'%</dd>';
   const d = el('date');
   d.min = m.date_window.start; d.max = m.date_window.end;
   if(!d.value) d.value = m.date_window.end;
-  // The download pickers span the same window and default to all of it.
-  ['dfrom','dto'].forEach(id => {
-    const x = el(id);
-    x.min = m.date_window.start; x.max = m.date_window.end;
+  ['dfrom','dto','gfrom','gto'].forEach(id=>{
+    const x = el(id); x.min = m.date_window.start; x.max = m.date_window.end;
   });
   if(!el('dfrom').value) el('dfrom').value = m.date_window.start;
   if(!el('dto').value)   el('dto').value   = m.date_window.end;
-  ['gfrom','gto'].forEach(id => {
-    const x = el(id);
-    x.min = m.date_window.start; x.max = m.date_window.end;
-  });
-  // The grid download defaults to one month rather than the full year: a year
-  // of 1 km data is 871,620 rows, which is a surprising thing to hand someone
-  // who just clicked Download.
-  if(!el('gfrom').value) el('gfrom').value = m.date_window.end.slice(0,8) + '01';
+  // The grid download defaults to one month, not the full year: 871,620 rows
+  // is a surprising thing to hand someone who just clicked Download.
+  if(!el('gfrom').value) el('gfrom').value = m.date_window.end.slice(0,8)+'01';
   if(!el('gto').value)   el('gto').value   = m.date_window.end;
+
+  el('legendrows').innerHTML = BANDS.map((b,i)=>
+    '<tr><td class="sw"><span class="chip" style="background:'+RAMP[i]+'"></span></td>'+
+    '<td>'+b+'</td><td class="num">'+RANGES[i]+'</td></tr>').join('');
 }
 
 async function loadStations(){
@@ -324,8 +301,8 @@ async function loadStations(){
   stationLayer.clearLayers();
   s.stations.forEach(st=>{
     L.circleMarker([st.latitude,st.longitude],
-      {radius:4,color:'#0b0b0b',weight:1.5,fillColor:'#fcfcfb',fillOpacity:1})
-     .bindTooltip(st.name+'<br><span style="color:#898781">training station '+st.location_id+'</span>')
+      {radius:3.5,color:'#0b0b0b',weight:1.4,fillColor:'#fcfcfb',fillOpacity:1})
+     .bindTooltip(st.name+'<br><span style="color:#898781">CPCB monitor</span>')
      .addTo(stationLayer);
   });
 }
@@ -333,268 +310,190 @@ async function loadStations(){
 async function loadGrid(){
   const date = el('date').value;
   if(!date) return;
-  const g = await getJSON('/api/grid?date='+date);
+  const res = el('res').value;
+  const g = await getJSON('/api/grid?date='+date+'&resolution_km='+res);
   gridLayer.clearLayers();
   const dLat = g.lat_step/2, dLon = g.lon_step/2;
   g.cells.forEach(c=>{
-    // Two different caveats, deliberately not merged. A cell can be close to a
-    // monitor and still be unlike every monitor (rural land cover a few km
-    // out), or far from one yet ordinary. Extrapolation is the stronger
-    // warning -- it says the model has no information, not merely that the
-    // distance is untested -- so it drives the hatching.
-    const extrapolating = c.outside_training_range;
-    const farFromStation = c.beyond_largest_validated_gap;
-    const caution = extrapolating || farFromStation;
+    // Extrapolation is the stronger warning -- it says the model has no
+    // information here, not merely that the distance is untested -- so it
+    // drives the hatching.
+    const ex = c.outside_training_range;
+    const far = c.beyond_largest_validated_gap;
+    const caution = ex || far;
     L.rectangle([[c.lat-dLat,c.lon-dLon],[c.lat+dLat,c.lon+dLon]],{
-      stroke: caution, color: extrapolating ? '#7E1A14' : '#898781',
+      stroke: caution, color: ex ? '#7E1A14' : '#898781',
       weight: caution ? 1 : 0, dashArray: caution ? '2 3' : null,
       fillColor: colorFor(c.pm25_ugm3),
-      fillOpacity: extrapolating ? 0.28 : (farFromStation ? 0.4 : 0.7)
+      fillOpacity: ex ? 0.28 : (far ? 0.42 : 0.7)
     }).bindTooltip(
       '<b>'+c.pm25_ugm3+' &micro;g/m&sup3;</b> &mdash; '+c.aqi_band+'<br>'+
       '<span style="color:#898781">'+g.interval_coverage_pct+'% interval '+
-      c.interval_lower_ugm3.toFixed(0)+'–'+
-      c.interval_upper_ugm3.toFixed(0)+' &middot; '+c.nearest_station_km+
-      ' km to nearest station</span>'+
-      (extrapolating
-        ? '<br><span style="color:#E93F33">outside the training range &mdash; '+
-          'estimate and interval unvalidated here</span>' : '')
+      c.interval_lower_ugm3.toFixed(0)+'&ndash;'+c.interval_upper_ugm3.toFixed(0)+
+      '</span>'+
+      (ex ? '<br><span style="color:#E93F33">outside the training range</span>' : '')
       ).addTo(gridLayer);
   });
+
+  // Only shown when it changes what the number means. Switching to a coarse
+  // resolution tightens the interval, and the reason is not that the data got
+  // better -- the quantity changed from a point to an area average.
+  showCtx(g.areal_mean_warning
+    ? '<b>'+g.grid_km+'&nbsp;km view:</b> '+g.areal_mean_warning
+    : '');
 }
 
 function setBand(label, idx){
   const b = el('band');
   b.textContent = label;
-  if(idx === null){ b.style.background=''; b.style.color=''; b.style.borderColor=''; }
-  else { b.style.background = RAMP[idx]; b.style.color = ONBAND[idx];
-         b.style.borderColor = 'transparent'; }
+  b.style.borderColor = idx===null ? 'var(--axis)' : RAMP[idx];
+  b.style.color = idx===null ? 'var(--ink2)' : 'var(--ink)';
 }
 
 async function estimate(lat, lon){
-  el('err').textContent=''; el('method').textContent='';
+  el('err').textContent = '';
   try{
     const date = el('date').value;
     const r = await getJSON('/api/predict?lat='+lat+'&lon='+lon+'&date='+date);
     el('val').textContent = r.predicted_pm25_ugm3.toFixed(1);
     setBand(r.aqi_band, bandIndex(r.predicted_pm25_ugm3));
     el('interval').innerHTML = r.interval.coverage_pct+'% interval <b>'+
-      r.interval.lower_ugm3.toFixed(0)+' – '+
-      r.interval.upper_ugm3.toFixed(0)+'</b> &micro;g/m&sup3;';
+      r.interval.lower_ugm3.toFixed(0)+' &ndash; '+r.interval.upper_ugm3.toFixed(0)+
+      '</b> &micro;g/m&sup3;';
+    const ns = r.nearest_station;
     el('meta').innerHTML =
-      '<dt>Nearest station</dt><dd>'+r.provenance.distance_to_nearest_station_km+' km</dd>'+
-      '<dt></dt><dd style="color:var(--muted)">'+r.nearest_station.name+'</dd>'+
-      '<dt>Observed there</dt><dd>'+r.nearest_station.observed_pm25_ugm3+' &micro;g/m&sup3;</dd>'+
-      (r.provenance.beyond_largest_validated_gap
-        ? '<dt></dt><dd style="color:var(--muted)">beyond largest validated gap</dd>' : '');
-    el('method').innerHTML = r.method_note +
-      (r.training_range && r.training_range.materially_outside
-        ? '<br><br><b style="color:#E93F33">Outside the training range.</b> ' +
-          r.training_range.note + ' (worst: ' + r.training_range.worst_feature +
-          ', ' + r.training_range.overshoot_range_widths +
-          ' range-widths beyond).'
-        : '');
+      '<dt>Nearest monitor</dt><dd>'+r.provenance.distance_to_nearest_station_km+' km</dd>'+
+      '<dt></dt><dd style="color:var(--muted)">'+ns.name.split(',')[0]+'</dd>'+
+      (ns.observed_pm25_ugm3!==null
+        ? '<dt>Measured there</dt><dd>'+ns.observed_pm25_ugm3+'</dd>' : '');
     if(pin) map.removeLayer(pin);
     pin = L.marker([lat,lon]).addTo(map)
-      .bindPopup('<b>'+r.predicted_pm25_ugm3.toFixed(1)+' &micro;g/m&sup3;</b> ('+r.aqi_band+')<br>'+
-        '<span style="color:#898781">'+r.interval.coverage_pct+'% interval '+
-        r.interval.lower_ugm3.toFixed(0)+'–'+
-        r.interval.upper_ugm3.toFixed(0)+'</span>').openPopup();
+      .bindPopup('<b>'+r.predicted_pm25_ugm3.toFixed(1)+' &micro;g/m&sup3;</b> ('+
+        r.aqi_band+')').openPopup();
+    // A per-point warning, shown only when this particular cell is one the
+    // model has no information for.
+    if(r.training_range && r.training_range.materially_outside){
+      showCtx('<b>This cell is outside the training range.</b> '+
+        r.training_range.note+' Worst feature: '+r.training_range.worst_feature+'. '+
+        '<a href="/about.html#extrapolation" style="color:inherit">Why this matters &rarr;</a>');
+    }
   }catch(e){
     el('val').textContent = '—';
     setBand('no estimate', null);
-    el('interval').innerHTML='';
-    el('meta').innerHTML=''; el('err').textContent = e.message;
+    el('interval').innerHTML=''; el('meta').innerHTML='';
+    el('err').textContent = e.message;
   }
 }
 
-el('go').onclick = function(){
-  const lat=parseFloat(el('lat').value), lon=parseFloat(el('lon').value);
-  if(isNaN(lat)||isNaN(lon)){
-    el('err').textContent='Enter a latitude and longitude, or use your location.'; return; }
-  estimate(lat,lon);
+el('go').onclick = ()=>{
+  const lat = parseFloat(el('lat').value || '28.6139');
+  const lon = parseFloat(el('lon').value || '77.2090');
+  estimate(lat, lon);
 };
-el('loc').onclick = function(){
-  if(!navigator.geolocation){ el('err').textContent='This browser has no geolocation support.'; return; }
-  el('err').textContent='Locating…';
-  navigator.geolocation.getCurrentPosition(
-    function(p){ el('lat').value=p.coords.latitude.toFixed(4);
-                 el('lon').value=p.coords.longitude.toFixed(4);
-                 el('err').textContent=''; estimate(p.coords.latitude,p.coords.longitude); },
-    function(e){ el('err').textContent='Could not get your location: '+e.message; });
+el('loc').onclick = ()=>{
+  if(!navigator.geolocation){ el('err').textContent='Geolocation unavailable.'; return; }
+  navigator.geolocation.getCurrentPosition(p=>{
+    el('lat').value = p.coords.latitude.toFixed(4);
+    el('lon').value = p.coords.longitude.toFixed(4);
+    estimate(p.coords.latitude, p.coords.longitude);
+  }, ()=>{ el('err').textContent='Location permission denied.'; });
 };
-el('reload').onclick = loadGrid;
 el('date').onchange = loadGrid;
-map.on('click', function(e){
-  el('lat').value=e.latlng.lat.toFixed(4); el('lon').value=e.latlng.lng.toFixed(4);
+el('res').onchange = loadGrid;
+map.on('click', e=>{
+  el('lat').value = e.latlng.lat.toFixed(4);
+  el('lon').value = e.latlng.lng.toFixed(4);
   estimate(e.latlng.lat, e.latlng.lng);
 });
 
-// ---- download panel ----
-// Feature selection is a plain checkbox grid rather than a multi-select: a
-// researcher picking covariates needs to see the whole list at once.
-let DLCOLS = null;
-
+// ---- station download ----
 function chosenFeatures(){
-  return [...document.querySelectorAll('#featlist input:checked')].map(c => c.value);
+  return [...document.querySelectorAll('#featlist input:checked')].map(c=>c.value);
 }
-
 function downloadQuery(){
-  const q = new URLSearchParams({
+  return new URLSearchParams({
     date_from: el('dfrom').value, date_to: el('dto').value,
-    features: chosenFeatures().join(',') || 'none',
-  });
-  return q;
+    features: chosenFeatures().join(',') || 'none'});
 }
-
 async function refreshPreview(){
-  el('dprev').textContent = 'counting' + '\u2026';
-  try {
-    const p = await getJSON('/api/download/stations/preview?' + downloadQuery());
-    const size = el('dfmt').value === 'csv' ? p.estimated_size.csv_mb
-                                            : p.estimated_size.parquet_mb;
-    el('dprev').innerHTML = '<b>' + p.n_rows.toLocaleString() + '</b> rows &times; <b>' +
-      p.n_columns + '</b> columns, ' + p.n_stations + ' stations &middot; about <b>' +
-      (size < 0.01 ? '<0.01' : size.toFixed(2)) + ' MB</b>';
-  } catch (e) {
-    el('dprev').textContent = e.message;
-  }
+  try{
+    const p = await getJSON('/api/download/stations/preview?'+downloadQuery());
+    const size = el('dfmt').value==='csv' ? p.estimated_size.csv_mb
+                                          : p.estimated_size.parquet_mb;
+    el('dprev').innerHTML = '<b>'+p.n_rows.toLocaleString()+'</b> rows &times; '+
+      p.n_columns+' cols &middot; <b>'+(size<0.01?'<0.01':size.toFixed(2))+' MB</b>';
+  }catch(e){ el('dprev').textContent = e.message; }
 }
-
-// Debounced so ticking through a dozen checkboxes does not fire a dozen counts.
-let prevTimer = null;
-function queuePreview(){ clearTimeout(prevTimer); prevTimer = setTimeout(refreshPreview, 180); }
-
+let prevTimer=null;
+function queuePreview(){ clearTimeout(prevTimer); prevTimer=setTimeout(refreshPreview,180); }
 async function loadColumns(){
-  DLCOLS = await getJSON('/api/download/stations/columns');
-  const meanings = {};
-  DLCOLS.dictionary.forEach(d => { meanings[d.column] = d.meaning + ' [' + d.units + ']'; });
-  el('featlist').innerHTML = DLCOLS.selectable_features.map(f =>
-    '<label title="' + (meanings[f] || '').replace(/"/g, '&quot;') + '">' +
-    '<input type="checkbox" value="' + f + '" checked>' + f + '</label>').join('');
+  const c = await getJSON('/api/download/stations/columns');
+  const mean = {};
+  c.dictionary.forEach(d=>{ mean[d.column] = d.meaning+' ['+d.units+']'; });
+  el('featlist').innerHTML = c.selectable_features.map(f=>
+    '<label title="'+(mean[f]||'').replace(/"/g,'&quot;')+'">'+
+    '<input type="checkbox" value="'+f+'" checked>'+f+'</label>').join('');
   el('featlist').addEventListener('change', queuePreview);
-
-  const a = DLCOLS.always_included;
-  const cls = a.aod_provenance_classes;
-  el('always').innerHTML =
-    '<b>Always included</b>, whatever you select above: ' +
-    a.identifiers.join(', ') + '; <b>' + a.observed[0] + '</b> (the measured value); ' +
-    a.model.join(', ') + ' (the model estimate and its interval); and ' +
-    a.aod_provenance.join(', ') + '.' +
-    '<br><br>Those last two are not optional because ' + a.why_provenance_is_not_optional +
-    '. The three cases are: <b>MAIAC retrieval</b> ' + cls.maiac_observed +
-    '; <b>MERRA-2 calibrated</b> ' + cls.merra2_calibrated +
-    '; <b>no AOD available</b> ' + cls.unfillable + '.' +
-    '<br><br>' + cls.note;
 }
-
 el('dfmt').addEventListener('change', refreshPreview);
 el('dfrom').addEventListener('change', queuePreview);
 el('dto').addEventListener('change', queuePreview);
-el('fall').addEventListener('click', () => {
-  document.querySelectorAll('#featlist input').forEach(c => { c.checked = true; });
-  queuePreview();
-});
-el('fnone').addEventListener('click', () => {
-  document.querySelectorAll('#featlist input').forEach(c => { c.checked = false; });
-  queuePreview();
-});
-el('dgo').addEventListener('click', () => {
-  // Let the browser handle the attachment -- fetch would buffer it in memory
-  // and then need a blob URL for no gain.
-  window.location = '/api/download/stations?' + downloadQuery() +
-    '&format=' + el('dfmt').value;
+el('dgo').addEventListener('click', ()=>{
+  window.location = '/api/download/stations?'+downloadQuery()+'&format='+el('dfmt').value;
 });
 
 // ---- gridded download ----
 function gridFeatures(){
   return [...document.querySelectorAll('#gfeatlist input:checked')].map(c=>c.value);
 }
-
 function gridQuery(){
   const res = el('gres').value;
-  const q = new URLSearchParams({
-    resolution_km: res,
-    date_from: el('gfrom').value, date_to: el('gto').value,
-  });
-  // Features exist only at native resolution. Coarser grids are areal means
-  // and deliberately carry none -- see the note the API returns.
-  if(res === '1') q.set('features', gridFeatures().join(',') || 'none');
+  const q = new URLSearchParams({resolution_km:res,
+    date_from: el('gfrom').value, date_to: el('gto').value});
+  // Features exist only at native resolution; coarser grids are areal means
+  // and deliberately carry none.
+  if(res==='1') q.set('features', gridFeatures().join(',') || 'none');
   return q;
 }
-
 async function refreshGridPreview(){
-  el('gprev').textContent = 'counting' + '\u2026';
-  try {
-    const p = await getJSON('/api/download/grid/preview?' + gridQuery());
-    const size = el('gfmt').value === 'csv' ? p.estimated_size.csv_mb
-                                            : p.estimated_size.parquet_mb;
-    el('gprev').innerHTML = '<b>' + p.n_rows.toLocaleString() + '</b> rows &times; <b>' +
-      p.n_columns + '</b> columns, ' + p.n_cells.toLocaleString() +
-      ' cells &middot; about <b>' +
-      (size < 0.01 ? '<0.01' : size.toFixed(2)) + ' MB</b>';
-  } catch(e){ el('gprev').textContent = e.message; }
+  try{
+    const p = await getJSON('/api/download/grid/preview?'+gridQuery());
+    const size = el('gfmt').value==='csv' ? p.estimated_size.csv_mb
+                                          : p.estimated_size.parquet_mb;
+    el('gprev').innerHTML = '<b>'+p.n_rows.toLocaleString()+'</b> rows &times; '+
+      p.n_columns+' cols &middot; <b>'+(size<0.01?'<0.01':size.toFixed(2))+' MB</b>';
+  }catch(e){ el('gprev').textContent = e.message; }
 }
-
-let gridTimer = null;
-function queueGridPreview(){
-  clearTimeout(gridTimer); gridTimer = setTimeout(refreshGridPreview, 180);
-}
-
+let gridTimer=null;
+function queueGridPreview(){ clearTimeout(gridTimer); gridTimer=setTimeout(refreshGridPreview,180); }
 async function loadGridColumns(){
   const res = el('gres').value;
-  const c = await getJSON('/api/download/grid/columns?resolution_km=' + res);
-  const meanings = {};
-  c.dictionary.forEach(d => { meanings[d.column] = d.meaning + ' [' + d.units + ']'; });
-
+  const c = await getJSON('/api/download/grid/columns?resolution_km='+res);
   if(c.selectable_features.length){
-    el('gfeatwrap').style.display = '';
-    el('gfeatlist').innerHTML = c.selectable_features.map(f =>
-      '<label title="' + (meanings[f] || '').replace(/"/g,'&quot;') + '">' +
-      '<input type="checkbox" value="' + f + '" checked>' + f + '</label>').join('');
+    el('gfeatwrap').style.display='';
+    const mean={};
+    c.dictionary.forEach(d=>{ mean[d.column]=d.meaning+' ['+d.units+']'; });
+    el('gfeatlist').innerHTML = c.selectable_features.map(f=>
+      '<label title="'+(mean[f]||'').replace(/"/g,'&quot;')+'">'+
+      '<input type="checkbox" value="'+f+'" checked>'+f+'</label>').join('');
     el('gfeatlist').addEventListener('change', queueGridPreview);
+    el('gnote').innerHTML = 'Re-running the model on these features reproduces the '+
+      'estimate exactly.';
   } else {
-    el('gfeatwrap').style.display = 'none';
-  }
-
-  const a = c.always_included;
-  let note = '<b>Always included:</b> ' + a.identifiers.join(', ') + '; ' +
-    a.model.join(', ') + '; ' + a.provenance.join(', ') + '.';
-  if(a.extrapolation) note += ' Plus ' + a.extrapolation.join(', ') + '.';
-  if(a.aggregation) note += ' Plus ' + a.aggregation.join(', ') + '.';
-  note += '<br><br>' + c.features_note;
-  if(c.interval_note){
+    el('gfeatwrap').style.display='none';
     const sh = c.interval_shrinkage;
-    note += '<br><br><b style="color:#E93F33">' + c.interval_note + '.</b> ' +
-      'This cell averages up to ' + (res*res) + ' one-kilometre predictions, so its ' +
-      'interval is ' + (sh.full_block*100).toFixed(0) + '% of the 1&nbsp;km width. ' +
-      'That makes it a sharper estimate of the average across ' + (res*res) +
-      '&nbsp;km&sup2; &mdash; not a sharper estimate for any street inside it. ' +
-      'The shrinkage rests on a measured error correlation of ' +
-      sh.rho.toFixed(3) + ' (95% CI ' + sh.rho_ci[0].toFixed(3) + '&ndash;' +
-      sh.rho_ci[1].toFixed(3) + '), which would give ' +
-      (sh.at_rho_ci_low*100).toFixed(0) + '&ndash;' + (sh.at_rho_ci_high*100).toFixed(0) +
-      '% instead; both bounds ship in the file.';
+    el('gnote').innerHTML = '<b>Areal means.</b> No features, and the interval '+
+      '(&plusmn;'+(sh.full_block*55).toFixed(0)+'%) describes the average over the '+
+      'cell, not any point in it. <a class="about" href="/about.html#aggregation">Why'+
+      ' &rarr;</a>';
   }
-  el('gnote').innerHTML = note;
 }
-
-el('gres').addEventListener('change', async () => {
-  await loadGridColumns(); refreshGridPreview();
-});
+el('gres').addEventListener('change', async()=>{ await loadGridColumns(); refreshGridPreview(); });
 el('gfmt').addEventListener('change', refreshGridPreview);
 el('gfrom').addEventListener('change', queueGridPreview);
 el('gto').addEventListener('change', queueGridPreview);
-el('gall').addEventListener('click', () => {
-  document.querySelectorAll('#gfeatlist input').forEach(c=>{c.checked=true;});
-  queueGridPreview();
-});
-el('gnone').addEventListener('click', () => {
-  document.querySelectorAll('#gfeatlist input').forEach(c=>{c.checked=false;});
-  queueGridPreview();
-});
-el('ggo').addEventListener('click', () => {
-  window.location = '/api/download/grid?' + gridQuery() + '&format=' + el('gfmt').value;
+el('ggo').addEventListener('click', ()=>{
+  window.location = '/api/download/grid?'+gridQuery()+'&format='+el('gfmt').value;
 });
 
 (async function(){
@@ -602,7 +501,6 @@ el('ggo').addEventListener('click', () => {
   await loadColumns(); await refreshPreview();
   await loadGridColumns(); await refreshGridPreview();
 })()
-  .catch(function(e){ el('err').textContent = 'Startup failed: '+e.message; });
 </script>
 </body>
 </html>

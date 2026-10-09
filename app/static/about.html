@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>About the Delhi PM2.5 data</title>
+<style>
+:root{
+  color-scheme: light;
+  --surface:#fcfcfb; --plane:#f9f9f7;
+  --ink:#0b0b0b; --ink2:#52514e; --muted:#898781;
+  --grid:#e1e0d9; --axis:#c3c2b7; --border:rgba(11,11,11,0.10);
+  --warn-bg:#fff8e6; --warn-ink:#6b4e00; --warn-line:#e8c766;
+  --accent:#2a78d6;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    color-scheme: dark;
+    --surface:#1a1a19; --plane:#0d0d0d;
+    --ink:#ffffff; --ink2:#c3c2b7; --muted:#898781;
+    --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,0.10);
+    --warn-bg:#2a2412; --warn-ink:#f0d48a; --warn-line:#6b5a22;
+  }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--plane);color:var(--ink);
+  font:15px/1.65 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:760px;margin:0 auto;padding:24px 20px 72px}
+a{color:var(--accent)}
+h1{font-size:23px;margin:0 0 4px;letter-spacing:-0.01em}
+h2{font-size:17px;margin:34px 0 8px;letter-spacing:-0.01em;
+  padding-top:16px;border-top:1px solid var(--grid)}
+h2:first-of-type{border-top:none;padding-top:0}
+h3{font-size:14px;margin:20px 0 6px;color:var(--ink2)}
+p{margin:0 0 12px}
+.lede{color:var(--ink2);margin-bottom:22px}
+.back{display:inline-block;margin-bottom:20px;font-size:13.5px;text-decoration:none}
+.back:hover{text-decoration:underline}
+.callout{background:var(--warn-bg);color:var(--warn-ink);border:1px solid var(--warn-line);
+  border-radius:9px;padding:13px 15px;margin:16px 0;font-size:14px}
+.callout b{font-weight:650}
+table{border-collapse:collapse;width:100%;font-size:13.5px;margin:12px 0}
+th,td{text-align:left;padding:5px 8px;border-bottom:1px solid var(--grid)}
+th{color:var(--muted);font-weight:600}
+td.num{text-align:right;font-variant-numeric:tabular-nums}
+code{font:13px ui-monospace,SFMono-Regular,Menlo,monospace;
+  background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:1px 5px}
+ul{margin:0 0 12px;padding-left:20px}
+li{margin-bottom:5px}
+.nav{font-size:13.5px;background:var(--surface);border:1px solid var(--border);
+  border-radius:9px;padding:12px 16px;margin-bottom:26px}
+.nav a{display:inline-block;margin-right:14px;white-space:nowrap}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="/">&larr; Back to the map</a>
+  <h1>About this data</h1>
+  <p class="lede">What the numbers are, how they were checked, and where they should
+    not be trusted.</p>
+
+  <div class="nav">
+    <a href="#what">What it is</a>
+    <a href="#validation">Validation</a>
+    <a href="#interval">The interval</a>
+    <a href="#extrapolation">Extrapolation</a>
+    <a href="#aggregation">Coarser grids</a>
+    <a href="#aod">AOD provenance</a>
+    <a href="#sources">Sources &amp; citation</a>
+  </div>
+
+  <h2 id="what">What this is</h2>
+  <p>A machine-learning model (LightGBM) that estimates daily mean PM2.5 anywhere in
+    Delhi from satellite and meteorological inputs, trained against 42 CPCB ground
+    monitors. The study window is 2025-03-01 to 2026-02-28.</p>
+  <p>Estimates are produced on a <b>1&nbsp;km grid of 2,388 cells</b>. Each cell's value
+    comes from its own aerosol optical depth, meteorology, vegetation and land cover —
+    it is not interpolated from nearby monitors.</p>
+
+  <div class="callout">
+    <b>This is retrospective, not live.</b> It cannot report current air quality. Its
+    inputs are ERA5 reanalysis (about five days behind) and MAIAC satellite AOD (one to
+    three days). It exists to reconstruct the past for research, not to tell you whether
+    to go outside today.
+  </div>
+
+  <h2 id="validation">How it was validated</h2>
+  <p>Performance is measured by <b>spatial leave-one-station-out</b> cross-validation:
+    each station is held out in turn, along with any other station within 2&nbsp;km, and
+    predicted by a model that never saw it. That simulates the real task — estimating
+    somewhere with no monitor.</p>
+  <table>
+    <tr><th>Metric</th><th class="num">Spatial LOSO</th><th class="num">Random CV</th></tr>
+    <tr><td>R&sup2;</td><td class="num">0.8018</td><td class="num">0.8830</td></tr>
+    <tr><td>Within-R&sup2;</td><td class="num">0.7156</td><td class="num">0.7762</td></tr>
+    <tr><td>RMSE &micro;g/m&sup3;</td><td class="num">33.84</td><td class="num">26.00</td></tr>
+    <tr><td>MAE &micro;g/m&sup3;</td><td class="num">20.79</td><td class="num">14.85</td></tr>
+  </table>
+  <p>The random-CV column is deliberately included as a warning: it is the number a
+    naive validation would report, and it is inflated by about 0.08 R&sup2; because
+    held-out days leak information about their own station. <b>0.8018 is the honest
+    figure.</b></p>
+
+  <h3>Is the grid itself trustworthy?</h3>
+  <p>Grid cells have no ground truth, so the pipeline was checked a different way: does
+    the cell <i>containing</i> a station predict what the station predicts? Across 13,595
+    station-days the correlation is <b>0.9901</b> with a median difference of
+    <b>&minus;0.11&nbsp;&micro;g/m&sup3;</b>. The near-zero bias is the meaningful part —
+    a mis-joined feature or shifted date would show up as a systematic offset.</p>
+
+  <h2 id="interval">What the interval means</h2>
+  <p>Every estimate carries a 90% prediction interval of roughly
+    <b>&plusmn;55%</b>, produced by normalized conformal prediction:
+    <code>interval = prediction &times; (1 &plusmn; 0.5497)</code>. The factor is
+    calibrated on out-of-fold errors at stations the model never trained on.</p>
+  <p>It is multiplicative because the error is: the <i>relative</i> error is roughly
+    stable across the concentration range while the absolute error is not. A Gaussian
+    &plusmn;1.645&times;RMSE interval was rejected — the residuals have kurtosis 17.6, so
+    it would be far too wide mid-range and too narrow in the tail, which for air quality
+    is the worse failure.</p>
+
+  <div class="callout">
+    <b>Coverage is marginal, not conditional.</b> The interval is right about 90% of the
+    time <i>on average across all predictions</i> — not at every location. Measured per
+    station it ranges from <b>72.0% to 99.1%</b>, with 18 of 42 stations below the 90%
+    target. The under-covered ones are where column AOD tracks surface PM2.5 weakly, a
+    property that cannot be computed for an unmonitored location. Widening the interval
+    enough to protect the worst station would need &plusmn;105%, nearly doubling every
+    estimate's range.
+  </div>
+
+  <h3>What is <i>not</i> used as a confidence measure</h3>
+  <p>Distance to the nearest monitor is reported, but it is <b>not</b> a confidence
+    grade. An earlier version of this app graded confidence by distance; that was tested
+    against actual per-fold error and found unsupported (r&nbsp;=&nbsp;0.149,
+    p&nbsp;=&nbsp;0.33, n&nbsp;=&nbsp;42) and removed. Distance still limits <i>scope</i>
+    — nothing is served beyond 15&nbsp;km from a monitor — because the absence of a
+    correlation across the 0.67–10.6&nbsp;km the network spans does not license unlimited
+    extrapolation.</p>
+
+  <h2 id="extrapolation">Where the model is guessing</h2>
+  <p>Every CPCB monitor is urban. Rural cells therefore sit outside anything the model
+    was trained on — not by oversight, but by construction. <b>585 of 2,388 cells</b> are
+    materially outside the training range, and 93 are more than a full training-range
+    width beyond it.</p>
+  <p>Those cells are drawn with <b>red hatching</b> on the map. Two things are wrong
+    there, and both matter:</p>
+  <ul>
+    <li><b>LightGBM cannot extrapolate.</b> A tree fitted on cropland up to 78% has no
+      split above 78%, so a 97%-cropland cell silently receives the boundary
+      prediction.</li>
+    <li><b>The interval was never validated there.</b> Its 90% coverage was measured at
+      42 urban stations; it is not evidence about farmland.</li>
+  </ul>
+  <p>The intervals are deliberately <b>not</b> widened for these cells. Whether being
+    unusual predicts worse coverage was tested against the stations' measured coverage:
+    one of four checks passed, and that one was driven entirely by a single station
+    sitting 102 range-widths out. Any widening factor would therefore have been invented,
+    and an invented correction that looks rigorous is worse than an honest flag.</p>
+
+  <h2 id="aggregation">Coarser grids, and the trap in them</h2>
+  <p>The 2, 5 and 10&nbsp;km products are averages of 1&nbsp;km cells. Their intervals
+    are narrower, because averaging cancels some error:</p>
+  <table>
+    <tr><th>Resolution</th><th class="num">Cells averaged</th><th class="num">Interval</th></tr>
+    <tr><td>1 km</td><td class="num">1</td><td class="num">&plusmn;55.0%</td></tr>
+    <tr><td>2 km</td><td class="num">4</td><td class="num">&plusmn;29.5%</td></tr>
+    <tr><td>5 km</td><td class="num">25</td><td class="num">&plusmn;16.3%</td></tr>
+    <tr><td>10 km</td><td class="num">100</td><td class="num">&plusmn;13.4%</td></tr>
+  </table>
+
+  <div class="callout">
+    <b>A narrower interval does not mean better data for your street.</b> It describes the
+    <i>average over the whole cell</i>. One real 5&nbsp;km cell reports
+    282.9&nbsp;&micro;g/m&sup3; with an interval of 237–329, while the 25 one-kilometre
+    cells inside it range from <b>201 to 327</b> — the lowest falls outside the coarse
+    interval entirely. For a specific location, use 1&nbsp;km and accept its wider range.
+  </div>
+
+  <p>How much the interval may shrink is measured, not assumed. It depends on
+    &rho;, the same-day correlation between two locations' prediction errors, measured
+    across all 861 station pairs: <b>&rho; = 0.050</b>, bootstrap 95% CI
+    [0.022, 0.085]. Both bounds ship in every coarse download so the uncertainty in the
+    shrinkage is visible.</p>
+  <p>&rho; does not decay with distance (p&nbsp;=&nbsp;0.62), which means it is a
+    <i>whole-day</i> effect rather than a local one — on 2025-05-22, 35 of 38 stations
+    erred in the same direction by an average of 29%. Such an error cannot be averaged
+    away, so the benefit of aggregating has a floor at &radic;&rho; &asymp; 0.22.
+    <b>Beyond about 5&nbsp;km, coarser cells buy almost no extra precision</b> — they are
+    worth using for smaller files, not better numbers.</p>
+  <p>Coarse products ship <b>no features</b>, deliberately. The model is nonlinear, so
+    the model applied to averaged features does not equal the average of its predictions.
+    Supplying both would invite a reproduction attempt that cannot succeed. For features,
+    use the 1&nbsp;km product — re-running the model on those reproduces the estimate
+    exactly.</p>
+
+  <h2 id="aod">The AOD column has three meanings</h2>
+  <p>In the station and 1&nbsp;km downloads, <code>aod_gap_filled</code> means "not a
+    MAIAC retrieval" — <i>not</i> "a value was imputed". There are three cases:</p>
+  <table>
+    <tr><th>Case</th><th>Condition</th><th class="num">Share</th></tr>
+    <tr><td>MAIAC retrieval</td><td><code>aod_gap_filled = 0</code></td><td class="num">51.4%</td></tr>
+    <tr><td>MERRA-2 calibrated</td><td><code>= 1</code>, <code>aod_055</code> present</td><td class="num">47.9%</td></tr>
+    <tr><td>No AOD available</td><td><code>= 1</code>, <code>aod_055</code> null</td><td class="num">0.7%</td></tr>
+  </table>
+  <p>Filter on <b>both</b> columns, not the flag alone. This matters because AOD–PM2.5
+    coupling is roughly half as strong on gap-filled rows (r&nbsp;=&nbsp;0.296) as on
+    retrieved ones (r&nbsp;=&nbsp;0.516).</p>
+
+  <h2 id="sources">Sources and citation</h2>
+  <ul>
+    <li><b>PM2.5 ground truth</b> — CPCB, via OpenAQ</li>
+    <li><b>Aerosol optical depth</b> — MODIS MAIAC (MCD19A2), NASA</li>
+    <li><b>AOD gap-fill</b> — MERRA-2, NASA GMAO</li>
+    <li><b>Meteorology</b> — ERA5-Land and ERA5, Copernicus Climate Change Service / ECMWF</li>
+    <li><b>Vegetation</b> — Sentinel-2, Copernicus</li>
+    <li><b>Land cover</b> — ESA WorldCover v200 (2021)</li>
+    <li><b>Terrain</b> — SRTM, NASA / USGS</li>
+    <li><b>Roads, industrial land use, power plants</b> — &copy; OpenStreetMap contributors, ODbL</li>
+  </ul>
+  <p>This dataset is free to use for research and educational purposes with attribution.</p>
+  <p>Please cite: Muhammed Fiyas, &ldquo;Delhi PM2.5 satellite-ground calibration&rdquo;,
+    2026.</p>
+
+  <p style="margin-top:28px"><a class="back" href="/">&larr; Back to the map</a></p>
+</div>
+</body>
+</html>

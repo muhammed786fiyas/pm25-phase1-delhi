@@ -548,6 +548,66 @@ def station_predictions_for_date(date):
     return out.dropna(subset=["latitude", "longitude"])
 
 
+def coarse_grid_response(date, resolution_km):
+    # Coarse cells are areal means of the 1 km grid. Their interval is narrower,
+    # and the response says plainly what that narrower interval refers to --
+    # the average over the cell, not any point in it. A viewer switching
+    # resolution sees the number tighten, so the caveat has to arrive with it.
+    frame = STATE["grid_download_coarse"].get(resolution_km)
+    if frame is None:
+        return JSONResponse(status_code=503, content={
+            "error": "resolution_unavailable",
+            "message": f"No aggregated grid at {resolution_km} km."})
+    day = frame[frame[DATE_COL] == date]
+    if len(day) == 0:
+        return JSONResponse(status_code=503, content={"error": "no_rows_for_date"})
+
+    out = []
+    for row in day.itertuples(index=False):
+        value = float(row.pm25_predicted_ugm3)
+        out.append({
+            "lat": round(float(row.latitude), 5),
+            "lon": round(float(row.longitude), 5),
+            "pm25_ugm3": round(value, 1),
+            "aqi_band": aqi_band(value),
+            "interval_lower_ugm3": round(float(row.pm25_lower_90_ugm3), 1),
+            "interval_upper_ugm3": round(float(row.pm25_upper_90_ugm3), 1),
+            "nearest_station_km": round(float(row.dist_to_nearest_station_km), 2),
+            "beyond_largest_validated_gap": bool(
+                row.dist_to_nearest_station_km > VALIDATED_GAP_KM),
+            # A coarse cell is rarely all-or-nothing, so this is the SHARE of
+            # its 1 km cells that are extrapolating rather than a flag.
+            "outside_training_range": bool(row.fraction_outside_training_range > 0.5),
+            "fraction_outside_training_range": round(
+                float(row.fraction_outside_training_range), 2),
+            "n_cells_averaged": int(row.n_cells_averaged),
+        })
+
+    agg = STATE["aggregation"]
+    level = next((x for x in agg["levels"] if x["grid_km"] == resolution_km), None)
+    shrink = level["shrinkage_full_block"] if level else 1.0
+    base_q = STATE["conformal"]["levels"][SERVED_COVERAGE_LEVEL]["q"]
+    return {
+        "date": date,
+        "grid_km": resolution_km,
+        "n_cells": len(out),
+        "lat_step": round(STATE["grid_lat_step"] * resolution_km, 6),
+        "lon_step": round(STATE["grid_lon_step"] * resolution_km, 6),
+        "interval_coverage_pct": int(SERVED_COVERAGE_LEVEL),
+        "interval_pct_of_prediction": round(100 * base_q * shrink, 1),
+        "n_cells_outside_training_range": sum(
+            1 for c in out if c["outside_training_range"]),
+        "method": "areal_mean_of_1km_cells",
+        "areal_mean_warning": (
+            f"Each cell is the MEAN of up to {resolution_km * resolution_km} "
+            f"one-kilometre predictions. Its interval is narrower "
+            f"(+/-{100 * base_q * shrink:.0f}% against +/-{100 * base_q:.0f}% at "
+            f"1 km) because it describes the average across the cell -- not any "
+            f"point inside it. For a specific location use 1 km."),
+        "cells": out,
+    }
+
+
 def nearest_station_record(lat, lon, date):
     # Context only: what the closest monitor actually measured that day. Useful
     # for judging an estimate against ground truth; never the estimate itself.
@@ -775,12 +835,20 @@ def predict(lat: float, lon: float, date: str):
 
 
 @app.get("/api/grid")
-def grid(date: str):
+def grid(date: str, resolution_km: int = 1):
     if date not in STATE["grid_by_date"]:
         return JSONResponse(status_code=422, content={
             "error": "date_out_of_window",
             "message": (f"This model covers {STATE['dates'][0]} to {STATE['dates'][-1]}."),
         })
+
+    if resolution_km not in GRID_RESOLUTIONS:
+        return JSONResponse(status_code=422, content={
+            "error": "bad_resolution",
+            "message": f"resolution_km must be one of {GRID_RESOLUTIONS}"})
+
+    if resolution_km > 1:
+        return coarse_grid_response(date, resolution_km)
 
     day = STATE["grid_by_date"].get(date)
     if day is None or len(day) == 0:
@@ -1305,6 +1373,15 @@ def main():
     @app.get("/")
     def index():
         return FileResponse(os.path.join(static_dir, "index.html"))
+
+    # Served at the bare path so the link from the map is just /about.html.
+    # The detail that used to crowd the main screen lives here: validation,
+    # what the interval does and does not promise, where the model is
+    # extrapolating, and why a coarse cell's narrower interval is not a better
+    # number for a single location.
+    @app.get("/about.html")
+    def about():
+        return FileResponse(os.path.join(static_dir, "about.html"))
 
     import uvicorn
     print(f"Serving on http://{args.host}:{args.port}")
